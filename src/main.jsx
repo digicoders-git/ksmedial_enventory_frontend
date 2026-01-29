@@ -49,6 +49,7 @@ import '@fontsource/playfair-display/700.css';
 
 import { InventoryProvider } from './context/InventoryContext'
 import { AuthProvider } from './context/AuthContext'
+import { NotificationProvider } from './context/NotificationContext'
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -56,11 +57,14 @@ createRoot(document.getElementById('root')).render(
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <InventoryProvider>
-            <App />
-          </InventoryProvider>
+          <NotificationProvider>
+            <InventoryProvider>
+              <App />
+            </InventoryProvider>
+          </NotificationProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
   </StrictMode>,
 )
+

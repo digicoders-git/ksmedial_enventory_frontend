@@ -6,7 +6,7 @@ import { useInventory } from '../../context/InventoryContext';
 
 const MedicineMaster = () => {
   const navigate = useNavigate();
-  const { addMedicine, generateSKU } = useInventory();
+  const { addMedicine, generateSKU, fetchInventory } = useInventory();
   const location = useLocation();
   const editData = location.state?.medicine;
   const mode = location.state?.mode;
@@ -54,6 +54,9 @@ const MedicineMaster = () => {
         purchasePrice: editData.rate || '',
         sellingPrice: editData.mrp || ''
       });
+      if (editData.image) {
+          setImagePreview(editData.image);
+      }
     } else {
       // Auto-generate SKU for new medicine
       setFormData(prev => ({
@@ -110,7 +113,8 @@ const MedicineMaster = () => {
         status: formData.status,
         isPrescriptionRequired: formData.isPrescriptionRequired,
         batchNumber: editData?.batch || 'N/A', // Using existing or default if new
-        expiryDate: editData?.expiry || 'N/A'     // Using existing or default if new
+        expiryDate: editData?.expiry || 'N/A',     // Using existing or default if new
+        image: imagePreview // Send Base64 image
       };
 
       const url = isEditMode ? `${apiBase}/products/${editData.id}` : `${apiBase}/products`;
@@ -128,6 +132,7 @@ const MedicineMaster = () => {
       const data = await response.json();
 
       if (data.success) {
+        await fetchInventory(); // Refresh context data
         Swal.fire({
           icon: 'success',
           title: 'Success!',

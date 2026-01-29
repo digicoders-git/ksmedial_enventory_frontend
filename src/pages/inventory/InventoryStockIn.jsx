@@ -7,7 +7,7 @@ import api from '../../api/axios';
 
 const InventoryStockIn = () => {
   const navigate = useNavigate();
-  const { inventory, suppliers } = useInventory();
+  const { inventory, suppliers, addSupplier } = useInventory();
   
   // Invoice Header State
   const [invoiceDetails, setInvoiceDetails] = useState({
@@ -54,6 +54,31 @@ const InventoryStockIn = () => {
            freeQty: 0,
            expiryDate: '' 
        }));
+  };
+
+  const handleAddSupplier = async () => {
+    const { value: name } = await Swal.fire({
+      title: 'New Supplier',
+      input: 'text',
+      inputLabel: 'Supplier Name',
+      showCancelButton: true,
+      inputPlaceholder: 'Enter supplier name'
+    });
+
+    if (name) {
+      const res = await addSupplier({ 
+        name, 
+        contactPerson: 'Manager', 
+        phone: '9999999999', 
+        email: 'supplier@example.com', 
+        address: 'Local' 
+      });
+      if (res.success) {
+        Swal.fire('Success', 'Supplier added', 'success');
+      } else {
+        Swal.fire('Error', res.message, 'error');
+      }
+    }
   };
 
   const handleInvoiceChange = (e) => {
@@ -153,6 +178,8 @@ const InventoryStockIn = () => {
               items: cart.map(item => ({
                   productId: item.medicineId,
                   name: item.name,
+                  batchNumber: item.batchNo,
+                  expiryDate: item.expiryDate || null, // Handle empty date
                   quantity: parseInt(item.quantity) + parseInt(item.freeQty || 0), // Total qty
                   purchasePrice: parseFloat(item.purchaseRate),
                   amount: item.total
@@ -161,7 +188,7 @@ const InventoryStockIn = () => {
               taxAmount: 0, // Not calculated in frontend currently
               discount: 0,
               grandTotal: invoiceTotal,
-              paymentStatus: 'Unpaid', // Default
+              paymentStatus: 'Pending', // Match backend enum (Paid, Pending, Partial)
               paymentMethod: 'Cash', // Default
               notes: 'Created from Stock In'
           };
@@ -182,7 +209,7 @@ const InventoryStockIn = () => {
           }
       } catch (error) {
           console.error(error);
-          Swal.fire('Error', 'Failed to save purchase transaction', 'error');
+          Swal.fire('Error', error.response?.data?.message || 'Failed to save purchase transaction', 'error');
       }
   };
 
@@ -239,15 +266,20 @@ const InventoryStockIn = () => {
              <div className="space-y-3">
                 <div className="space-y-1">
                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Supplier</label>
-                   <select 
-                     name="supplierId"
-                     value={invoiceDetails.supplierId}
-                     onChange={handleInvoiceChange}
-                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none text-sm text-gray-800 dark:text-gray-100"
-                   >
-                      <option value="">Select Supplier</option>
-                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                   </select>
+                   <div className="flex gap-2">
+                       <select 
+                         name="supplierId"
+                         value={invoiceDetails.supplierId}
+                         onChange={handleInvoiceChange}
+                         className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none text-sm text-gray-800 dark:text-gray-100"
+                       >
+                          <option value="">Select Supplier</option>
+                          {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                       </select>
+                       <button onClick={handleAddSupplier} className="px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-900/30">
+                            <Plus size={18} />
+                       </button>
+                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">

@@ -34,7 +34,9 @@ import ViewSalesReturn from './pages/sales/ViewSalesReturn';
 import SalesReturn from './pages/sales/SalesReturn';
 import SupplierList from './pages/purchase/SupplierList';
 import PurchaseInvoices from './pages/purchase/PurchaseInvoices';
+import ViewPurchaseInvoice from './pages/purchase/ViewPurchaseInvoice';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
+import ViewPurchaseReturn from './pages/purchase/ViewPurchaseReturn';
 import CustomerList from './pages/people/CustomerList';
 import DoctorList from './pages/people/DoctorList';
 import DoctorForm from './pages/people/DoctorForm';
@@ -43,8 +45,11 @@ import DoctorDetails from './pages/people/DoctorDetails';
 // Reports
 import GroupWiseReport from './pages/reports/GroupWiseReport';
 import InventoryReport from './pages/reports/InventoryReport';
+import ViewInventoryReport from './pages/reports/ViewInventoryReport';
 import SalesReport from './pages/reports/SalesReport';
+import ViewSalesReport from './pages/reports/ViewSalesReport';
 import ProfitReport from './pages/reports/ProfitReport';
+import ViewProfitReport from './pages/reports/ViewProfitReport';
 
 // Config Pages
 import GeneralSettings from './pages/config/GeneralSettings';
@@ -120,6 +125,7 @@ function App() {
           <Route path="purchase/suppliers" element={<SupplierList />} />
           <Route path="purchase/invoices" element={<PurchaseInvoices />} />
           <Route path="purchase/return" element={<PurchaseReturn />} />
+          <Route path="purchase/return/view/:id" element={<ViewPurchaseReturn />} />
 
           {/* =======================
               6. CUSTOMERS ROUTES 
@@ -134,8 +140,11 @@ function App() {
               7. REPORTS ROUTES 
              ======================= */}
           <Route path="reports/inventory" element={<InventoryReport />} />
+          <Route path="reports/inventory/view" element={<ViewInventoryReport />} />
           <Route path="reports/sales" element={<SalesReport />} />
+          <Route path="reports/sales/view" element={<ViewSalesReport />} />
           <Route path="reports/profit" element={<ProfitReport />} />
+          <Route path="reports/profit/view" element={<ViewProfitReport />} />
           <Route path="reports/groups" element={<GroupWiseReport />} />
 
            {/* =======================
@@ -162,6 +171,7 @@ function App() {
 
         {/* Standalone Pages (No Layout) */}
         <Route path="/sales/invoices/view/:id" element={<ViewInvoice />} />
+        <Route path="/purchase/invoices/view/:id" element={<ViewPurchaseInvoice />} />
         <Route path="/sales/return/view/:id" element={<ViewSalesReturn />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

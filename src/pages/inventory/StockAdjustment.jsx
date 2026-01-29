@@ -65,13 +65,14 @@ const StockAdjustment = () => {
       showCancelButton: true,
       confirmButtonText: 'Yes, Adjust',
       confirmButtonColor: formData.adjustmentType === 'add' ? '#10B981' : '#EF4444'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        const adjustmentResult = adjustStock(
+        const adjustmentResult = await adjustStock(
             selectedProduct.id, 
             formData.adjustmentType, 
             qty, 
-            formData.reason
+            formData.reason,
+            formData.note
         );
 
         if (adjustmentResult.success) {
@@ -308,7 +309,7 @@ const StockAdjustment = () => {
               <h3 className="font-bold text-gray-800 dark:text-white mb-4">Recent Adjustments</h3>
                <div className="space-y-4">
                   {transactions
-                    .filter(tx => tx.type === 'IN' || tx.type === 'OUT')
+                    .filter(tx => (tx.type === 'IN' || tx.type === 'OUT') && tx.reason !== 'Sale')
                     .slice(0, 5)
                     .map((tx, idx) => (
                     <div key={tx.id || idx} className="flex items-start gap-3 pb-3 border-b border-gray-50 dark:border-gray-700 last:border-0 last:pb-0">

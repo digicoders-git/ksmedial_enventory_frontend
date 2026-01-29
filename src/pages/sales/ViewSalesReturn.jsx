@@ -4,6 +4,8 @@ import { MapPin, Phone, Mail, Printer, ArrowLeft, Download } from 'lucide-react'
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import KS2Logo from '/KS2-Logo.png'; 
+import api from '../../api/axios';
+import Swal from 'sweetalert2';
 
 const ViewSalesReturn = () => {
   const { id } = useParams();
@@ -101,12 +103,12 @@ const ViewSalesReturn = () => {
         doc.text(reasonText, pageWidth - 14 - (reasonWidth/2), reasonY + 1.5, { align: 'center' });
 
         // Items Table
-        const tableColumn = ["#", "Item Name", "Ret Qty", "Rate", "Tax", "Total"];
+        const tableColumn = ["#", "Item Name", "Rate", "Ret Qty", "Tax", "Total"];
         const tableRows = returnNote.items.map((item, index) => [
             index + 1,
             item.name,
-            item.qty,
             `Rs. ${item.rate.toFixed(2)}`,
+            item.qty,
             `${item.tax}%`,
             `Rs. ${(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}`
         ]);
@@ -116,12 +118,13 @@ const ViewSalesReturn = () => {
             head: [tableColumn],
             body: tableRows,
             theme: 'striped',
-            headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
+            headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', halign: 'center' },
             bodyStyles: { fontSize: 9 },
             columnStyles: {
-                0: { halign: 'center' },
-                2: { halign: 'center' },
-                3: { halign: 'right' },
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'left' },
+                2: { halign: 'right' },
+                3: { halign: 'center' },
                 4: { halign: 'right' },
                 5: { halign: 'right' },
             },
@@ -188,26 +191,43 @@ const ViewSalesReturn = () => {
   };
 
   useEffect(() => {
-    // Mock Fetch - Simulate fetching return data
-    setTimeout(() => {
-        setReturnNote({
-            id: id || 'RET-2024-001',
-            date: '2024-01-28',
-            originalInvoiceId: 'INV-2024-001',
-            customer: 'Rahul Sharma',
-            contact: '+91 98765 43210',
-            address: 'Sector 45, Near City Hospital, Mumbai, Maharashtra - 400001',
-            reason: 'Expired Medicine',
-            status: 'Refunded',
-            items: [
-                { name: 'Dolo 650mg Tablet', qty: 2, rate: 30, tax: 18 },
-                { name: 'Azithral 500mg', qty: 1, rate: 120, tax: 18 },
-            ],
-            subtotal: 180,
-            taxAmount: 32.4,
-            refundAmount: 212.4
-        });
-    }, 500);
+    const fetchReturnData = async () => {
+        try {
+            const { data } = await api.get(`/sales/returns/${id}`);
+            if (data.success) {
+                const ret = data.saleReturn;
+                const sale = ret.saleId;
+                
+                // Populate returnNote with real data
+                setReturnNote({
+                    id: ret.returnNumber,
+                    dbId: ret._id,
+                    date: new Date(ret.createdAt).toLocaleDateString(),
+                    originalInvoiceId: ret.invoiceNumber,
+                    customer: ret.customerName || 'Walk-in',
+                    contact: sale?.customerId?.phone || 'N/A',
+                    address: sale?.customerId?.address || 'N/A',
+                    reason: ret.reason || 'Not specified',
+                    status: ret.status,
+                    items: ret.items.map(item => ({
+                        name: item.name,
+                        qty: item.quantity,
+                        rate: item.price,
+                        tax: item.productId?.tax || 18,
+                        subtotal: item.subtotal
+                    })),
+                    subtotal: ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
+                    taxAmount: ret.totalAmount - ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
+                    refundAmount: ret.totalAmount
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching return details:", error);
+            Swal.fire('Error', 'Failed to load return details', 'error');
+        }
+    };
+
+    if (id) fetchReturnData();
   }, [id]);
 
   if (!returnNote) return (
@@ -314,12 +334,12 @@ const ViewSalesReturn = () => {
                                 <td className="py-4 px-6 text-center text-gray-500 font-medium">{index + 1}</td>
                                 <td className="py-4 px-6 font-semibold text-gray-800">{item.name}</td>
                                 <td className="py-4 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
-                                <td className="py-4 px-6 text-right text-gray-600">₹{item.rate.toFixed(2)}</td>
+                                <td className="py-4 px-6 text-right text-gray-600">Rs. {item.rate.toFixed(2)}</td>
                                 <td className="py-4 px-6 text-right text-xs text-gray-500 flex flex-col items-end gap-1">
                                     <span>{item.tax}% GST</span>
-                                    <span className="text-gray-400">₹{((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
+                                    <span className="text-gray-400">Rs. {((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
                                 </td>
-                                <td className="py-4 px-6 text-right font-bold text-red-600">- ₹{(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</td>
+                                <td className="py-4 px-6 text-right font-bold text-red-600">- Rs. {(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -337,11 +357,11 @@ const ViewSalesReturn = () => {
              <div className="w-full md:w-80 space-y-4">
                 <div className="flex justify-between text-sm text-gray-600">
                     <span className="font-medium">Subtotal (Refund)</span>
-                    <span>₹{returnNote.subtotal.toFixed(2)}</span>
+                    <span>Rs. {returnNote.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-600">
                     <span className="font-medium">Reversed Tax</span>
-                    <span>₹{returnNote.taxAmount.toFixed(2)}</span>
+                    <span>Rs. {returnNote.taxAmount.toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between border-t border-gray-200 pt-4 mt-2">
@@ -349,7 +369,7 @@ const ViewSalesReturn = () => {
                         <span className="font-black text-gray-900 text-lg">Total Refund</span>
                         <span className="text-xs text-gray-500 font-normal">Credited to customer account</span>
                     </div>
-                    <span className="font-black text-red-600 text-2xl">- ₹{returnNote.refundAmount.toFixed(2)}</span>
+                    <span className="font-black text-red-600 text-2xl">- Rs. {returnNote.refundAmount.toFixed(2)}</span>
                 </div>
              </div>
         </div>

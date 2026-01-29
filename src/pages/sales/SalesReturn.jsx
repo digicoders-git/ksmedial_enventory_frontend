@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import api from '../../api/axios';
 import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, Printer, Eye, Calendar, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
@@ -12,87 +13,117 @@ const SalesReturn = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const location = React.useMemo(() => window.location, []);
+    const [returns, setReturns] = useState([]);
+    const [loading, setLoading] = useState(true);
     
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+
+    const fetchReturns = useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data } = await api.get('/sales/returns', {
+                params: {
+                    keyword: searchTerm,
+                    startDate,
+                    endDate,
+                    page: currentPage,
+                    limit: itemsPerPage
+                }
+            });
+            if (data.success) {
+                setReturns(data.returns);
+                setTotalPages(data.pages);
+                setTotalItems(data.total);
+            }
+        } catch (error) {
+            console.error("Error fetching returns:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [searchTerm, startDate, endDate, currentPage, itemsPerPage]);
+
+    useEffect(() => {
+        if (view === 'list') fetchReturns();
+    }, [view, fetchReturns]);
+
     // Check for pre-filled ID from navigation
-    React.useEffect(() => {
+    useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const preId = params.get('invId');
         if (preId) {
             setInvoiceSearch(preId);
             setView('create');
-            // Trigger search automatically
-            const found = mockInvoices.find(inv => inv.id.toLowerCase() === preId.toLowerCase());
-            if (found) setInvoiceData(found);
+            // We can optionally trigger search here
         }
-    }, [location.search]);
-    
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    }, []);
 
     // --- Create Return Logic ---
     const [invoiceSearch, setInvoiceSearch] = useState('');
+    const [invoiceSuggestions, setInvoiceSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [invoiceData, setInvoiceData] = useState(null);
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
 
-    // Mock Database
-    const mockInvoices = [
-        { 
-            id: 'INV-2024-001', 
-            customer: 'Rahul Sharma', 
-            date: '2024-01-22', 
-            items: [
-                { id: 101, name: 'Dolo 650', qty: 2, price: 30.00, batch: 'B001', sku: 'DLO-001' },
-                { id: 102, name: 'Azithral 500', qty: 1, price: 115.00, batch: 'AZ-99', sku: 'AZ-99' }
-            ]
-        },
-        { 
-            id: 'INV-2024-005', 
-            customer: 'Sneha Gupta', 
-            date: '2024-01-20', 
-            items: [
-                { id: 103, name: 'Paracetamol 500', qty: 5, price: 10.00, batch: 'PCM-12', sku: 'PCM-102' }
-            ]
-        }
-    ];
+    // Fetch Suggestions for Invoice
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            if (invoiceSearch.trim().length < 2) {
+                setInvoiceSuggestions([]);
+                return;
+            }
+            try {
+                const { data } = await api.get('/sales', {
+                    params: { keyword: invoiceSearch, limit: 5 }
+                });
+                if (data.success) {
+                    setInvoiceSuggestions(data.sales);
+                }
+            } catch (error) {
+                console.error("Error fetching invoice suggestions:", error);
+            }
+        };
 
-    const mockReturns = [
-        { id: 'RET-2024-001', invId: 'INV-2024-001', customer: 'Rahul Sharma', date: '2024-01-28', items: 2, amount: 212.40, status: 'Refunded', products: 'Dolo 650, Azithral 500', sku: 'DLO-001, AZ-99' },
-        { id: 'RET-2024-002', invId: 'INV-2024-005', customer: 'Sneha Gupta', date: '2024-01-25', items: 1, amount: 45.00, status: 'Credit', products: 'Paracetamol 500', sku: 'PCM-102' },
-        { id: 'RET-2024-003', invId: 'INV-2024-008', customer: 'Amit Singh', date: '2024-01-24', items: 3, amount: 550.00, status: 'Refunded', products: 'Azithromycin, Vitamin C', sku: 'AZ-112, VIT-003' },
-        { id: 'RET-2024-004', invId: 'INV-2024-012', customer: 'Priya Verma', date: '2024-01-23', items: 1, amount: 120.00, status: 'Pending', products: 'Cetirizine', sku: 'CET-882' },
-        { id: 'RET-2024-005', invId: 'INV-2024-015', customer: 'Arjun Reddy', date: '2024-01-22', items: 5, amount: 1200.00, status: 'Refunded', products: 'Amoxicillin, Pan 40', sku: 'AMX-001, PAN-401' },
-        { id: 'RET-2024-006', invId: 'INV-2024-018', customer: 'Meera Nair', date: '2024-01-21', items: 2, amount: 340.00, status: 'Credit', products: 'Ibuprofen 400', sku: 'IBU-400' },
-        { id: 'RET-2024-007', invId: 'INV-2024-021', customer: 'Suresh Raina', date: '2024-01-20', items: 1, amount: 85.00, status: 'Refunded', products: 'Vicks Vaporub', sku: 'VCK-111' },
-        { id: 'RET-2024-008', invId: 'INV-2024-024', customer: 'Anjali Devi', date: '2024-01-19', items: 4, amount: 890.00, status: 'Pending', products: 'Omez, Telma 40', sku: 'OMZ-88, TLM-44' },
-        { id: 'RET-2024-009', invId: 'INV-2024-027', customer: 'Vikram Singh', date: '2024-01-18', items: 2, amount: 450.00, status: 'Refunded', products: 'Limcee, Rantac 150', sku: 'LIM-01, RAN-150' },
-        { id: 'RET-2024-010', invId: 'INV-2024-030', customer: 'Pooja Hegde', date: '2024-01-17', items: 1, amount: 110.00, status: 'Credit', products: 'Combiflam', sku: 'CMB-99' },
-        { id: 'RET-2024-011', invId: 'INV-2024-033', customer: 'Rajesh Khanna', date: '2024-01-16', items: 3, amount: 670.00, status: 'Refunded', products: 'Metformin, Glipizide', sku: 'MET-500, GLP-02' },
-        { id: 'RET-2024-012', invId: 'INV-2024-036', customer: 'Simran Kaur', date: '2024-01-15', items: 2, amount: 230.00, status: 'Pending', products: 'Digene, Gelusil', sku: 'DIG-10, GEL-01' },
-    ];
+        const timer = setTimeout(fetchSuggestions, 300);
+        return () => clearTimeout(timer);
+    }, [invoiceSearch]);
 
     // Search Invoice Logic
-    const handleInvoiceSearch = (e) => {
-        e.preventDefault();
-        const search = invoiceSearch.toLowerCase();
+    const handleInvoiceSearch = async (e) => {
+        if (e) e.preventDefault();
+        const search = invoiceSearch.trim();
+        if (!search) return;
         
-        // Search by Invoice ID, Customer Name, or SKU inside items
-        const found = mockInvoices.find(inv => 
-            inv.id.toLowerCase() === search || 
-            inv.customer.toLowerCase().includes(search) ||
-            inv.items.some(item => 
-                item.name.toLowerCase().includes(search) || 
-                (item.sku && item.sku.toLowerCase() === search)
-            )
-        );
-
-        if (found) {
-            setInvoiceData(found);
-            setReturnItems([]);
-        } else {
-            Swal.fire('Not Found', 'No invoice matches this ID, Customer, or SKU.', 'error');
+        try {
+            Swal.fire({ title: 'Searching...', didOpen: () => Swal.showLoading() });
+            const { data } = await api.get(`/sales/${search}`);
+            Swal.close();
+            
+            if (data.success) {
+                const sale = data.sale;
+                setInvoiceData({
+                    id: sale.invoiceNumber,
+                    dbId: sale._id,
+                    customer: sale.customerName || 'Walk-in',
+                    date: new Date(sale.createdAt).toLocaleDateString(),
+                    items: sale.items.map(item => ({
+                        id: item._id,
+                        productId: item.productId._id,
+                        name: item.name,
+                        qty: item.quantity,
+                        price: item.price,
+                        sku: item.productId.sku
+                    }))
+                });
+                setReturnItems([]);
+            }
+        } catch (error) {
+            Swal.close();
+            Swal.fire('Not Found', 'No invoice matches this Number or ID.', 'error');
             setInvoiceData(null);
         }
     };
@@ -122,30 +153,56 @@ const SalesReturn = () => {
         setReturnItems(allItems);
     };
 
-    const processReturn = () => {
+    const processReturn = async () => {
         if (returnItems.length === 0) {
             Swal.fire('Error', 'Please select at least one item to return.', 'warning');
             return;
         }
 
-        const isFull = returnItems.length === invoiceData?.items.length && 
-                      returnItems.every(r => r.returnQty === invoiceData.items.find(i => i.id === r.id)?.qty);
+        const refundAmount = calculateRefund();
 
         Swal.fire({
-            title: isFull ? 'Confirm Full Return?' : 'Confirm Partial Return?',
-            text: `Refund Amount: ₹${calculateRefund().toFixed(2)}`,
+            title: 'Confirm Return?',
+            text: `Refund Amount: Rs. ${refundAmount.toFixed(2)}`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Process Refund',
             confirmButtonColor: '#dc2626'
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                Swal.fire('Processed', `${isFull ? 'Full' : 'Partial'} sales return created successfully.`, 'success');
-                setView('list');
-                setInvoiceData(null);
-                setInvoiceSearch('');
-                setReturnItems([]);
-                setReason('');
+                try {
+                    Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+                    const payload = {
+                        saleId: invoiceData.dbId,
+                        items: returnItems.map(item => ({
+                            productId: item.productId,
+                            name: item.name,
+                            quantity: item.returnQty,
+                            price: item.price,
+                            subtotal: item.price * item.returnQty
+                        })),
+                        totalAmount: refundAmount,
+                        reason,
+                        status: 'Refunded'
+                    };
+
+                    const { data } = await api.post('/sales/returns', payload);
+                    Swal.close();
+
+                    if (data.success) {
+                        Swal.fire('Processed', `Sales return created successfully.`, 'success');
+                        setView('list');
+                        setInvoiceData(null);
+                        setInvoiceSearch('');
+                        setReturnItems([]);
+                        setReason('');
+                        setCurrentPage(1); 
+                        fetchReturns();
+                    }
+                } catch (error) {
+                    Swal.close();
+                    Swal.fire('Error', error.response?.data?.message || 'Failed to process return', 'error');
+                }
             }
         });
     };
@@ -153,24 +210,7 @@ const SalesReturn = () => {
     const handleDownloadReport = () => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
-        const filteredAll = mockReturns.filter(ret => {
-            const search = searchTerm.toLowerCase();
-            const matchesSearch = ret.id.toLowerCase().includes(search) || 
-                                 ret.customer.toLowerCase().includes(search) ||
-                                 ret.invId.toLowerCase().includes(search) ||
-                                 (ret.products && ret.products.toLowerCase().includes(search)) ||
-                                 (ret.sku && ret.sku.toLowerCase().includes(search));
-            
-            let matchesDate = true;
-            if (startDate && endDate) {
-                matchesDate = ret.date >= startDate && ret.date <= endDate;
-            } else if (startDate) {
-                matchesDate = ret.date >= startDate;
-            } else if (endDate) {
-                matchesDate = ret.date <= endDate;
-            }
-            return matchesSearch && matchesDate;
-        });
+        const allReturnsForReport = returns; // In a full app, maybe fetchAllForReport
 
         const img = new Image();
         img.src = KS2Logo;
@@ -191,9 +231,6 @@ const SalesReturn = () => {
             doc.setTextColor(100);
             doc.setFont('helvetica', 'normal');
             doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth - 14, 32, { align: 'right' });
-            if (startDate || endDate) {
-                doc.text(`Period: ${startDate || 'Start'} to ${endDate || 'End'}`, pageWidth - 14, 37, { align: 'right' });
-            }
 
             // Summary Box
             doc.setDrawColor(254, 242, 242);
@@ -208,17 +245,18 @@ const SalesReturn = () => {
             doc.setFontSize(14);
             doc.setTextColor(0);
             doc.setFont('helvetica', 'bold');
-            doc.text(filteredAll.length.toString(), 20, 68);
-            doc.text(`Rs. ${filteredAll.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}`, pageWidth / 2, 68, { align: 'center' });
+            doc.text(totalItems.toString(), 20, 68);
+            const totalRefundValue = allReturnsForReport.reduce((acc, curr) => acc + curr.totalAmount, 0);
+            doc.text(`Rs. ${totalRefundValue.toLocaleString()}`, pageWidth / 2, 68, { align: 'center' });
 
             // Table
             const tableColumn = ["Return ID", "Invoice ID", "Date", "Customer", "Amount", "Status"];
-            const tableRows = filteredAll.map(ret => [
-                ret.id,
-                ret.invId,
-                ret.date,
-                ret.customer,
-                `Rs. ${ret.amount.toFixed(2)}`,
+            const tableRows = allReturnsForReport.map(ret => [
+                ret.returnNumber,
+                ret.invoiceNumber,
+                new Date(ret.createdAt).toLocaleDateString(),
+                ret.customerName || 'Walk-in',
+                `Rs. ${ret.totalAmount.toFixed(2)}`,
                 ret.status
             ]);
 
@@ -227,12 +265,7 @@ const SalesReturn = () => {
                 head: [tableColumn],
                 body: tableRows,
                 theme: 'striped',
-                headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
-                bodyStyles: { fontSize: 8 },
-                columnStyles: {
-                    4: { halign: 'right' },
-                    5: { halign: 'center' },
-                },
+                headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255] },
                 margin: { left: 14, right: 14 },
             });
 
@@ -240,48 +273,21 @@ const SalesReturn = () => {
         };
     };
 
-    // Filter & Pagination Logic
-    const { paginatedReturns, totalPages, paginationInfo } = useMemo(() => {
-        // Filter
-        let filtered = mockReturns.filter(ret => {
-            const search = searchTerm.toLowerCase();
-            const matchesSearch = ret.id.toLowerCase().includes(search) || 
-                                 ret.customer.toLowerCase().includes(search) ||
-                                 ret.invId.toLowerCase().includes(search) ||
-                                 (ret.products && ret.products.toLowerCase().includes(search)) ||
-                                 (ret.sku && ret.sku.toLowerCase().includes(search));
-            
-            // Date Filter
-            let matchesDate = true;
-            if (startDate && endDate) {
-                matchesDate = ret.date >= startDate && ret.date <= endDate;
-            } else if (startDate) {
-                matchesDate = ret.date >= startDate;
-            } else if (endDate) {
-                matchesDate = ret.date <= endDate;
-            }
-
-            return matchesSearch && matchesDate;
-        });
-
-        // Pagination
-        const totalItems = filtered.length;
-        const totalPgs = Math.ceil(totalItems / itemsPerPage);
+    // Pagination & List View Logic
+    const { paginatedReturns, paginationInfo } = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
-        const paginatedItems = filtered.slice(startIndex, endIndex);
 
         return {
-            paginatedReturns: paginatedItems,
-            totalPages: totalPgs,
+            paginatedReturns: returns, // Already filtered and paginated from backend
             paginationInfo: {
                 totalItems,
-                startIndex: startIndex + 1,
+                startIndex: totalItems > 0 ? startIndex + 1 : 0,
                 endIndex: Math.min(endIndex, totalItems),
                 currentPage
             }
         };
-    }, [mockReturns, searchTerm, startDate, endDate, currentPage, itemsPerPage]);
+    }, [returns, totalItems, currentPage, itemsPerPage]);
 
     // Handlers
     const handleSearchChange = (value) => {
@@ -319,17 +325,45 @@ const SalesReturn = () => {
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center text-center">
                     <FileText size={40} className="text-gray-200 dark:text-gray-700 mb-4" />
                     <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Find Original Invoice</h3>
-                    <form onSubmit={handleInvoiceSearch} className="flex gap-2 w-full max-w-md relative mt-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="e.g. INV-2024-001" 
-                            value={invoiceSearch}
-                            onChange={(e) => setInvoiceSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition-all font-mono uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                        />
-                        <button type="submit" className="px-6 py-3 bg-gray-900 dark:bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-600 active:scale-95 transition-all">Fetching</button>
-                    </form>
+                    <div className="flex flex-col w-full max-w-md relative mt-4">
+                        <form onSubmit={handleInvoiceSearch} className="flex gap-2 w-full relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="e.g. INV-2024-001" 
+                                value={invoiceSearch}
+                                onFocus={() => setShowSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                onChange={(e) => setInvoiceSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition-all font-mono uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                            />
+                            <button type="submit" className="px-6 py-3 bg-gray-900 dark:bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-600 active:scale-95 transition-all">Find Invoice</button>
+                        </form>
+
+                        {/* Suggestions Dropdown */}
+                        {showSuggestions && invoiceSuggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto text-left">
+                                {invoiceSuggestions.map(inv => (
+                                    <div 
+                                        key={inv._id}
+                                        onClick={() => {
+                                            setInvoiceSearch(inv.invoiceNumber);
+                                            setShowSuggestions(false);
+                                            // Trigger search for this specific invoice
+                                            handleInvoiceSearch(null, inv.invoiceNumber);
+                                        }}
+                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-bold text-sm text-gray-800 dark:text-gray-100">{inv.invoiceNumber}</p>
+                                            <span className="text-[10px] font-bold text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{inv.customerName || 'Walk-in'}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Step 2: Select Items */}
@@ -387,7 +421,7 @@ const SalesReturn = () => {
                                                 </div>
                                                 <div className="text-right w-24">
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">Refund</p>
-                                                    <p className="font-bold text-red-600 dark:text-red-400">₹{(item.price * isSelected.returnQty).toFixed(2)}</p>
+                                                    <p className="font-bold text-red-600 dark:text-red-400">Rs. {(item.price * isSelected.returnQty).toFixed(2)}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -402,7 +436,7 @@ const SalesReturn = () => {
                              </div>
                              <div className="w-full md:w-auto text-right">
                                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Total Refund (Inc. Tax)</p>
-                                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">₹{calculateRefund().toFixed(2)}</h2>
+                                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Rs. {calculateRefund().toFixed(2)}</h2>
                                  <button onClick={processReturn} disabled={returnItems.length === 0} className="w-full md:w-auto px-8 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                                     <RotateCcw size={18} /> Confirm Return
                                  </button>
@@ -498,28 +532,31 @@ const SalesReturn = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {paginatedReturns.map((ret) => (
-                                <tr key={ret.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
+                                <tr key={ret._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
                                     <td className="px-6 py-5">
                                         <div className="flex items-center gap-2">
                                             <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                                            <span className="font-bold text-gray-800 dark:text-gray-100 tracking-tight">{ret.id}</span>
+                                            <span className="font-bold text-gray-800 dark:text-gray-100 tracking-tight">{ret.returnNumber}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-5">
                                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-[11px] font-bold text-gray-600 dark:text-gray-400 font-mono tracking-tighter transition-colors group-hover:bg-gray-200 dark:group-hover:bg-gray-600">
-                                            {ret.invId}
+                                            {ret.invoiceNumber}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-5 text-gray-500 dark:text-gray-400 font-medium">{ret.date}</td>
-                                    <td className="px-6 py-5 font-bold text-gray-800 dark:text-gray-200">{ret.customer}</td>
+                                    <td className="px-6 py-5 text-gray-500 dark:text-gray-400 font-medium">
+                                        {new Date(ret.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-5 font-bold text-gray-800 dark:text-gray-200">{ret.customerName || 'Walk-in'}</td>
                                     <td className="px-6 py-5">
                                         <div className="flex flex-col gap-0.5 max-w-[200px]">
-                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">{ret.products}</span>
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wide uppercase italic">{ret.sku}</span>
+                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">
+                                                {ret.items.map(i => i.name).join(', ')}
+                                            </span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-5 text-center font-bold text-gray-700 dark:text-gray-300">{ret.items}</td>
-                                    <td className="px-6 py-5 text-right font-black text-red-600 dark:text-red-400">₹{ret.amount.toFixed(2)}</td>
+                                    <td className="px-6 py-5 text-center font-bold text-gray-700 dark:text-gray-300">{ret.items.length}</td>
+                                    <td className="px-6 py-5 text-right font-black text-red-600 dark:text-red-400">Rs. {ret.totalAmount.toFixed(2)}</td>
                                     <td className="px-6 py-5 text-center">
                                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all
                                             ${ret.status === 'Refunded' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
@@ -531,14 +568,14 @@ const SalesReturn = () => {
                                     <td className="px-6 py-5 text-right">
                                         <div className="flex items-center justify-end gap-2">
                                             <button 
-                                                onClick={() => navigate(`/sales/return/view/${ret.id}`)}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 rounded-xl transition-all shadow-sm hover:shadow-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700" 
+                                                onClick={() => navigate(`/sales/return/view/${ret._id}`)}
+                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 rounded-xl transition-all shadow-sm hover:shadow-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700" 
                                                 title="View Details"
                                             >
                                                 <Eye size={16} />
                                             </button>
                                             <button 
-                                                onClick={() => navigate(`/sales/return/view/${ret.id}`)}
+                                                onClick={() => navigate(`/sales/return/view/${ret._id}`)}
                                                 className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all shadow-sm hover:shadow-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700" 
                                             >
                                                 <Printer size={16} />
@@ -547,10 +584,28 @@ const SalesReturn = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {paginatedReturns.length === 0 && (
+                            {loading && (
                                 <tr>
-                                    <td colSpan="8" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
-                                        No sales returns found matching your search.
+                                    <td colSpan="9" className="px-6 py-10 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-red-500 border-t-transparent"></div>
+                                            <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching returns...</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                            {!loading && paginatedReturns.length === 0 && (
+                                <tr>
+                                    <td colSpan="9" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                                                <Search size={32} className="text-gray-300 dark:text-gray-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-800 dark:text-gray-200 font-bold">No data found</p>
+                                                <p className="text-gray-400 dark:text-gray-500 text-xs">No sales returns found matching your search.</p>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             )}

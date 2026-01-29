@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { useInventory } from '../../context/InventoryContext';
 
 const InventoryStockOut = () => {
-  const { inventory, sellItems, transactions } = useInventory(); // Use Context
+  const { inventory, sellItems, transactions, deleteTransaction, clearAllTransactions } = useInventory(); // Use Context
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [stockOutReason, setStockOutReason] = useState('Sale');
@@ -95,11 +95,11 @@ const InventoryStockOut = () => {
       showCancelButton: true,
       confirmButtonText: 'Confirm & Process',
       confirmButtonColor: 'var(--color-primary)'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
         // Use context sellItems
         const soldItems = cart.map(item => ({ id: item.id, qty: item.qty }));
-        const saleResult = sellItems(soldItems, { 
+        const saleResult = await sellItems(soldItems, { 
             customer, 
             paymentMode: stockOutReason === 'Sale' ? paymentMode : null,
             reason: stockOutReason
@@ -116,13 +116,30 @@ const InventoryStockOut = () => {
     });
   };
 
-  return (
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
+
+    // Filtered & Paginated Transactions
+    const stockOutTransactions = transactions
+        .filter(t => t.type === 'OUT')
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const totalPages = Math.ceil(stockOutTransactions.length / itemsPerPage);
+    const paginatedTransactions = stockOutTransactions.slice(
+        (currentPage - 1) * itemsPerPage, 
+        currentPage * itemsPerPage
+    );
+
+    return (
     <div className="animate-fade-in-up pb-10 space-y-8">
       <div className="h-[calc(100vh-100px)] flex flex-col xl:flex-row gap-6">
       
-      {/* LEFT: Product Catalog (Professional List View) */}
+      {/* ... (Keep existing layout code) ... */}
+      
+      {/* LEFT: Product Catalog */}
       <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-         {/* Search Header */}
+         {/* ... (Keep existing catalog code search/table header) ... */}
          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1 relative w-full">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -135,14 +152,7 @@ const InventoryStockOut = () => {
                  autoFocus
                />
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-               <select className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                  <option>All Categories</option>
-                  <option>Tablets</option>
-                  <option>Syrups</option>
-                  <option>Injections</option>
-               </select>
-            </div>
+            {/* ... */}
          </div>
 
          {/* Product List Table Header */}
@@ -160,15 +170,13 @@ const InventoryStockOut = () => {
                 <div className="divide-y divide-gray-50 dark:divide-gray-700">
                    {filteredInventory.map((item) => (
                       <div key={item.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
-                         
-                         {/* Name & Company */}
+                         {/* ... (Keep row content) ... */}
                         <div className="col-span-4">
                            <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm">{item.name}</h4>
                            <p className="text-xs text-gray-400 mt-0.5">{item.company || 'Generic'} • {item.category}</p>
                            {item.sku && <span className="text-[10px] text-blue-500 font-mono">{item.sku}</span>}
                         </div>
 
-                        {/* Batch & Exp */}
                         <div className="col-span-2">
                            <span className="block text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit mb-1">{item.batch}</span>
                            <span className={`text-[10px] font-bold ${item.exp?.includes('23') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
@@ -176,20 +184,17 @@ const InventoryStockOut = () => {
                            </span>
                         </div>
 
-                        {/* Stock */}
                         <div className="col-span-2 text-center">
                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.stock === 0 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : item.stock < 50 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'}`}>
                               {item.stock}
                            </span>
                         </div>
 
-                        {/* Price */}
                         <div className="col-span-2 text-right">
                            <span className="font-bold text-gray-800 dark:text-gray-200 text-sm">₹{item.rate.toFixed(2)}</span>
                            <p className="text-[10px] text-gray-400">/ unit</p>
                         </div>
 
-                        {/* Action */}
                         <div className="col-span-2 flex justify-center">
                            <button 
                              onClick={() => addToCart(item)}
@@ -211,16 +216,14 @@ const InventoryStockOut = () => {
          </div>
       </div>
 
-      {/* RIGHT: Transaction Cart */}
+      {/* RIGHT: Transaction Cart (Keep as is) */}
       <div className="w-full xl:w-[400px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col border border-gray-100 dark:border-gray-700 h-full">
-         
          {/* Cart Header & Type */}
          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50">
             <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-base mb-3">
                <ShoppingCart size={18} className="text-primary" /> Stock Out Entry
             </h2>
             
-            {/* Reason Selector */}
             <div className="relative">
                 <select 
                    value={stockOutReason}
@@ -242,7 +245,6 @@ const InventoryStockOut = () => {
          {/* Sales Specific (Customer & Payment) */}
          {stockOutReason === 'Sale' && (
             <div className="p-3 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-3">
-               {/* Customer Name */}
                <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input 
@@ -254,7 +256,6 @@ const InventoryStockOut = () => {
                   />
                </div>
 
-               {/* Payment Mode Selector */}
                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Payment Mode</label>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -334,6 +335,56 @@ const InventoryStockOut = () => {
             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <FileText size={18} className="text-gray-500" /> Recent Stock Out History
             </h3>
+            
+            <div className="flex items-center gap-4">
+                {transactions.length > 0 && (
+                     <button
+                        onClick={() => {
+                            Swal.fire({
+                                title: 'Clear Entire History?',
+                                text: "Cannot be undone. This will reset all stock out records and RESTORE inventory!",
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: '#d33',
+                                confirmButtonText: 'Yes, Clear All'
+                            }).then(async (result) => {
+                                if (result.isConfirmed) {
+                                    const res = await clearAllTransactions();
+                                    if (res.success) {
+                                        Swal.fire('Cleared!', 'History reset.', 'success');
+                                    } else {
+                                        Swal.fire('Error', res.message, 'error');
+                                    }
+                                }
+                            });
+                        }}
+                        className="text-xs font-bold text-red-500 hover:text-red-700 underline"
+                     >
+                        Clear History
+                     </button>
+                )}
+
+            {/* Simple Pagination Info */}
+             <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-1 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-semibold disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                >
+                    Prev
+                </button>
+                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
+                    Page {currentPage} of {totalPages || 1}
+                </span>
+                <button 
+                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                     disabled={currentPage >= totalPages}
+                     className="p-1 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-semibold disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                >
+                    Next
+                </button>
+            </div>
+            </div>
         </div>
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -345,14 +396,11 @@ const InventoryStockOut = () => {
                         <th className="px-6 py-4 text-center">Qty</th>
                          <th className="px-6 py-4 text-right">Total Amount</th>
                         <th className="px-6 py-4 text-center">Status</th>
+                        <th className="px-4 py-4 text-center">Action</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                    {transactions
-                        .filter(t => t.type === 'OUT')
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))
-                        .slice(0, 10)
-                        .map(tx => (
+                    {paginatedTransactions.map(tx => (
                         <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
                                 <div className="font-bold text-gray-800 dark:text-white">{new Date(tx.date).toLocaleDateString()}</div>
@@ -385,18 +433,44 @@ const InventoryStockOut = () => {
                                 {tx.totalQty}
                             </td>
                             <td className="px-6 py-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                ₹{tx.items.reduce((sum, i) => sum + (i.qty * i.rate), 0).toFixed(2)}
+                                ₹{tx.items.reduce((sum, i) => sum + (i.qty * (i.price || i.rate || 0)), 0).toFixed(2)}
                             </td>
                             <td className="px-6 py-4 text-center">
                                 <span className="px-2.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-full text-xs font-bold border border-green-200 dark:border-green-900/30">
                                     Processed
                                 </span>
                             </td>
+                            <td className="px-4 py-4 text-center">
+                                <button 
+                                    onClick={() => {
+                                        Swal.fire({
+                                            title: 'Delete History?',
+                                            text: "This will undo the stock deduction.",
+                                            icon: 'warning',
+                                            showCancelButton: true,
+                                            confirmButtonColor: '#d33',
+                                            confirmButtonText: 'Yes, Delete'
+                                        }).then(async (result) => {
+                                            if (result.isConfirmed) {
+                                                const res = await deleteTransaction(tx.id);
+                                                if (res.success) {
+                                                    Swal.fire('Deleted!', 'Transaction removed.', 'success');
+                                                } else {
+                                                    Swal.fire('Error', res.message, 'error');
+                                                }
+                                            }
+                                        });
+                                    }}
+                                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </td>
                         </tr>
                     ))}
-                    {transactions.filter(t => t.type === 'OUT').length === 0 && (
+                    {stockOutTransactions.length === 0 && (
                         <tr>
-                            <td colSpan="6" className="px-6 py-8 text-center text-gray-400">No stock out transactions found yet.</td>
+                            <td colSpan="7" className="px-6 py-8 text-center text-gray-400">No stock out transactions found yet.</td>
                         </tr>
                     )}
                 </tbody>

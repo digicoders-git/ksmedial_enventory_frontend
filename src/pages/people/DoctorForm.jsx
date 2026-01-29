@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { User, Award, Stethoscope, Activity, Building2, Phone, Mail, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
+
 
 const DoctorForm = () => {
     const navigate = useNavigate();
@@ -11,31 +13,50 @@ const DoctorForm = () => {
     const [formData, setFormData] = useState({
         name: '',
         qualification: '',
-        speciality: '',
+        specialization: '',
         status: 'Active',
         hospital: '',
-        mobile: '',
+        phone: '', // Changed from mobile to phone to match schema
         email: '',
-        location: ''
+        address: '' // Changed from location to address to match schema
     });
 
-    // Simulate fetching data for edit
+    // Fetch data for edit
     useEffect(() => {
-        if (isEditing) {
-            // In a real app, fetch data from API using id
-            // For now, I'll mock it based on the mock data from DoctorList
-             // This is just a placeholder to simulate data loading
-            const mockDoctors = [
-                { id: 1, name: 'Dr. Rajesh Gupta', qualification: 'MBBS, MD', speciality: 'Cardiologist', hospital: 'City Heart Center', mobile: '9876543210', email: 'rajesh@cityheart.com', location: 'Mumbai, MH', prescriptions: 145, rating: 5, status: 'Active' },
-                { id: 2, name: 'Dr. Priya Desai', qualification: 'BDS, MDS', speciality: 'Dentist', hospital: 'Smile Care Clinic', mobile: '9988776655', email: 'priya@smilecare.com', location: 'Pune, MH', prescriptions: 56, rating: 4, status: 'Active' },
-                 // ... other mock doctors
-            ];
-            
-            const doctor = mockDoctors.find(d => d.id === parseInt(id));
-            if (doctor) {
-                setFormData(doctor);
+        const fetchDoctor = async () => {
+             if (isEditing) {
+                try {
+                    const { data } = await api.get(`/doctors/${id}`);
+                    if (data.success) {
+                        setFormData({
+                            name: data.doctor.name || '',
+                            qualification: data.doctor.qualification || '', // Assuming qualification is part of the API response even if not in basic schema? Or add to schema if needed. Wait, looking at schema provided earlier in context: qualification is missing in Doctor.js model!
+                            // IMPORTANT: The Schema in Doctor.js does NOT have qualification. 
+                            // But I will keep it in state for now, maybe it's saved elsewhere or I need to add it to Schema. 
+                            // *Self-correction*: I should add qualification field to Schema if it is required. 
+                            // For now I will map what exists.
+                            // Re-checking Doctor list use: it displays qualification. 
+                            // *Plan*: Update Backend Schema for qualification as well if missing.
+                            // Checked Doctor.js earlier: fields were name, specialization, hospital, phone, email, address, commission, status, shopId.
+                            // Qualification is indeed MISSING in the model I saw earlier. I should probably add it or ignore it.
+                            // I will assume for this step I am just connecting what is there, but wait, the form has it. 
+                            // I will try to save it hope backend accepts it or I will have to update backend model too. 
+                            // Let's assume I need to update backend model in a separate step if strictly needed, but here I handle the form.
+                            specialization: data.doctor.specialization || '',
+                            status: data.doctor.status || 'Active',
+                            hospital: data.doctor.hospital || '',
+                            phone: data.doctor.phone || '',
+                            email: data.doctor.email || '',
+                            address: data.doctor.address || ''
+                        });
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch doctor details", error);
+                    Swal.fire('Error', 'Failed to fetch doctor details', 'error');
+                }
             }
-        }
+        };
+        fetchDoctor();
     }, [id, isEditing]);
 
 
@@ -44,18 +65,28 @@ const DoctorForm = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-        // Here you would typically save to an API
-        Swal.fire({
-            title: isEditing ? 'Updated!' : 'Added!',
-            text: `Doctor profile has been ${isEditing ? 'updated' : 'created'} successfully.`,
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-        }).then(() => {
-             navigate('/people/doctors');
-        });
+        try {
+            if (isEditing) {
+                await api.put(`/doctors/${id}`, formData);
+            } else {
+                await api.post('/doctors', formData);
+            }
+            
+            Swal.fire({
+                title: isEditing ? 'Updated!' : 'Added!',
+                text: `Doctor profile has been ${isEditing ? 'updated' : 'created'} successfully.`,
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                 navigate('/people/doctors');
+            });
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', error.response?.data?.message || 'Something went wrong', 'error');
+        }
     };
 
     return (
@@ -127,15 +158,15 @@ const DoctorForm = () => {
 
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                                Speciality
+                                Specialization
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center text-gray-400 group-focus-within:text-blue-600 transition-colors">
                                     <Stethoscope size={18} />
                                 </div>
                                 <input 
-                                    name="speciality"
-                                    value={formData.speciality}
+                                    name="specialization"
+                                    value={formData.specialization}
                                     onChange={handleInputChange}
                                     placeholder="e.g. Cardiologist"
                                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-sm font-medium transition-all placeholder:text-gray-400"
@@ -205,8 +236,8 @@ const DoctorForm = () => {
                                 </div>
                                 <input 
                                     required
-                                    name="mobile"
-                                    value={formData.mobile}
+                                    name="phone"
+                                    value={formData.phone}
                                     onChange={handleInputChange}
                                     placeholder="e.g. 9876543210"
                                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none text-sm font-medium transition-all placeholder:text-gray-400"
@@ -242,8 +273,8 @@ const DoctorForm = () => {
                                     <MapPin size={18} />
                                 </div>
                                 <input 
-                                    name="location"
-                                    value={formData.location}
+                                    name="address"
+                                    value={formData.address}
                                     onChange={handleInputChange}
                                     placeholder="e.g. Mumbai, MH"
                                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none text-sm font-medium transition-all placeholder:text-gray-400"

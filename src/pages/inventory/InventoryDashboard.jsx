@@ -1,49 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Package, AlertTriangle, RefreshCcw, DollarSign, Activity, TrendingUp, FileText } from 'lucide-react';
 import { AdjustStockModal, StockCheckModal } from './InventoryModals';
 import { useNavigate } from 'react-router-dom';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
+import { useInventory } from '../../context/InventoryContext';
 
 const InventoryDashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    totalStockValue: 0,
-    totalStockUnits: 0,
-    lowStockItems: 0,
-    outOfStockItems: 0,
-    pendingRx: 0,
-    categoryDistribution: [],
-    weeklyMovement: { stockIn: [0,0,0,0,0,0,0], stockOut: [0,0,0,0,0,0,0] },
-    recentTransactions: []
-  });
-  const [loading, setLoading] = useState(true);
+  const {  stats: contextStats, inventory, transactions, loading } = useInventory();
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('ks_shop_token');
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${apiBase}/dashboard/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error("Inventory Dashboard fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Compute additional dashboard-specific stats dynamically from Context data
+  const dashboardStats = useMemo(() => {
+     // Category Distribution
+     const categoryMap = {};
+     inventory.forEach(item => {
+         const cat = item.category || 'Uncategorized';
+         categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+     });
+     const categoryDistribution = Object.keys(categoryMap).map(key => ({
+         name: key,
+         y: categoryMap[key]
+     }));
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+     // Weekly Movement (Mocking logic based on transactions for now, ideally backend aggregates this)
+     // For demo/dynamic feel, we can calculate from 'transactions' if they have dates
+     // Assuming transactions has recent history.
+     const last7Days = [...Array(7)].map((_, i) => {
+         const d = new Date();
+         d.setDate(d.getDate() - i);
+         return d.toISOString().split('T')[0];
+     }).reverse();
+
+     const stockIn = [0, 0, 0, 0, 0, 0, 0];
+     const stockOut = [0, 0, 0, 0, 0, 0, 0];
+
+     transactions.forEach(tx => {
+         const txDate = new Date(tx.date).toISOString().split('T')[0];
+         const index = last7Days.indexOf(txDate);
+         if (index !== -1) {
+             if (tx.type === 'IN') stockIn[index] += tx.totalQty;
+             if (tx.type === 'OUT') stockOut[index] += tx.totalQty;
+         }
+     });
+
+     return {
+         ...contextStats,
+         categoryDistribution,
+         weeklyMovement: { stockIn, stockOut },
+         recentTransactions: transactions.slice(0, 10),
+         pendingRx: 0, // Placeholder or fetch from PrescriptionContext if available
+         xAxisCategories: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short' }))
+     };
+  }, [contextStats, inventory, transactions]);
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showCheckModal, setShowCheckModal] = useState(false);
@@ -59,9 +68,9 @@ const InventoryDashboard = () => {
     title: { text: null },
     credits: { enabled: false },
     xAxis: {
-      categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      categories: dashboardStats.xAxisCategories,
       gridLineWidth: 0,
-      lineColor: '#e5e7eb',
+       lineColor: '#e5e7eb',
       labels: { style: { color: '#9ca3af', fontWeight: 'bold' } }
     },
     yAxis: {
@@ -85,17 +94,16 @@ const InventoryDashboard = () => {
     },
     series: [{
       name: 'Stock In',
-      data: stats.weeklyMovement.stockIn,
+      data: dashboardStats.weeklyMovement.stockIn,
       color: '#10b981' // Emerald-500
     }, {
       name: 'Stock Out',
-      data: stats.weeklyMovement.stockOut,
+      data: dashboardStats.weeklyMovement.stockOut,
       color: '#f97316' // Orange-500
     }]
   };
 
   // Highcharts Options for Category Distribution
-  // Colors for pie chart
   const pieColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899'];
   const categoryChartOptions = {
     chart: {
@@ -128,9 +136,10 @@ const InventoryDashboard = () => {
     series: [{
       name: 'Category',
       colorByPoint: true,
-      data: stats.categoryDistribution.length > 0 ? stats.categoryDistribution : [{ name: 'No Data', y: 1, color: '#f3f4f6' }]
+      data: dashboardStats.categoryDistribution.length > 0 ? dashboardStats.categoryDistribution : [{ name: 'No Data', y: 1, color: '#f3f4f6' }]
     }]
   };
+
 
   if (loading) {
     return (
@@ -174,9 +183,9 @@ const InventoryDashboard = () => {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Total Products</p>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{stats.totalProducts}</h3>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{dashboardStats.totalProducts}</h3>
             <p className="text-[11px] text-blue-500 font-bold mt-1 flex items-center gap-1">
-                <TrendingUp size={12} /> {stats.totalStockUnits.toLocaleString()} In Stock
+                <TrendingUp size={12} /> {dashboardStats.totalStockUnits.toLocaleString()} In Stock
             </p>
           </div>
         </div>
@@ -197,7 +206,7 @@ const InventoryDashboard = () => {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Net Valuation</p>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">₹{Number(stats.totalStockValue).toLocaleString()}</h3>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">₹{Number(dashboardStats.totalStockValue).toLocaleString()}</h3>
             <p className="text-[11px] text-emerald-500 font-bold mt-1">Live Market Rate</p>
           </div>
         </div>
@@ -218,9 +227,9 @@ const InventoryDashboard = () => {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Pending Rx</p>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{stats.pendingRx.toString().padStart(2, '0')}</h3>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{dashboardStats.pendingRx.toString().padStart(2, '0')}</h3>
             <p className="text-[11px] text-orange-500 font-bold mt-1 flex items-center gap-1">
-                <Activity size={12} /> {stats.pendingRx} New Requests
+                <Activity size={12} /> {dashboardStats.pendingRx} New Requests
             </p>
           </div>
         </div>
@@ -241,8 +250,8 @@ const InventoryDashboard = () => {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Stock Alerts</p>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{stats.lowStockItems + stats.outOfStockItems}</h3>
-            <p className="text-[11px] text-red-500 font-bold mt-1">Low: {stats.lowStockItems} | Out: {stats.outOfStockItems}</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{dashboardStats.lowStockItems + dashboardStats.outOfStockItems}</h3>
+            <p className="text-[11px] text-red-500 font-bold mt-1">Low: {dashboardStats.lowStockItems} | Out: {dashboardStats.outOfStockItems}</p>
           </div>
         </div>
 
@@ -262,16 +271,16 @@ const InventoryDashboard = () => {
           <div className="relative z-10">
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">System Health</p>
             <h3 className="text-xl font-black text-white mt-0.5 tracking-tight">
-              {stats.lowStockItems + stats.outOfStockItems > 10 ? 'ATTENTION' : 'OPTIMIZED'}
+              {dashboardStats.lowStockItems + dashboardStats.outOfStockItems > 10 ? 'ATTENTION' : 'OPTIMIZED'}
             </h3>
             <div className="flex items-center gap-2 mt-2">
                 <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)] transition-all duration-1000"
-                      style={{ width: `${Math.max(10, 100 - (stats.lowStockItems + stats.outOfStockItems) * 2)}%` }}
+                      style={{ width: `${Math.max(10, 100 - (dashboardStats.lowStockItems + dashboardStats.outOfStockItems) * 2)}%` }}
                     ></div>
                 </div>
-                <span className="text-[10px] font-black text-emerald-400">{Math.max(10, 100 - (stats.lowStockItems + stats.outOfStockItems) * 2)}%</span>
+                <span className="text-[10px] font-black text-emerald-400">{Math.max(10, 100 - (dashboardStats.lowStockItems + dashboardStats.outOfStockItems) * 2)}%</span>
             </div>
           </div>
         </div>
@@ -342,7 +351,7 @@ const InventoryDashboard = () => {
                 <button onClick={() => navigate('/inventory/stats-history')} className="text-[10px] font-black uppercase text-blue-600 hover:underline">View All Activities</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             {stats.recentTransactions.length > 0 ? stats.recentTransactions.slice(0, 6).map(tx => (
+             {dashboardStats.recentTransactions.length > 0 ? dashboardStats.recentTransactions.slice(0, 6).map(tx => (
                <div key={tx.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors">
                  <div className="flex items-center gap-3">
                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] shadow-sm ${tx.type === 'IN' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>

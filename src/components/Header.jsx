@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, Calendar, Monitor, Type } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext';
 
 const Header = ({ toggleSidebar }) => {
   const navigate = useNavigate();
   const { fonts, currentFont, changeFont, colors, currentColor, changeColor, mode, changeMode } = useTheme();
+  const { unreadCount } = useNotifications();
 
   // State
   const [isThemeOpen, setIsThemeOpen] = useState(false);
@@ -30,6 +32,8 @@ const Header = ({ toggleSidebar }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+
 
   // Search logic
   useEffect(() => {
@@ -233,8 +237,13 @@ const Header = ({ toggleSidebar }) => {
           className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"
         >
           <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-800"></span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-white dark:border-gray-800 animate-pulse">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
+
       </div>
     </header>
   );

@@ -1,13 +1,14 @@
 import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Printer, Download, QrCode } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react'; // Kept for reference but unused in rendered output if we use img
 
 const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
   const printRef = useRef();
 
   if (!isOpen) return null;
 
-  // Generate QR data - comprehensive medicine information
+  // ... (keep existing helper functions like generateQRData, handlePrint, handleDownload)
   const generateQRData = (med) => {
     return JSON.stringify({
       id: med.id,
@@ -22,11 +23,9 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
     });
   };
 
-  // Single medicine mode or batch mode
   const isBatchMode = medicines.length > 0;
   const itemsToDisplay = isBatchMode ? medicines : [medicine];
 
-  // Print function
   const handlePrint = () => {
     const printContent = printRef.current;
     const windowPrint = window.open('', '', 'width=800,height=600');
@@ -125,32 +124,35 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
     }, 250);
   };
 
-  // Download QR as image
-  const handleDownload = (medName) => {
-    const svg = document.getElementById(`qr-${medName}`);
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-      const pngFile = canvas.toDataURL('image/png');
+  const handleDownload = async (medName, medId) => {
+    try {
+      const med = medicines.length > 0 ? medicines.find(m => m.id === medId) : medicine;
+      const data = generateQRData(med);
+      const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data)}`;
+      
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
       
       const downloadLink = document.createElement('a');
       downloadLink.download = `QR_${medName.replace(/\s+/g, '_')}.png`;
-      downloadLink.href = pngFile;
+      downloadLink.href = blobUrl;
+      document.body.appendChild(downloadLink);
       downloadLink.click();
-    };
-    
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+      document.body.removeChild(downloadLink);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Could not download image directly. Opening in new tab.");
+      const med = medicines.length > 0 ? medicines.find(m => m.id === medId) : medicine;
+       const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(generateQRData(med))}`;
+      window.open(url, '_blank');
+    }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in relative">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-accent/10 to-transparent">
           <div className="flex justify-between items-center">
@@ -194,18 +196,11 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
 
                   {/* QR Code */}
                   <div className="flex justify-center my-6 bg-white p-4 rounded-lg">
-                    <QRCodeSVG
-                      id={`qr-${med.name}`}
-                      value={generateQRData(med)}
-                      size={isBatchMode ? 150 : 200}
-                      level="H"
-                      includeMargin={true}
-                      imageSettings={{
-                        src: "/logo.png",
-                        height: 24,
-                        width: 24,
-                        excavate: true,
-                      }}
+                    <img 
+                        id={`qr-${med.id}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(generateQRData(med))}`}
+                        alt="QR Code"
+                        className="w-[150px] h-[150px]"
                     />
                   </div>
 
@@ -235,7 +230,7 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
                   {/* Individual Download (only in single mode) */}
                   {!isBatchMode && (
                     <button
-                      onClick={() => handleDownload(med.name)}
+                      onClick={() => handleDownload(med.name, med.id)}
                       className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
                     >
                       <Download size={16} />
@@ -271,7 +266,8 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Eye, CheckCircle, XCircle, Clock, Upload, FileText, ChevronRight, Calendar, ArrowLeft, Printer, ZoomIn, User, MapPin, Phone, ChevronLeft } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const PrescriptionManagement = () => {
   const [activeTab, setActiveTab] = useState('pending'); // pending, verified, rejected
@@ -12,29 +13,54 @@ const PrescriptionManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Mock Data
-  const [prescriptions, setPrescriptions] = useState([
-    { id: 101, patient: 'Rahul Kumar', age: 45, gender: 'Male', phone: '+91 98765 43210', address: 'Sector 45, Gurgaon', doctor: 'Dr. Sharma', date: '2024-01-25', status: 'Pending', items: 3, urgency: 'High', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=800&auto=format&fit=crop' },
-    { id: 102, patient: 'Amit Verma', age: 32, gender: 'Male', phone: '+91 99887 76655', address: 'Indiranagar, Bangalore', doctor: 'Dr. Gupta', date: '2024-01-26', status: 'Pending', items: 2, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=800&auto=format&fit=crop' },
-    { id: 103, patient: 'Sneha Singh', age: 28, gender: 'Female', phone: '+91 88776 65544', address: 'Koramangala, Bangalore', doctor: 'Dr. Mehra', date: '2024-01-24', status: 'Verified', items: 5, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?q=80&w=800&auto=format&fit=crop' },
-    { id: 104, patient: 'Vikram Das', age: 60, gender: 'Male', phone: '+91 77665 54433', address: 'Salt Lake, Kolkata', doctor: 'Dr. Roy', date: '2024-01-23', status: 'Rejected', items: 1, urgency: 'Normal', reason: 'Unclear Image', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=800&auto=format&fit=crop' },
-    { id: 105, patient: 'Priya Sharma', age: 35, gender: 'Female', phone: '+91 66554 43322', address: 'Andheri West, Mumbai', doctor: 'Dr. Desai', date: '2024-01-22', status: 'Pending', items: 4, urgency: 'High', image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=800&auto=format&fit=crop' },
-    { id: 106, patient: 'Arjun Reddy', age: 29, gender: 'Male', phone: '+91 55443 32211', address: 'Jubilee Hills, Hyderabad', doctor: 'Dr. Rao', date: '2024-01-21', status: 'Verified', items: 2, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?q=80&w=800&auto=format&fit=crop' },
-    { id: 107, patient: 'Meera Iyer', age: 52, gender: 'Female', phone: '+91 44332 21100', address: 'Adyar, Chennai', doctor: 'Dr. Lakshmi', date: '2024-01-20', status: 'Pending', items: 6, urgency: 'High', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=800&auto=format&fit=crop' },
-    { id: 108, patient: 'Rohan Mehta', age: 41, gender: 'Male', phone: '+91 33221 10099', address: 'Vastrapur, Ahmedabad', doctor: 'Dr. Patel', date: '2024-01-19', status: 'Verified', items: 3, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=800&auto=format&fit=crop' },
-    { id: 109, patient: 'Kavita Gill', age: 26, gender: 'Female', phone: '+91 22110 09988', address: 'Model Town, Ludhiana', doctor: 'Dr. Singh', date: '2024-01-18', status: 'Rejected', items: 2, urgency: 'Normal', reason: 'Incomplete Rx', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?q=80&w=800&auto=format&fit=crop' },
-    { id: 110, patient: 'Suresh Raina', age: 55, gender: 'Male', phone: '+91 11009 98877', address: 'Civil Lines, Kanpur', doctor: 'Dr. Tiwari', date: '2024-01-17', status: 'Pending', items: 4, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=800&auto=format&fit=crop' },
-    { id: 111, patient: 'Anjali Devi', age: 65, gender: 'Female', phone: '+91 99008 87766', address: 'Boring Road, Patna', doctor: 'Dr. Mishra', date: '2024-01-16', status: 'Verified', items: 7, urgency: 'High', image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=800&auto=format&fit=crop' },
-    { id: 112, patient: 'Vijay Kumar', age: 38, gender: 'Male', phone: '+91 88990 07766', address: 'Rajendra Nagar, Raipur', doctor: 'Dr. Sahu', date: '2024-01-15', status: 'Pending', items: 2, urgency: 'Normal', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?q=80&w=800&auto=format&fit=crop' },
-  ]);
+  // State
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch Prescriptions
+  const fetchPrescriptions = async () => {
+      try {
+          const { data } = await api.get('/prescriptions');
+          if (data.success) {
+              const mapped = data.prescriptions.map(p => ({
+                  ...p,
+                  id: p._id,
+                  // Ensure date is formatted if string or date obj
+                  date: p.date ? new Date(p.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+              }));
+              setPrescriptions(mapped);
+          }
+      } catch (error) {
+          console.error("Error fetching prescriptions:", error);
+          Swal.fire('Error', 'Failed to load prescriptions', 'error');
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  React.useEffect(() => {
+      fetchPrescriptions();
+  }, []);
 
   const [uploadData, setUploadData] = useState({
       patient: '',
       age: '',
+      gender: 'Male',
+      phone: '',
+      address: '',
       doctor: '',
       notes: '',
+      urgency: 'Normal',
       image: null
   });
+
+  const calculateRxAge = (dateString) => {
+      const today = new Date();
+      const rxDate = new Date(dateString);
+      const diffTime = Math.abs(today - rxDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      return `${diffDays} Day${diffDays !== 1 ? 's' : ''}`;
+  };
 
   // Filter & Pagination Logic
   const { filteredPrescriptions, totalPages, paginationInfo } = useMemo(() => {
@@ -70,110 +96,136 @@ const PrescriptionManagement = () => {
     };
   }, [prescriptions, activeTab, searchTerm, currentPage, itemsPerPage]);
 
-  // Handlers
-  const handleSearchChange = (value) => {
+  function handleSearchChange(value) {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to page 1 on search
-  };
+    setCurrentPage(1);
+  }
 
-  const handleTabChange = (tab) => {
+  function handleTabChange(tab) {
     setActiveTab(tab);
-    setCurrentPage(1); // Reset to page 1 on tab change
-  };
+    setCurrentPage(1);
+  }
 
-  const handleItemsPerPageChange = (value) => {
+  function handleItemsPerPageChange(value) {
     setItemsPerPage(Number(value));
     setCurrentPage(1);
-  };
+  }
 
-  const goToPage = (page) => {
+  function goToPage(page) {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
-  };
+  }
 
-  const handleVerify = (id) => {
-      Swal.fire({
-          title: 'Approve Prescription?',
-          text: 'This will mark the prescription as verified and ready for dispensing.',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Yes, Approve',
-          confirmButtonColor: '#007242'
-      }).then((result) => {
-          if (result.isConfirmed) {
-              setPrescriptions(prev => prev.map(item => item.id === id ? { ...item, status: 'Verified' } : item));
-              if (selectedRx && selectedRx.id === id) {
-                 setSelectedRx(prev => ({...prev, status: 'Verified'}));
-              }
-              Swal.fire('Approved!', 'Prescription has been verified.', 'success');
+  async function handleVerify(id) {
+    Swal.fire({
+      title: 'Approve Prescription?',
+      text: 'This will mark the prescription as verified and ready for dispensing.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Approve',
+      confirmButtonColor: '#007242'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { data } = await api.put(`/prescriptions/${id}/status`, { status: 'Verified' });
+          if (data.success) {
+            setPrescriptions(prev => prev.map(item => item.id === id ? { ...item, status: 'Verified' } : item));
+            if (selectedRx && selectedRx.id === id) {
+              setSelectedRx(prev => ({ ...prev, status: 'Verified' }));
+            }
+            Swal.fire('Approved!', 'Prescription has been verified.', 'success');
           }
-      });
-  };
+        } catch (err) {
+          console.error(err);
+          Swal.fire('Error', 'Verification failed', 'error');
+        }
+      }
+    });
+  }
 
-  const handleReject = (id) => {
-      Swal.fire({
-          title: 'Reject Prescription',
-          input: 'text',
-          inputLabel: 'Reason for rejection',
-          inputPlaceholder: 'e.g. Unclear image, Date expired...',
-          showCancelButton: true,
-          confirmButtonColor: '#d33',
-          confirmButtonText: 'Reject'
-      }).then((result) => {
-          if (result.isConfirmed && result.value) {
-              setPrescriptions(prev => prev.map(item => item.id === id ? { ...item, status: 'Rejected', reason: result.value } : item));
-              if (selectedRx && selectedRx.id === id) {
-                 setSelectedRx(prev => ({...prev, status: 'Rejected', reason: result.value}));
-              }
-              Swal.fire('Rejected', 'Prescription marked as rejected.', 'error');
+  async function handleReject(id) {
+    Swal.fire({
+      title: 'Reject Prescription',
+      input: 'text',
+      inputLabel: 'Reason for rejection',
+      inputPlaceholder: 'e.g. Unclear image, Date expired...',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Reject'
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value) {
+        try {
+          const { data } = await api.put(`/prescriptions/${id}/status`, { status: 'Rejected', reason: result.value });
+          if (data.success) {
+            setPrescriptions(prev => prev.map(item => item.id === id ? { ...item, status: 'Rejected', reason: result.value } : item));
+            if (selectedRx && selectedRx.id === id) {
+              setSelectedRx(prev => ({ ...prev, status: 'Rejected', reason: result.value }));
+            }
+            Swal.fire('Rejected', 'Prescription marked as rejected.', 'error');
           }
-      });
-  };
-
-  const handleFileChange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-              setUploadData(prev => ({ ...prev, image: reader.result }));
-          };
-          reader.readAsDataURL(file);
+        } catch (err) {
+          console.error(err);
+          Swal.fire('Error', 'Rejection failed', 'error');
+        }
       }
-  };
+    });
+  }
 
-  const handleUploadSubmit = (e) => {
-      e.preventDefault();
-      if (!uploadData.patient || !uploadData.image) {
-          Swal.fire('Error', 'Patient Name and Prescription Image are required', 'error');
-          return;
-      }
+  function handleFileChange(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadData(prev => ({ ...prev, image: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 
-      const newRx = {
-          id: Date.now(),
-          patient: uploadData.patient,
-          age: uploadData.age || 'N/A',
-          gender: 'Unknown',
-          phone: 'N/A',
-          address: 'N/A',
-          doctor: uploadData.doctor || 'Self / Unknown',
-          date: new Date().toISOString().split('T')[0],
-          status: 'Pending',
-          items: 0,
-          urgency: 'Normal',
-          image: uploadData.image
+  async function handleUploadSubmit(e) {
+    e.preventDefault();
+    if (!uploadData.patient || !uploadData.image) {
+      Swal.fire('Error', 'Patient Name and Prescription Image are required', 'error');
+      return;
+    }
+
+    try {
+      const payload = {
+        patient: uploadData.patient,
+        age: uploadData.age || 0,
+        gender: uploadData.gender,
+        phone: uploadData.phone,
+        address: uploadData.address,
+        doctor: uploadData.doctor,
+        urgency: uploadData.urgency,
+        image: uploadData.image,
+        notes: uploadData.notes
       };
 
-      setPrescriptions([newRx, ...prescriptions]);
-      setShowUploadModal(false);
-      setUploadData({ patient: '', age: '', doctor: '', notes: '', image: null });
-      Swal.fire({
+      const { data } = await api.post('/prescriptions', payload);
+
+      if (data.success) {
+        const newRx = {
+          ...data.prescription,
+          id: data.prescription._id,
+          date: new Date(data.prescription.date).toISOString().split('T')[0]
+        };
+        setPrescriptions([newRx, ...prescriptions]);
+        setShowUploadModal(false);
+        setUploadData({ patient: '', age: '', gender: 'Male', phone: '', address: '', doctor: '', notes: '', urgency: 'Normal', image: null });
+        Swal.fire({
           icon: 'success',
           title: 'Uploaded!',
           text: 'Prescription has been queued for verification.',
           confirmButtonColor: '#007242'
-      });
-  };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', err.response?.data?.message || 'Upload failed', 'error');
+    }
+  }
 
   // --- DETAIL PAGE VIEW ---
   if (selectedRx) {
@@ -296,7 +348,7 @@ const PrescriptionManagement = () => {
                                   </div>
                                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 text-center">
                                       <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Rx Age</p>
-                                      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">2 Days</p>
+                                      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{calculateRxAge(selectedRx.date)}</p>
                                   </div>
                              </div>
                         </div>
@@ -669,16 +721,62 @@ const PrescriptionManagement = () => {
                     />
                   </div>
                    <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Age</label>
-                    <input 
-                        type="number" 
-                        placeholder="Yrs"
-                        value={uploadData.age}
-                        onChange={(e) => setUploadData({ ...uploadData, age: e.target.value })}
-                        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                    />
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Age & Gender</label>
+                    <div className="flex gap-2">
+                        <input 
+                            type="number" 
+                            placeholder="Yrs"
+                            value={uploadData.age}
+                            onChange={(e) => setUploadData({ ...uploadData, age: e.target.value })}
+                            className="w-20 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white"
+                        />
+                         <select 
+                            value={uploadData.gender}
+                            onChange={(e) => setUploadData({ ...uploadData, gender: e.target.value })}
+                            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white cursor-pointer"
+                        >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
                   </div>
                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Phone Number</label>
+                        <input 
+                            type="tel" 
+                            placeholder="e.g. 9876543210"
+                            value={uploadData.phone}
+                            onChange={(e) => setUploadData({ ...uploadData, phone: e.target.value })}
+                            className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white"
+                        />
+                   </div>
+                   <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Urgency</label>
+                        <select 
+                            value={uploadData.urgency}
+                            onChange={(e) => setUploadData({ ...uploadData, urgency: e.target.value })}
+                            className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white cursor-pointer"
+                        >
+                            <option value="Normal">Normal Priority</option>
+                            <option value="High">High Priority</option>
+                        </select>
+                   </div>
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Address</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. Sector-45, Gurgaon"
+                        value={uploadData.address}
+                        onChange={(e) => setUploadData({ ...uploadData, address: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white"
+                    />
+                </div>
 
                <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Doctor Name</label>

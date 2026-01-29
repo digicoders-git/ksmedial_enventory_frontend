@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Stethoscope, Phone, MapPin, Plus, FileText, Activity, User, Star, Award, Building2, Printer, Eye, Edit2, Trash2, X, Mail, CheckCircle, GraduationCap, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Stethoscope, Phone, MapPin, Plus, FileText, Activity, User, Star, Award, Building2, Printer, Eye, Edit2, Trash2, X, Mail, CheckCircle, GraduationCap, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const DoctorList = () => {
     const navigate = useNavigate();
@@ -9,30 +10,48 @@ const DoctorList = () => {
     const [filterSpeciality, setFilterSpeciality] = useState('All');
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
-    // Mock Data
-    const [doctors, setDoctors] = useState([
-        { id: 1, name: 'Dr. Rajesh Gupta', qualification: 'MBBS, MD', speciality: 'Cardiologist', hospital: 'City Heart Center', mobile: '9876543210', email: 'rajesh@cityheart.com', location: 'Mumbai, MH', prescriptions: 145, rating: 5, status: 'Active' },
-        { id: 2, name: 'Dr. Priya Desai', qualification: 'BDS, MDS', speciality: 'Dentist', hospital: 'Smile Care Clinic', mobile: '9988776655', email: 'priya@smilecare.com', location: 'Pune, MH', prescriptions: 56, rating: 4, status: 'Active' },
-        { id: 3, name: 'Dr. Amit Kumar', qualification: 'MBBS, MS', speciality: 'Orthopedic', hospital: 'Bone & Joint Hospital', mobile: '8877665544', email: 'amit@ortho.com', location: 'Nashik, MH', prescriptions: 89, rating: 5, status: 'Active' },
-        { id: 4, name: 'Dr. Sneha Patil', qualification: 'MBBS, DGO', speciality: 'Gynecologist', hospital: 'Care Hospital', mobile: '7766554433', email: 'sneha@carehosp.com', location: 'Nagpur, MH', prescriptions: 23, rating: 4, status: 'Inactive' },
-        { id: 5, name: 'Dr. Vikram Singh', qualification: 'MBBS, MD', speciality: 'General Physician', hospital: 'GetWell Clinic', mobile: '9123456789', email: 'vikram@getwell.com', location: 'Thane, MH', prescriptions: 210, rating: 5, status: 'Active' },
-    ]);
+    // State
+    const [doctors, setDoctors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalDoctors, setTotalDoctors] = useState(0);
 
-    const specialities = ['All', ...new Set(doctors.map(d => d.speciality))];
+    const fetchDoctors = useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data } = await api.get('/doctors', {
+                params: {
+                    keyword: searchTerm,
+                    pageNumber: page,
+                    pageSize: 12
+                }
+            });
+            if (data.success) {
+                setDoctors(data.doctors);
+                setPage(data.page);
+                setTotalPages(data.pages);
+                setTotalDoctors(data.total);
+            }
+        } catch (error) {
+            console.error("Error fetching doctors:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, searchTerm]);
+
+    useEffect(() => {
+        fetchDoctors();
+    }, [fetchDoctors]);
+
+    const specialities = ['All', ...new Set(doctors.map(d => d.specialization))];
 
     const filteredDoctors = doctors.filter(doctor => {
-        const query = searchTerm.toLowerCase();
-        const matchesSearch = 
-            doctor.name.toLowerCase().includes(query) || 
-            doctor.hospital.toLowerCase().includes(query) ||
-            doctor.qualification.toLowerCase().includes(query) ||
-            doctor.mobile.includes(searchTerm);
-            
-        const matchesSpeciality = filterSpeciality === 'All' || doctor.speciality === filterSpeciality;
-        return matchesSearch && matchesSpeciality;
+        if (filterSpeciality === 'All') return true;
+        return doctor.specialization === filterSpeciality;
     });
 
-    const topPrescriber = doctors.reduce((prev, current) => (prev.prescriptions > current.prescriptions) ? prev : current, doctors[0]);
+    const topPrescriber = doctors.length > 0 ? doctors.reduce((prev, current) => ((prev.totalPrescriptions || 0) > (current.totalPrescriptions || 0)) ? prev : current, doctors[0]) : null;
 
     // --- Actions ---
 
@@ -41,11 +60,15 @@ const DoctorList = () => {
     };
 
     const handleEdit = (doctor) => {
-        navigate(`/people/doctors/edit/${doctor.id}`);
+        navigate(`/people/doctors/edit/${doctor._id}`);
     };
 
     const handleView = (doctor) => {
-         navigate(`/people/doctors/view/${doctor.id}`);
+         navigate(`/people/doctors/view/${doctor._id}`);
+    };
+
+    const handleNewRx = (doctor) => {
+        navigate('/sales/pos', { state: { doctor: { _id: doctor._id, name: doctor.name } } });
     };
 
     const handleDelete = (id) => {
@@ -56,17 +79,20 @@ const DoctorList = () => {
             showCancelButton: true,
             confirmButtonColor: '#d33',
             confirmButtonText: 'Yes, delete it!'
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                setDoctors(doctors.filter(d => d.id !== id));
-                Swal.fire('Deleted!', 'Doctor has been deleted.', 'success');
+                try {
+                    await api.delete(`/doctors/${id}`);
+                    fetchDoctors(); // Refresh list
+                    Swal.fire('Deleted!', 'Doctor has been deleted.', 'success');
+                } catch (err) {
+                    Swal.fire('Error', 'Failed to delete doctor', 'error');
+                }
             }
         });
     };
 
     const handlePrint = (doctor) => {
-        // Reuse the print logic here or just rely on the view page for printing.
-        // For quick action, keeping the print logic here as well is fine.
         const printWindow = window.open('', '', 'height=600,width=800');
         printWindow.document.write(`
           <!DOCTYPE html>
@@ -113,7 +139,7 @@ const DoctorList = () => {
                   <div class="avatar">Dr</div>
                   <div>
                     <div class="doc-name">${doctor.name}</div>
-                    <div class="doc-spec">${doctor.speciality}</div>
+                    <div class="doc-spec">${doctor.specialization}</div>
                   </div>
                 </div>
 
@@ -129,7 +155,7 @@ const DoctorList = () => {
                     </div>
                     <div class="item">
                       <div class="label">Contact Number</div>
-                      <div class="value">${doctor.mobile}</div>
+                      <div class="value">${doctor.phone || doctor.mobile}</div>
                     </div>
                     <div class="item">
                       <div class="label">Email Address</div>
@@ -137,18 +163,14 @@ const DoctorList = () => {
                     </div>
                     <div class="item" style="grid-column: 1 / -1;">
                       <div class="label">Location</div>
-                      <div class="value">${doctor.location}</div>
+                      <div class="value">${doctor.address || doctor.location || 'N/A'}</div>
                     </div>
                   </div>
 
                   <div class="stats-section">
                     <div>
-                      <div class="stat-num">${doctor.prescriptions}</div>
+                      <div class="stat-num">${doctor.totalPrescriptions || 0}</div>
                       <div class="stat-lbl">Total Prescriptions</div>
-                    </div>
-                    <div>
-                      <div class="stat-num">${doctor.rating} ⭐</div>
-                      <div class="stat-lbl">Rating</div>
                     </div>
                     <div>
                       <div class="stat-num">${doctor.status}</div>
@@ -171,6 +193,14 @@ const DoctorList = () => {
             printWindow.close();
         }, 250);
     };
+
+    if (loading && doctors.length === 0) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10">
@@ -197,7 +227,7 @@ const DoctorList = () => {
                  <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
                     <div>
                         <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Total Doctors</p>
-                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{doctors.length}</h3>
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{totalDoctors}</h3>
                          <div className="flex items-center gap-1 text-green-500 text-xs font-medium mt-1">
                             <Activity size={14} /> Active Network
                         </div>
@@ -211,7 +241,7 @@ const DoctorList = () => {
                     <div>
                         <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Total Prescriptions</p>
                         <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">
-                            {doctors.reduce((acc, curr) => acc + curr.prescriptions, 0)}
+                            {doctors.reduce((acc, curr) => acc + (curr.totalPrescriptions || 0), 0)}
                         </h3>
                          <div className="flex items-center gap-1 text-blue-500 text-xs font-medium mt-1">
                             <FileText size={14} /> Script Sales
@@ -227,7 +257,7 @@ const DoctorList = () => {
                         <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Top Prescriber</p>
                         <h3 className="text-xl font-bold text-gray-800 dark:text-white mt-1">{topPrescriber?.name || 'N/A'}</h3>
                          <div className="flex items-center gap-1 text-purple-500 text-xs font-medium mt-1">
-                            <Star size={14} /> {topPrescriber?.prescriptions || 0} Scripts
+                            <Star size={14} /> {topPrescriber?.totalPrescriptions || 0} Scripts
                         </div>
                     </div>
                     <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-xl">
@@ -270,7 +300,8 @@ const DoctorList = () => {
                 </div>
                 
                 <div className="flex items-center gap-2 overflow-x-auto w-full xl:w-auto no-scrollbar mask-linear-fade pr-4">
-                    {specialities.map((spec) => (
+                    {specialities.length > 5 && (
+                        specialities.map((spec) => (
                         <button
                             key={spec}
                             onClick={() => setFilterSpeciality(spec)}
@@ -281,7 +312,7 @@ const DoctorList = () => {
                         >
                             {spec}
                         </button>
-                    ))}
+                    )))}
                 </div>
             </div>
 
@@ -289,7 +320,7 @@ const DoctorList = () => {
             {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up">
                     {filteredDoctors.map((doctor) => (
-                        <div key={doctor.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col">
+                        <div key={doctor._id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col">
                             
                              {/* Header Band */}
                              <div className="h-1.5 bg-gradient-to-r from-blue-400 to-indigo-600"></div>
@@ -302,7 +333,7 @@ const DoctorList = () => {
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight line-clamp-1">{doctor.name}</h3>
-                                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 inline-block px-2 py-0.5 rounded mt-1">{doctor.speciality}</p>
+                                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 inline-block px-2 py-0.5 rounded mt-1">{doctor.specialization}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -323,11 +354,11 @@ const DoctorList = () => {
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2"><Phone size={14} /> Contact</span>
-                                        <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{doctor.mobile}</span>
+                                        <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{doctor.phone || doctor.mobile}</span>
                                     </div>
                                      <div className="flex items-center justify-between text-sm">
                                         <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2"><FileText size={14} /> Total Referred</span>
-                                        <span className="font-bold text-primary">{doctor.prescriptions}</span>
+                                        <span className="font-bold text-primary">{doctor.totalPrescriptions || 0}</span>
                                     </div>
                                 </div>
                             </div>
@@ -344,13 +375,13 @@ const DoctorList = () => {
                                     <button onClick={() => handleEdit(doctor)} className="p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Edit Profile">
                                         <Edit2 size={18} />
                                     </button>
-                                    <button onClick={() => handleDelete(doctor.id)} className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
+                                    <button onClick={() => handleDelete(doctor._id)} className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
                                         <Trash2 size={18} />
                                     </button>
                                 </div>
                                 <button 
                                     className="px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-secondary transition-all flex items-center gap-1 shadow-md shadow-primary/20"
-                                    onClick={() => navigate('/sales/pos')}
+                                    onClick={() => handleNewRx(doctor)}
                                 >
                                     <Plus size={14} /> New Rx
                                 </button>
@@ -375,7 +406,7 @@ const DoctorList = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {filteredDoctors.map((doctor) => (
-                                    <tr key={doctor.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors group">
+                                    <tr key={doctor._id} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold border border-blue-100 dark:border-blue-800">
@@ -389,7 +420,7 @@ const DoctorList = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
-                                                {doctor.speciality}
+                                                {doctor.specialization}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -399,10 +430,10 @@ const DoctorList = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-300">
-                                            {doctor.mobile}
+                                            {doctor.phone || 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className="font-bold text-gray-800 dark:text-white">{doctor.prescriptions}</span>
+                                            <span className="font-bold text-gray-800 dark:text-white">{doctor.totalPrescriptions || 0}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${doctor.status === 'Active' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
@@ -418,7 +449,7 @@ const DoctorList = () => {
                                                 <button onClick={() => handleEdit(doctor)} className="p-1.5 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Edit">
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button onClick={() => handleDelete(doctor.id)} className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
+                                                <button onClick={() => handleDelete(doctor._id)} className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
@@ -428,12 +459,31 @@ const DoctorList = () => {
                             </tbody>
                         </table>
                     </div>
-                    {filteredDoctors.length === 0 && (
-                        <div className="p-12 text-center text-gray-500 dark:text-gray-400">
-                            <Search size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-                            <p className="text-sm">No doctors found matching your criteria.</p>
-                        </div>
-                    )}
+                </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mt-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Showing page <span className="font-bold text-gray-800 dark:text-white">{page}</span> of <span className="font-bold text-gray-800 dark:text-white">{totalPages}</span>
+                    </p>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                            disabled={page === 1}
+                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-600 dark:text-gray-300"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                        <button
+                            onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={page === totalPages}
+                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-600 dark:text-gray-300"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

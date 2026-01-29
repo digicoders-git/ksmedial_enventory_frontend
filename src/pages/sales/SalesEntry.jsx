@@ -1,41 +1,95 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Ticket, Trash2, Printer, Grid, List, Filter, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const SalesEntry = () => {
-  const { inventory, sellItems } = useInventory();
+  const navigate = useNavigate();
+  const { inventory, sellItems, loading: inventoryLoading } = useInventory();
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const { id } = useParams();
   const isEditing = !!id;
 
-  const [customer, setCustomer] = useState('');
+  const [categories, setCategories] = useState(['All']);
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [loading, setLoading] = useState(true);
 
-  // Loads mock data if editing
+  // Fetch Categories & Customers
   useEffect(() => {
-    if (isEditing) {
-      // Mock loading logic - In a real app we'd fetch from API
-      const loadMockData = () => {
-          const mockCart = [
-            { ...inventory[0], qty: 2, amount: (inventory[0]?.rate || 0) * 2 },
-            { ...inventory[1], qty: 1, amount: (inventory[1]?.rate || 0) * 1 },
-          ];
-          setCart(mockCart);
-          setCustomer('Rahul Sharma');
-          setPaymentMode('UPI');
-      };
-      
-      const timer = setTimeout(loadMockData, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [isEditing, inventory]);
+    const fetchData = async () => {
+        try {
+            const [catRes, custRes] = await Promise.all([
+                api.get('/categories'),
+                api.get('/customers')
+            ]);
+            if (catRes.data.success) {
+                setCategories(['All', ...catRes.data.categories.map(c => c.name)]);
+            }
+            if (custRes.data.success) {
+                setCustomers(custRes.data.customers);
+            }
+        } catch (error) {
+            console.error("Error fetching POS data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
+  }, []);
 
-  // Categories for Tabs
-  const categories = ['All', 'Tablet', 'Syrup', 'Injection', 'Cream', 'Other'];
+  // Loads data if editing
+  useEffect(() => {
+    const fetchInvoice = async () => {
+        if (!isEditing || inventory.length === 0) return;
+        
+        try {
+            setLoading(true);
+            const { data } = await api.get(`/sales/${id}`);
+            if (data.success && data.sale) {
+                const sale = data.sale;
+                
+                // Set customer
+                if (sale.customer) {
+                    setSelectedCustomer(sale.customer);
+                    setCustomerSearch(sale.customer.name);
+                } else {
+                    setCustomerSearch(sale.customerName || 'Walk-in');
+                }
+                
+                // Set payment mode
+                setPaymentMode(sale.paymentMethod || 'Cash');
+                
+                // Sync cart with inventory to ensure stock/price details are fresh
+                const populatedCart = sale.items.map(item => {
+                    const invItem = inventory.find(p => p.id === item.productId?._id || p.id === item.productId);
+                    return {
+                        id: item.productId?._id || item.productId,
+                        name: item.name,
+                        qty: item.quantity,
+                        rate: item.price,
+                        amount: item.subtotal,
+                        stock: invItem ? invItem.stock + item.quantity : item.quantity // Add back current qty to stock limit
+                    };
+                });
+                setCart(populatedCart);
+            }
+        } catch (error) {
+            console.error("Error loading invoice for edit:", error);
+            Swal.fire('Error', 'Failed to load invoice details', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchInvoice();
+  }, [isEditing, id, inventory]);
 
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
@@ -68,11 +122,11 @@ const SalesEntry = () => {
       if (item.id === id) {
         const newQty = item.qty + delta;
         
-        if (newQty <= 0) return item; // Don't allow 0 here, use remove button
+        if (newQty <= 0) return item; 
 
         const product = inventory.find(p => p.id === id);
         if (newQty > product.stock) {
-           Swal.fire({
+            Swal.fire({
                 icon: 'warning',
                 title: 'Insufficient Stock',
                 text: `Max available: ${product.stock}`,
@@ -105,13 +159,56 @@ const SalesEntry = () => {
           }).then((result) => {
               if (result.isConfirmed) {
                   setCart([]);
+                  setSelectedCustomer(null);
+                  setCustomerSearch('');
                   Swal.fire('Cleared!', 'Cart is now empty.', 'success');
               }
           })
       }
   }
 
-  const handleProcessSale = () => {
+    const handleQuickAddCustomer = async () => {
+        const { value: formValues } = await Swal.fire({
+            title: 'Quick Add Customer',
+            html: `
+                <input id="swal-name" class="swal2-input" placeholder="Full Name" value="${customerSearch}">
+                <input id="swal-phone" class="swal2-input" placeholder="Phone Number">
+                <input id="swal-address" class="swal2-input" placeholder="Address (Optional)">
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Add Customer',
+            confirmButtonColor: '#007242',
+            preConfirm: () => {
+                const name = document.getElementById('swal-name').value;
+                const phone = document.getElementById('swal-phone').value;
+                const address = document.getElementById('swal-address').value;
+                if (!name || !phone) {
+                    Swal.showValidationMessage('Name and Phone are required');
+                    return false;
+                }
+                return { name, phone, address };
+            }
+        });
+
+        if (formValues) {
+            try {
+                Swal.fire({ title: 'Saving...', didOpen: () => Swal.showLoading() });
+                const { data } = await api.post('/customers', formValues);
+                if (data.success) {
+                    setCustomers([...customers, data.customer]);
+                    setSelectedCustomer(data.customer);
+                    setCustomerSearch(data.customer.name);
+                    setShowCustomerDropdown(false);
+                    Swal.fire('Success', 'Customer added and selected.', 'success');
+                }
+            } catch (error) {
+                Swal.fire('Error', error.response?.data?.message || 'Failed to add customer', 'error');
+            }
+        }
+    };
+
+    const handleProcessSale = () => {
     if (cart.length === 0) {
       Swal.fire('Empty Cart', 'Please add items to process sale.', 'info');
       return;
@@ -120,34 +217,58 @@ const SalesEntry = () => {
     Swal.fire({
         title: isEditing ? 'Update Invoice' : 'Confirm Payment',
         html: `
-            <div class="text-left">
-                <p><strong>Invoice ID:</strong> ${isEditing ? id : 'Auto-generated'}</p>
-                <p><strong>Total Amount:</strong> ₹${grandTotal.toFixed(2)}</p>
-                <p><strong>Items:</strong> ${cart.length}</p>
-                <p><strong>Payment Mode:</strong> ${paymentMode}</p>
+            <div class="text-left py-2">
+                <div class="flex justify-between mb-1">
+                    <span class="text-gray-500">Customer:</span>
+                    <span class="font-bold">${selectedCustomer ? selectedCustomer.name : 'Walk-in'}</span>
+                </div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-gray-500">Items:</span>
+                    <span class="font-bold">${cart.length}</span>
+                </div>
+                <div class="flex justify-between mb-1 border-t pt-1 mt-2">
+                    <span class="text-gray-800 font-bold">Total Amount:</span>
+                    <span class="text-primary font-black text-lg">Rs. ${grandTotal.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between mt-2">
+                    <span class="text-gray-500">Payment Via:</span>
+                    <span class="badge bg-primary/10 text-primary border-none px-2 rounded font-bold">${paymentMode}</span>
+                </div>
             </div>
         `,
-        icon: 'info',
+        icon: 'success',
         showCancelButton: true,
-        confirmButtonText: isEditing ? 'Update Bill' : 'Confirm & Print',
-        confirmButtonColor: '#007242'
+        confirmButtonText: isEditing ? 'Update Bill' : 'Complete Sale & Print',
+        confirmButtonColor: '#007242',
+        cancelButtonColor: '#d33'
     }).then(async (result) => {
         if (result.isConfirmed) {
             const saleData = cart.map(item => ({ id: item.id, qty: item.qty }));
-            const metadata = { customer, paymentMode };
+            const metadata = { 
+                customer: selectedCustomer || (customerSearch ? { name: customerSearch } : 'Walk-in'), 
+                paymentMode,
+                totalAmount: grandTotal,
+                subTotal: totalAmount,
+                tax,
+                discount
+            };
             
-            // sellItems is now async
-            const response = await sellItems(saleData, metadata);
+            const response = await sellItems(saleData, metadata, isEditing ? id : null);
             
             if (response.success) {
                 setCart([]);
+                setSelectedCustomer(null);
+                setCustomerSearch('');
                 Swal.fire({
                     icon: 'success',
                     title: isEditing ? 'Invoice Updated!' : 'Sale Successful!',
-                    text: isEditing ? 'Invoice changes saved successfully.' : 'Invoice generated successfully.',
+                    text: response.message,
                     timer: 2000,
                     showConfirmButton: false
                 });
+                if (isEditing) {
+                    setTimeout(() => navigate('/sales/invoices'), 2000);
+                }
             } else {
                 Swal.fire('Failed', response.message, 'error');
             }
@@ -157,22 +278,30 @@ const SalesEntry = () => {
 
   const filteredInventory = inventory.filter(item => {
       const searchLower = searchTerm.toLowerCase().trim();
-      if (!searchLower) return activeCategory === 'All' || item.category === activeCategory;
-      
-      const matchesSearch = 
+      const matchesSearch = !searchLower || (
         item.name.toLowerCase().includes(searchLower) ||
         item.sku?.toLowerCase().includes(searchLower) ||
-        item.batch?.toLowerCase().includes(searchLower);
+        item.batch?.toLowerCase().includes(searchLower)
+      );
         
       const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
       
       return matchesSearch && matchesCategory;
   });
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.amount, 0);
-  const tax = totalAmount * 0.18; // 18% GST Mock
-  const discount = 0; // Can be added later
-  const grandTotal = totalAmount + tax - discount;
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.phone?.includes(customerSearch)
+  );
+
+  const subTotal = cart.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+  const totalTax = cart.reduce((sum, item) => {
+      const prod = inventory.find(p => p.id === item.id);
+      const taxRate = prod?.tax || 18;
+      return sum + (item.qty * item.rate * (taxRate / 100));
+  }, 0);
+  const discountAmount = 0; // Can be made dynamic with a state
+  const grandTotal = subTotal + totalTax - discountAmount;
 
   return (
     <div className="flex flex-col gap-6 p-2 lg:p-4 bg-gray-50/50 dark:bg-gray-900 min-h-[calc(100vh-5rem)] text-gray-800 dark:text-gray-100 font-sans">
@@ -219,51 +348,58 @@ const SalesEntry = () => {
 
         {/* Product Grid */}
         <div className="w-full">
-           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-               {filteredInventory.map((item) => (
-                   <div 
-                        key={item.id} 
-                        onClick={() => item.stock > 0 && addToCart(item)}
-                        className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-primary/20 dark:hover:border-primary/20 transition-all duration-300 group flex flex-col justify-between relative overflow-hidden h-full ${item.stock === 0 ? 'opacity-60 grayscale cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' : 'cursor-pointer hover:-translate-y-1'}`}
-                   >
-                       {/* Stock Badge */}
-                       <div className="flex justify-between items-start mb-3">
-                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
-                                item.stock > 10 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
-                                item.stock > 0 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800'
-                            }`}>
-                                {item.stock > 0 ? `${item.stock} left` : 'No Stock'}
-                            </span>
-                            {item.stock > 0 && (
-                                <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <Plus size={16} strokeWidth={3} />
-                                </div>
-                            )}
-                       </div>
-
-                       <div className="flex-1 flex flex-col items-center text-center">
-                           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform duration-300">
-                               <Package size={32} />
+           {inventoryLoading ? (
+               <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+                   <p className="font-medium animate-pulse">Loading Medicines...</p>
+               </div>
+           ) : (
+               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                   {filteredInventory.map((item) => (
+                       <div 
+                            key={item.id} 
+                            onClick={() => item.stock > 0 && addToCart(item)}
+                            className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-primary/20 dark:hover:border-primary/20 transition-all duration-300 group flex flex-col justify-between relative overflow-hidden h-full ${item.stock === 0 ? 'opacity-60 grayscale cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' : 'cursor-pointer hover:-translate-y-1'}`}
+                       >
+                           {/* Stock Badge */}
+                           <div className="flex justify-between items-start mb-3">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
+                                    item.stock > 10 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
+                                    item.stock > 0 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800'
+                                }`}>
+                                    {item.stock > 0 ? `${item.stock} left` : 'No Stock'}
+                                </span>
+                                {item.stock > 0 && (
+                                    <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                                        <Plus size={16} strokeWidth={3} />
+                                    </div>
+                                )}
                            </div>
-                           <h3 className="font-bold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-primary transition-colors line-clamp-2 w-full text-base">{item.name}</h3>
-                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.location || 'Bin A-1'}</p>
+
+                           <div className="flex-1 flex flex-col items-center text-center">
+                               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform duration-300">
+                                   <Package size={32} />
+                               </div>
+                               <h3 className="font-bold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-primary transition-colors line-clamp-2 w-full text-base">{item.name}</h3>
+                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.sku || 'SKU'}</p>
+                           </div>
+                           
+                           <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 w-full text-center">
+                               <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">Rs. {item.rate}</p>
+                           </div>
                        </div>
-                       
-                       <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 w-full text-center">
-                           <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">₹{item.rate}</p>
+                   ))}
+                   {filteredInventory.length === 0 && (
+                       <div className="col-span-full h-64 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
+                           <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                                <Search size={32} className="opacity-40" />
+                           </div>
+                           <p className="font-medium text-lg text-gray-500 dark:text-gray-400">No medicines found</p>
+                           <p className="text-sm">Try adjusting your search or filters</p>
                        </div>
-                   </div>
-               ))}
-               {filteredInventory.length === 0 && (
-                   <div className="col-span-full h-64 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
-                       <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                            <Search size={32} className="opacity-40" />
-                       </div>
-                       <p className="font-medium text-lg text-gray-500 dark:text-gray-400">No medicines found</p>
-                       <p className="text-sm">Try adjusting your search or filters</p>
-                   </div>
-               )}
-           </div>
+                   )}
+               </div>
+           )}
         </div>
       </div>
 
@@ -277,20 +413,63 @@ const SalesEntry = () => {
                        <ShoppingCart size={24} className="text-primary" /> {isEditing ? 'Edit Invoice' : 'Current Order'}
                    </h2>
                    <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-lg text-xs font-bold text-gray-500 dark:text-gray-400">
-                       {isEditing ? id : '#00452'}
+                       {isEditing ? id : '#POS-' + Date.now().toString().slice(-6)}
                    </div>
                </div>
                
                {/* Customer Input */}
-               <div className="bg-gray-50 dark:bg-gray-750 rounded-xl p-1 flex items-center border border-gray-200 dark:border-gray-600 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                   <div className="p-2.5 text-gray-400 dark:text-gray-500"><User size={18} /></div>
-                   <input 
-                       type="text" 
-                       placeholder="Select Customer (Optional)" 
-                       value={customer}
-                       onChange={(e) => setCustomer(e.target.value)}
-                       className="bg-transparent w-full text-sm text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none font-medium" 
-                   />
+               <div className="relative">
+                   <div className="bg-gray-50 dark:bg-gray-750 rounded-xl p-1 flex items-center border border-gray-200 dark:border-gray-600 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                       <div className="p-2.5 text-gray-400 dark:text-gray-500"><User size={18} /></div>
+                       <input 
+                           type="text" 
+                           placeholder="Search Customer (Name/Phone)" 
+                           value={customerSearch}
+                           onFocus={() => setShowCustomerDropdown(true)}
+                           onChange={(e) => {
+                               setCustomerSearch(e.target.value);
+                               setSelectedCustomer(null);
+                               setShowCustomerDropdown(true);
+                           }}
+                           className="bg-transparent w-full text-sm text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none font-medium" 
+                       />
+                       {selectedCustomer && (
+                           <button onClick={() => {setSelectedCustomer(null); setCustomerSearch('');}} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                               <XCircle size={16} />
+                           </button>
+                       )}
+                   </div>
+                   
+                   {showCustomerDropdown && (customerSearch || customers.length > 0) && !selectedCustomer && (
+                       <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto">
+                           {filteredCustomers.length > 0 ? (
+                               filteredCustomers.map(c => (
+                                   <div 
+                                       key={c._id}
+                                       onClick={() => {
+                                           setSelectedCustomer(c);
+                                           setCustomerSearch(c.name);
+                                           setShowCustomerDropdown(false);
+                                       }}
+                                       className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                   >
+                                       <p className="font-bold text-sm text-gray-800 dark:text-gray-100">{c.name}</p>
+                                       <p className="text-xs text-gray-500 dark:text-gray-400">{c.phone}</p>
+                                   </div>
+                               ))
+                           ) : (
+                               <div className="p-4 text-center">
+                                   <p className="text-xs text-gray-500">No customer found. Will treat as walk-in: <span className="font-bold">"{customerSearch}"</span></p>
+                                   <button 
+                                       onClick={() => setShowCustomerDropdown(false)}
+                                       className="mt-2 text-xs font-bold text-primary"
+                                   >
+                                       Use this name
+                                   </button>
+                               </div>
+                           )}
+                       </div>
+                   )}
                </div>
           </div>
 
@@ -344,15 +523,15 @@ const SalesEntry = () => {
                <div className="space-y-3 mb-6">
                    <div className="flex justify-between text-sm">
                        <span className="text-gray-500 dark:text-gray-400 font-medium">Subtotal</span>
-                       <span className="font-bold text-gray-900 dark:text-white">₹{totalAmount.toFixed(2)}</span>
+                       <span className="font-bold text-gray-900 dark:text-white">Rs. {subTotal.toFixed(2)}</span>
                    </div>
                    <div className="flex justify-between text-sm">
-                       <span className="text-gray-500 dark:text-gray-400 font-medium">Tax (GST 18%)</span>
-                       <span className="font-bold text-gray-900 dark:text-white">₹{tax.toFixed(2)}</span>
+                       <span className="text-gray-500 dark:text-gray-400 font-medium">Tax</span>
+                       <span className="font-bold text-gray-900 dark:text-white">Rs. {totalTax.toFixed(2)}</span>
                    </div>
                    <div className="flex justify-between items-end pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
                        <span className="text-gray-500 dark:text-gray-400 font-bold">Total to Pay</span>
-                       <span className="text-2xl font-black text-gray-900 dark:text-white">₹{grandTotal.toFixed(2)}</span>
+                       <span className="text-2xl font-black text-gray-900 dark:text-white">Rs. {grandTotal.toFixed(2)}</span>
                    </div>
                </div>
 

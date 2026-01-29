@@ -1,13 +1,50 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, Phone, Mail, MapPin, MoreVertical, Edit2, Trash2, Truck, Star, CreditCard, X, Briefcase, FileText, CheckCircle, LayoutGrid, List as ListIcon, Building2, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const SupplierList = () => {
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [searchTerm, setSearchTerm] = useState('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState([]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get('/suppliers', {
+        params: { keyword: searchTerm }
+      });
+      if (data.success) {
+        setSuppliers(data.suppliers.map(s => ({
+          ...s,
+          id: s._id,
+          contact: s.contactPerson,
+          gst: s.gstNumber,
+          license: s.drugLicenseNumber
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      Swal.fire('Error', 'Failed to fetch suppliers', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm]);
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
 
   // Print function for supplier details
   const handlePrint = (supplier) => {
@@ -295,7 +332,7 @@ const SupplierList = () => {
 
               <div class="balance-section">
                 <div class="balance-label">Outstanding Balance</div>
-                <div class="balance-amount">₹${supplier.balance.toLocaleString('en-IN')}</div>
+                <div class="balance-amount">Rs. ${supplier.balance.toLocaleString('en-IN')}</div>
               </div>
 
               <div class="footer">
@@ -320,37 +357,41 @@ const SupplierList = () => {
   };
 
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  // Mock Data
-  const [suppliers, setSuppliers] = useState([
-    { id: 1, name: 'Health Dist', contact: 'Rahul Singh', phone: '9876543210', email: 'rahul@healthdist.com', gst: '27AABCU9603R1ZN', city: 'Mumbai', address: '123, Pharma Park, Andheri East, Mumbai', rating: 4.5, status: 'Active', balance: 0, license: 'DL-MH-10293' },
-    { id: 2, name: 'Pharma World', contact: 'Amit Verma', phone: '9898989898', email: 'amit@pharmaworld.com', gst: '27AABCU9603R1ZN', city: 'Pune', address: '45, Tech Hub, Hinjewadi, Pune', rating: 4.8, status: 'Active', balance: 12500, license: 'DL-MH-44556' },
-    { id: 3, name: 'Sun Pharma Dist', contact: 'Suresh Kumar', phone: '9123456780', email: 'suresh@sunpharma.com', gst: '27AABCU9603R1ZN', city: 'Nagpur', address: 'Plot 88, MIDC, Nagpur', rating: 4.2, status: 'Inactive', balance: 0, license: 'DL-MH-77889' },
-    { id: 4, name: 'MediCare Supplies', contact: 'Priya Gupta', phone: '8765432109', email: 'priya@medicare.com', gst: '27AABCU9603R1ZN', city: 'Nashik', address: 'Shop 12, Main Market, Nashik', rating: 4.0, status: 'Active', balance: 45000, license: 'DL-MH-33221' },
-    { id: 5, name: 'Global Meds', contact: 'Vikram Das', phone: '9000012345', email: 'vikram@globalmeds.com', gst: '27AABCU9603R1ZN', city: 'Thane', address: 'Sector 5, Thane West', rating: 4.6, status: 'Active', balance: 2500, license: 'DL-MH-55667' },
-    { id: 6, name: 'Zenith Pharma', contact: 'Anjali Rao', phone: '9988776655', email: 'anjali@zenith.com', gst: '27AABCU9603R1ZN', city: 'Aurangabad', address: 'Industrial Area, Waluj', rating: 3.9, status: 'Inactive', balance: 0, license: 'DL-MH-99001' },
-    { id: 7, name: 'LifeCare Distributors', contact: 'Rohan Mehta', phone: '8877665544', email: 'rohan@lifecare.com', gst: '27AABCU9603R1ZN', city: 'Mumbai', address: 'Dadar West, Mumbai', rating: 4.3, status: 'Active', balance: 18000, license: 'DL-MH-22334' },
-    { id: 8, name: 'Shiv Shakti Pharma', contact: 'Manoj Tiwari', phone: '7766554433', email: 'manoj@shivshakti.com', gst: '27AABCU9603R1ZN', city: 'Pune', address: 'Camp, Pune', rating: 4.1, status: 'Active', balance: 5000, license: 'DL-MH-44112' },
-    { id: 9, name: 'Apollo Supply Chain', contact: 'Kavita Iyer', phone: '6655443322', email: 'kavita@apollo.com', gst: '27AABCU9603R1ZN', city: 'Navi Mumbai', address: 'Vashi, Navi Mumbai', rating: 4.9, status: 'Active', balance: 0, license: 'DL-MH-77665' },
-    { id: 10, name: 'Metro Medicals', contact: 'Rajesh Khanna', phone: '5544332211', email: 'rajesh@metro.com', gst: '27AABCU9603R1ZN', city: 'Mumbai', address: 'Bandra, Mumbai', rating: 4.4, status: 'Active', balance: 8900, license: 'DL-MH-33445' },
-    { id: 11, name: 'Universal Drugs', contact: 'Simran Kaur', phone: '4433221100', email: 'simran@universal.com', gst: '27AABCU9603R1ZN', city: 'Nagpur', address: 'Sitabuldi, Nagpur', rating: 3.8, status: 'Inactive', balance: 0, license: 'DL-MH-11223' },
-    { id: 12, name: 'City Pharma', contact: 'Arjun Reddy', phone: '3322110099', email: 'arjun@citypharma.com', gst: '27AABCU9603R1ZN', city: 'Nashik', address: 'Gangapur Road, Nashik', rating: 4.7, status: 'Active', balance: 1200, license: 'DL-MH-66778' },
-    { id: 13, name: 'Best Care', contact: 'Pooja Hegde', phone: '2211009988', email: 'pooja@bestcare.com', gst: '27AABCU9603R1ZN', city: 'Pune', address: 'Kothrud, Pune', rating: 4.5, status: 'Active', balance: 0, license: 'DL-MH-88990' },
-  ]);
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setShowAddModal(false);
-    Swal.fire({
-      icon: 'success',
-      title: 'Success',
-      text: selectedSupplier ? 'Supplier updated successfully!' : 'New supplier added successfully!',
-      timer: 2000,
-      showConfirmButton: false
-    });
-    setSelectedSupplier(null);
+    const formData = new FormData(e.currentTarget);
+    const supplierData = {
+      name: formData.get('name'),
+      contactPerson: formData.get('contact'),
+      gstNumber: formData.get('gst'),
+      drugLicenseNumber: formData.get('license'),
+      phone: formData.get('phone'),
+      email: formData.get('email'),
+      city: formData.get('city'),
+      address: formData.get('address'),
+    };
+
+    try {
+      if (selectedSupplier) {
+        // Edit mode
+        const { data } = await api.put(`/suppliers/${selectedSupplier._id}`, supplierData);
+        if (data.success) {
+          Swal.fire('Updated', 'Supplier updated successfully', 'success');
+        }
+      } else {
+        // Create mode
+        const { data } = await api.post('/suppliers', supplierData);
+        if (data.success) {
+          Swal.fire('Created', 'New supplier added successfully', 'success');
+        }
+      }
+      setShowAddModal(false);
+      setSelectedSupplier(null);
+      fetchSuppliers();
+    } catch (error) {
+      console.error("Error saving supplier:", error);
+      Swal.fire('Error', error.response?.data?.message || 'Failed to save supplier', 'error');
+    }
   };
 
   const handleDelete = (id) => {
@@ -361,10 +402,17 @@ const SupplierList = () => {
         showCancelButton: true,
         confirmButtonColor: '#d33',
         confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
-            setSuppliers(suppliers.filter(s => s.id !== id));
-            Swal.fire('Deleted!', 'Supplier has been deleted.', 'success');
+            try {
+              const { data } = await api.delete(`/suppliers/${id}`);
+              if (data.success) {
+                Swal.fire('Deleted!', 'Supplier has been deleted.', 'success');
+                fetchSuppliers();
+              }
+            } catch (error) {
+              Swal.fire('Error', 'Failed to delete supplier', 'error');
+            }
         }
     });
   };
@@ -379,32 +427,45 @@ const SupplierList = () => {
       setShowViewModal(true);
   };
 
-  // Filter & Pagination Logic
-  const { paginatedSuppliers, totalPages, paginationInfo } = useMemo(() => {
-    const search = searchTerm.toLowerCase();
-    const filtered = suppliers.filter(s => 
-      s.name.toLowerCase().includes(search) || 
-      s.contact.toLowerCase().includes(search) || 
-      s.city.toLowerCase().includes(search)
-    );
+  const handleViewHistory = async (supplier) => {
+    try {
+        setHistoryLoading(true);
+        const { data } = await api.get('/purchases', {
+            params: { supplierId: supplier._id || supplier.id }
+        });
+        if (data.success) {
+            setHistoryData(data.purchases);
+            setSelectedSupplier(supplier);
+            setShowViewModal(false); // Close view modal if it was open
+            setShowHistoryModal(true);
+        }
+    } catch (error) {
+        console.error("Error fetching history:", error);
+        Swal.fire('Error', 'Failed to fetch supplier history', 'error');
+    } finally {
+        setHistoryLoading(false);
+    }
+  };
 
-    const totalItems = filtered.length;
+  // Pagination Logic
+  const { paginatedSuppliers, totalPages, paginationInfo } = useMemo(() => {
+    const totalItems = suppliers.length;
     const totalPgs = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const paginatedItems = filtered.slice(startIndex, endIndex);
+    const paginatedItems = suppliers.slice(startIndex, endIndex);
 
     return {
       paginatedSuppliers: paginatedItems,
       totalPages: totalPgs,
       paginationInfo: {
         totalItems,
-        startIndex: startIndex + 1,
+        startIndex: totalItems > 0 ? startIndex + 1 : 0,
         endIndex: Math.min(endIndex, totalItems),
         currentPage
       }
     };
-  }, [suppliers, searchTerm, currentPage, itemsPerPage]);
+  }, [suppliers, currentPage, itemsPerPage]);
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
@@ -476,7 +537,12 @@ const SupplierList = () => {
         </div>
 
         {/* Content */}
-        {viewMode === 'grid' ? (
+        {loading ? (
+           <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+               <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
+               <p className="text-gray-500 font-medium">Loading suppliers...</p>
+           </div>
+        ) : viewMode === 'grid' ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {paginatedSuppliers.map((supplier) => (
                     <div key={supplier.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden flex flex-col">
@@ -513,7 +579,7 @@ const SupplierList = () => {
                     <div className="mt-auto border-t border-gray-50 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30 p-4 px-6 flex items-center justify-between">
                         <div>
                             <p className="text-[10px] bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold inline-block mb-1">Due Balance</p>
-                            <p className={`text-lg font-bold ${supplier.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>₹{supplier.balance.toLocaleString()}</p>
+                            <p className={`text-lg font-bold ${supplier.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>Rs. {supplier.balance.toLocaleString()}</p>
                         </div>
                         <div className="flex gap-1 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleEdit(supplier)} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors" title="Edit"><Edit2 size={16} /></button>
@@ -553,7 +619,7 @@ const SupplierList = () => {
                                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{s.city}</td>
                                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{s.contact}</td>
                                     <td className="px-6 py-4 font-medium dark:text-gray-300">{s.phone}</td>
-                                    <td className={`px-6 py-4 font-bold ${s.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>₹{s.balance.toLocaleString()}</td>
+                                    <td className={`px-6 py-4 font-bold ${s.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>Rs. {s.balance.toLocaleString()}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.status === 'Active' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
                                             {s.status}
@@ -665,19 +731,23 @@ const SupplierList = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Company Name <span className="text-red-500">*</span></label>
-                              <input type="text" defaultValue={selectedSupplier?.name} placeholder="e.g. Health Distributors" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" required />
+                              <input type="text" name="name" defaultValue={selectedSupplier?.name} placeholder="e.g. Health Distributors" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" required />
                           </div>
                           <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Contact Person</label>
-                              <input type="text" defaultValue={selectedSupplier?.contact} placeholder="Rahul Singh" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+                              <input type="text" name="contact" defaultValue={selectedSupplier?.contact} placeholder="Rahul Singh" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
                           </div>
                           <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">GSTIN</label>
-                              <input type="text" defaultValue={selectedSupplier?.gst} placeholder="27AABCU9603R1ZN" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-mono uppercase text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+                              <input type="text" name="gst" defaultValue={selectedSupplier?.gst} placeholder="27AABCU9603R1ZN" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-mono uppercase text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
                           </div>
                            <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Drug License No.</label>
-                              <input type="text" defaultValue={selectedSupplier?.license} placeholder="DL-123456" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-mono uppercase text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+                              <input type="text" name="license" defaultValue={selectedSupplier?.license} placeholder="DL-123456" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-mono uppercase text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+                          </div>
+                          <div className="space-y-1.5">
+                              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">City</label>
+                              <input type="text" name="city" defaultValue={selectedSupplier?.city} placeholder="Mumbai" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white" />
                           </div>
                       </div>
                   </div>
@@ -686,15 +756,15 @@ const SupplierList = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Phone <span className="text-red-500">*</span></label>
-                              <input type="tel" defaultValue={selectedSupplier?.phone} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white" required />
+                              <input type="tel" name="phone" defaultValue={selectedSupplier?.phone} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white" required />
                           </div>
                           <div className="space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Email</label>
-                              <input type="email" defaultValue={selectedSupplier?.email} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white" />
+                              <input type="email" name="email" defaultValue={selectedSupplier?.email} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white" />
                           </div>
                           <div className="col-span-1 md:col-span-2 space-y-1.5">
                               <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Address</label>
-                              <textarea rows="2" defaultValue={selectedSupplier?.address} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm resize-none text-gray-800 dark:text-white"></textarea>
+                              <textarea rows="2" name="address" defaultValue={selectedSupplier?.address} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm resize-none text-gray-800 dark:text-white"></textarea>
                           </div>
                       </div>
                   </div>
@@ -763,7 +833,7 @@ const SupplierList = () => {
                        <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
                             <div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Outstanding Balance</p>
-                                <p className={`text-xl font-black ${selectedSupplier.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>₹{selectedSupplier.balance.toLocaleString()}</p>
+                                <p className={`text-xl font-black ${selectedSupplier.balance > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>Rs. {selectedSupplier.balance.toLocaleString()}</p>
                             </div>
                             <div className="flex gap-2">
                                 <button 
@@ -774,7 +844,10 @@ const SupplierList = () => {
                                     <Printer size={16} />
                                     Print
                                 </button>
-                                <button className="px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm font-bold rounded-xl hover:bg-black dark:hover:bg-gray-600 transition-colors">
+                                <button 
+                                    onClick={() => handleViewHistory(selectedSupplier)}
+                                    className="px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm font-bold rounded-xl hover:bg-black dark:hover:bg-gray-600 transition-colors"
+                                >
                                     View History
                                 </button>
                             </div>
@@ -783,6 +856,116 @@ const SupplierList = () => {
               </div>
           </div>
       )}
+
+      {/* History Modal */}
+      {showHistoryModal && selectedSupplier && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md animate-fade-in">
+              <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-3xl shadow-2xl animate-scale-up border border-white/20 dark:border-gray-700 overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="px-8 py-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-700/50">
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-800 dark:text-white">Transaction History</h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Showing all purchases from <span className="font-bold text-primary">{selectedSupplier.name}</span></p>
+                      </div>
+                      <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:shadow-md dark:shadow-none">
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                      {historyLoading ? (
+                          <div className="flex flex-col items-center justify-center py-20">
+                              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
+                              <p className="text-gray-500 font-medium">Fetching history...</p>
+                          </div>
+                      ) : historyData.length > 0 ? (
+                          <div className="space-y-6">
+                              <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
+                                  <table className="w-full text-left text-sm">
+                                      <thead className="bg-gray-50 dark:bg-gray-750 text-gray-500 dark:text-gray-400 uppercase font-semibold">
+                                          <tr>
+                                              <th className="px-6 py-4">Date</th>
+                                              <th className="px-6 py-4">Invoice #</th>
+                                              <th className="px-6 py-4">Status</th>
+                                              <th className="px-6 py-4">Payment</th>
+                                              <th className="px-6 py-4 text-right">Amount</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                                          {historyData.map((item) => (
+                                              <tr key={item._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
+                                                  <td className="px-6 py-4 dark:text-gray-300 whitespace-nowrap">
+                                                       {new Date(item.purchaseDate || item.createdAt).toLocaleDateString('en-IN', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric'
+                                                      })}
+                                                  </td>
+                                                  <td className="px-6 py-4 font-bold text-gray-800 dark:text-white">{item.invoiceNumber}</td>
+                                                  <td className="px-6 py-4">
+                                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                          item.status === 'Received' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                          item.status === 'Pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                      }`}>
+                                                          {item.status}
+                                                      </span>
+                                                  </td>
+                                                  <td className="px-6 py-4">
+                                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                          item.paymentStatus === 'Paid' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                          item.paymentStatus === 'Partial' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                      }`}>
+                                                          {item.paymentStatus}
+                                                      </span>
+                                                  </td>
+                                                  <td className="px-6 py-4 text-right font-black text-gray-900 dark:text-white">
+                                                      Rs. {item.grandTotal.toLocaleString()}
+                                                  </td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </table>
+                              </div>
+                              
+                              <div className="bg-primary/5 dark:bg-primary/10 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                                   <div className="flex items-center gap-4">
+                                       <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+                                           <CreditCard size={24} />
+                                       </div>
+                                       <div>
+                                           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Total Procurement</p>
+                                           <p className="text-xl font-black text-gray-800 dark:text-white">Rs. {historyData.reduce((acc, curr) => acc + curr.grandTotal, 0).toLocaleString()}</p>
+                                       </div>
+                                   </div>
+                                   <div className="flex items-center gap-3">
+                                       <div className="text-right">
+                                           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-widest">Outstanding</p>
+                                           <p className="text-lg font-black text-red-500">Rs. {selectedSupplier.balance.toLocaleString()}</p>
+                                       </div>
+                                   </div>
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="flex flex-col items-center justify-center py-20 text-center">
+                              <div className="w-20 h-20 bg-gray-50 dark:bg-gray-700 rounded-3xl flex items-center justify-center text-gray-300 dark:text-gray-600 mb-4">
+                                  <FileText size={40} />
+                              </div>
+                              <h4 className="text-lg font-bold text-gray-700 dark:text-white">No history found</h4>
+                              <p className="text-gray-500 dark:text-gray-400 max-w-xs mt-1">There are no recorded transactions for this supplier yet.</p>
+                          </div>
+                      )}
+                  </div>
+                  
+                  <div className="p-8 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex justify-end">
+                      <button onClick={() => setShowHistoryModal(false)} className="px-8 py-3 bg-gray-900 dark:bg-gray-700 text-white font-bold rounded-2xl hover:bg-black dark:hover:bg-gray-600 transition-all active:scale-95 shadow-lg shadow-gray-200 dark:shadow-none">
+                          Close History
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </>
   );
 };

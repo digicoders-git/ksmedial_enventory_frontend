@@ -1,24 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { User, Award, Stethoscope, Activity, Building2, Phone, Mail, MapPin, Printer, Edit2, ArrowLeft, Star } from 'lucide-react';
+import api from '../../api/axios';
 
 const DoctorDetails = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const [doctor, setDoctor] = useState(null);
 
-    // Simulate fetching data for view
+    // Fetch data for view
     useEffect(() => {
-        // In a real app, fetch data from API using id
-        const mockDoctors = [
-            { id: 1, name: 'Dr. Rajesh Gupta', qualification: 'MBBS, MD', speciality: 'Cardiologist', hospital: 'City Heart Center', mobile: '9876543210', email: 'rajesh@cityheart.com', location: 'Mumbai, MH', prescriptions: 145, rating: 5, status: 'Active' },
-            { id: 2, name: 'Dr. Priya Desai', qualification: 'BDS, MDS', speciality: 'Dentist', hospital: 'Smile Care Clinic', mobile: '9988776655', email: 'priya@smilecare.com', location: 'Pune, MH', prescriptions: 56, rating: 4, status: 'Active' },
-             // ... other mock doctors
-        ];
-        
-        const doc = mockDoctors.find(d => d.id === parseInt(id));
-        if (doc) {
-            setDoctor(doc);
+        const fetchDoctor = async () => {
+            try {
+                const { data } = await api.get(`/doctors/${id}`);
+                if (data.success) {
+                    setDoctor(data.doctor);
+                } else {
+                    // Handle case where doctor is not found or error
+                    console.error("Doctor not found");
+                }
+            } catch (error) {
+                console.error("Error fetching doctor:", error);
+            }
+        };
+
+        if (id) {
+            fetchDoctor();
         }
     }, [id]);
 
@@ -70,7 +77,7 @@ const DoctorDetails = () => {
                   <div class="avatar">Dr</div>
                   <div>
                     <div class="doc-name">${doctor.name}</div>
-                    <div class="doc-spec">${doctor.speciality}</div>
+                    <div class="doc-spec">${doctor.specialization}</div>
                   </div>
                 </div>
 
@@ -86,7 +93,7 @@ const DoctorDetails = () => {
                     </div>
                     <div class="item">
                       <div class="label">Contact Number</div>
-                      <div class="value">${doctor.mobile}</div>
+                      <div class="value">${doctor.phone || doctor.mobile}</div>
                     </div>
                     <div class="item">
                       <div class="label">Email Address</div>
@@ -94,18 +101,14 @@ const DoctorDetails = () => {
                     </div>
                     <div class="item" style="grid-column: 1 / -1;">
                       <div class="label">Location</div>
-                      <div class="value">${doctor.location}</div>
+                      <div class="value">${doctor.address || 'N/A'}</div>
                     </div>
                   </div>
 
                   <div class="stats-section">
                     <div>
-                      <div class="stat-num">${doctor.prescriptions}</div>
+                      <div class="stat-num">${doctor.totalPrescriptions || 0}</div>
                       <div class="stat-lbl">Total Prescriptions</div>
-                    </div>
-                    <div>
-                      <div class="stat-num">${doctor.rating} ⭐</div>
-                      <div class="stat-lbl">Rating</div>
                     </div>
                     <div>
                       <div class="stat-num">${doctor.status}</div>
@@ -162,7 +165,7 @@ const DoctorDetails = () => {
                     </button>
                     <button 
                          onClick={() => navigate(`/people/doctors/edit/${id}`)}
-                        className="px-5 py-2 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-xl hover:shadow-lg hover:shadow-primary/30 active:scale-95 transition-all flex items-center gap-2"
+                        className="px-5 py-2 bg-[#007242] text-white font-bold rounded-xl hover:shadow-lg hover:shadow-primary/30 active:scale-95 transition-all flex items-center gap-2"
                     >
                         <Edit2 size={18} /> Edit Profile
                     </button>
@@ -176,7 +179,7 @@ const DoctorDetails = () => {
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white rounded-3xl shadow-xl shadow-gray-100/50 border border-gray-100 overflow-hidden relative group">
                         {/* Decorative Background */}
-                        <div className="h-32 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 relative overflow-hidden">
+                        <div className="h-32 bg-[#007242] relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-xl"></div>
                             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12 blur-xl"></div>
                         </div>
@@ -195,13 +198,13 @@ const DoctorDetails = () => {
                             
                             <h2 className="text-2xl font-bold text-gray-900 mb-1">{doctor.name}</h2>
                             <p className="text-blue-600 font-medium mb-6 flex items-center justify-center gap-1.5 bg-blue-50 inline-block px-3 py-1 rounded-full text-sm">
-                                <Stethoscope size={14} /> {doctor.speciality}
+                                <Stethoscope size={14} /> {doctor.specialization}
                             </p>
 
                             {/* Stats */}
                             <div className="grid grid-cols-2 gap-4 py-6 border-t border-gray-100 bg-gray-50/30 rounded-2xl mx-2">
                                 <div className="text-center">
-                                    <p className="text-2xl font-black text-gray-900">{doctor.prescriptions}</p>
+                                    <p className="text-2xl font-black text-gray-900">{doctor.totalPrescriptions || 0}</p>
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Total Scripts</p>
                                 </div>
                                 <div className="text-center border-l border-gray-200">
@@ -251,9 +254,9 @@ const DoctorDetails = () => {
                                 </p>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Speciality</label>
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Specialization</label>
                                 <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                     <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> {doctor.speciality}
+                                     <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> {doctor.specialization}
                                 </p>
                             </div>
                             <div>
@@ -286,7 +289,7 @@ const DoctorDetails = () => {
                             <div>
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Mobile Number</label>
                                 <p className="text-lg font-mono font-semibold text-gray-900 flex items-center gap-2">
-                                    <Phone size={16} className="text-gray-400" /> {doctor.mobile}
+                                    <Phone size={16} className="text-gray-400" /> {doctor.phone || doctor.mobile}
                                 </p>
                             </div>
                              <div>
@@ -298,7 +301,7 @@ const DoctorDetails = () => {
                             <div className="sm:col-span-2">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Location</label>
                                 <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                    <MapPin size={16} className="text-gray-400" /> {doctor.location}
+                                    <MapPin size={16} className="text-gray-400" /> {doctor.address}
                                 </p>
                             </div>
                         </div>

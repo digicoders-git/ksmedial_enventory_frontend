@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     Cpu, Moon, Sun, Globe, Database, RotateCw, 
     Bell, Printer, Save, Smartphone, Layout, 
-    Monitor, Shield, Keyboard, Zap, Wifi
+    Monitor, Shield, Keyboard, Zap, Wifi, Loader2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
-
+import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
 
 const AppSettings = () => {
     const { mode, changeMode } = useTheme();
     const [activeTab, setActiveTab] = useState('appearance');
     const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
 
-    // Mock Settings State
+    // Settings State
     const [settings, setSettings] = useState({
-        // theme removed, using global context
         density: 'comfortable',
         language: 'en-US',
         currency: 'INR',
@@ -28,6 +28,22 @@ const AppSettings = () => {
         scannerMode: 'keyboard'
     });
 
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const { data } = await api.get('/profile');
+                if (data.success && data.user.appSettings) {
+                    setSettings(data.user.appSettings);
+                }
+            } catch (error) {
+                console.error('Error fetching settings:', error);
+            } finally {
+                setFetching(false);
+            }
+        };
+        fetchSettings();
+    }, []);
+
     const handleToggle = (key) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     };
@@ -36,37 +52,34 @@ const AppSettings = () => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
 
-    const defaultSettings = {
-        theme: 'light',
-        density: 'comfortable',
-        language: 'en-US',
-        currency: 'INR',
-        dateFormat: 'DD-MM-YYYY',
-        enableSound: true,
-        emailAlerts: true,
-        pushNotifications: true,
-        printerType: 'thermal-3inch',
-        autoPrint: true,
-        scannerMode: 'keyboard'
-    };
-
-    const handleSave = () => {
+    const handleSave = async () => {
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const { data } = await api.put('/profile', { appSettings: settings });
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Settings Saved',
+                    text: 'Application preferences updated successfully',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
             Swal.fire({
-                icon: 'success',
-                title: 'Settings Saved',
-                text: 'Application preferences updated successfully',
-                timer: 1500,
-                showConfirmButton: false,
-                confirmButtonColor: '#007242'
+                icon: 'error',
+                title: 'Save Failed',
+                text: error.response?.data?.message || 'Failed to update settings'
             });
-        }, 1000);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleBackup = () => {
-        // ... (existing backup code)
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ ...settings, theme: mode }, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
@@ -80,12 +93,14 @@ const AppSettings = () => {
             title: 'Backup Created',
             text: 'Settings backup downloaded successfully',
             timer: 2000,
-            showConfirmButton: false
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
         });
     };
 
-    const handleReset = () => {
-        Swal.fire({
+    const handleReset = async () => {
+        const result = await Swal.fire({
             title: 'Reset All Settings?',
             text: "This will restore default preferences. This action cannot be undone.",
             icon: 'warning',
@@ -93,17 +108,33 @@ const AppSettings = () => {
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
             confirmButtonText: 'Yes, Reset Defaults'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                setSettings(defaultSettings);
-                changeMode('light'); // Reset theme too
-                Swal.fire(
-                    'Reset!',
-                    'Application settings have been restored to defaults.',
-                    'success'
-                );
-            }
         });
+
+        if (result.isConfirmed) {
+            const defaultSettings = {
+                language: 'en-US',
+                currency: 'INR',
+                dateFormat: 'DD-MM-YYYY',
+                enableSound: true,
+                emailAlerts: true,
+                pushNotifications: true,
+                printerType: 'thermal-3inch',
+                autoPrint: true,
+                scannerMode: 'keyboard',
+                density: 'comfortable'
+            };
+            
+            try {
+                const { data } = await api.put('/profile', { appSettings: defaultSettings });
+                if (data.success) {
+                    setSettings(defaultSettings);
+                    changeMode('light'); 
+                    Swal.fire('Reset!', 'Settings restored to defaults.', 'success');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Failed to reset settings', 'error');
+            }
+        }
     };
 
     const tabs = [
@@ -114,14 +145,33 @@ const AppSettings = () => {
         { id: 'system', label: 'System', icon: <Database size={18} /> },
     ];
 
+    if (fetching) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh]">
+                <Loader2 className="animate-spin text-primary" size={48} />
+                <p className="mt-4 text-gray-500 font-medium">Loading settings...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="animate-fade-in-up max-w-6xl mx-auto space-y-6 pb-20">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                    <Cpu className="text-primary" /> Application Settings
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Configure app behavior, appearance, and connectivity.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <Cpu className="text-primary" /> Application Settings
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Configure app behavior, appearance, and connectivity.</p>
+                </div>
+                <div className="flex gap-2">
+                     <button 
+                        onClick={handleReset}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                    >
+                        Reset Defaults
+                    </button>
+                </div>
             </div>
 
             {/* Layout Container */}
@@ -368,7 +418,7 @@ const AppSettings = () => {
                                     <Shield size={20} /> Danger Zone
                                 </h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                    Resetting the application will clear all local cache and settings. This does not delete cloud data.
+                                    Resetting these settings will clear all local cache. This does not delete cloud data.
                                 </p>
                                 <button 
                                     onClick={handleReset}

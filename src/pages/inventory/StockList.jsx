@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Filter, Eye, Edit2, Ban, Calendar, X, Save, AlertTriangle, Plus, Package, Trash2, ChevronLeft, ChevronRight, QrCode, Download } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
@@ -483,7 +484,7 @@ const StockList = () => {
       </div>
 
       {/* View Details Modal */}
-      {showViewModal && selectedStock && (
+      {showViewModal && selectedStock && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 flex flex-col max-h-[85vh]">
              <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 shrink-0 rounded-t-2xl">
@@ -522,13 +523,13 @@ const StockList = () => {
                 <div className="grid grid-cols-2 gap-x-8 gap-y-6">
                     <div className="space-y-1">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Batch Number</p>
-                        <p className="font-mono font-bold text-gray-800 dark:text-gray-200 text-lg border-b border-gray-100 dark:border-gray-700 pb-1">{selectedStock.batch}</p>
+                        <p className="font-mono font-bold text-gray-800 dark:text-gray-200 text-lg border-b border-gray-100 dark:border-gray-700 pb-1">{selectedStock.batch || 'N/A'}</p>
                     </div>
 
                     <div className="space-y-1">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Expiry Date</p>
                         <p className="font-bold text-gray-800 dark:text-gray-200 text-lg border-b border-gray-100 dark:border-gray-700 pb-1 flex items-center gap-2">
-                           <Calendar size={16} className="text-red-500" /> {selectedStock.exp}
+                           <Calendar size={16} className="text-red-500" /> {selectedStock.exp || 'N/A'}
                         </p>
                     </div>
 
@@ -541,26 +542,51 @@ const StockList = () => {
 
                     <div className="row-span-2 flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-xl">
                       <div className="bg-white p-2 rounded-lg shadow-sm mb-2">
-                        <QRCodeCanvas 
-                          id="sku-qr-code"
-                          value={selectedStock.sku || selectedStock.batch} 
-                          size={120}
-                          level={"H"}
-                          includeMargin={true}
+                        <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({
+                                id: selectedStock.id,
+                                name: selectedStock.name,
+                                batch: selectedStock.batch,
+                                expiry: selectedStock.exp,
+                                mrp: selectedStock.rate, // map rate to mrp for consistency
+                                stock: selectedStock.stock,
+                                sku: selectedStock.sku,
+                                generic: selectedStock.generic,
+                                company: selectedStock.company
+                            }))}`}
+                            alt="QR Code"
+                            className="w-[120px] h-[120px]"
                         />
                       </div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Scan for Details</p>
                       <button 
-                        onClick={() => {
-                            const canvas = document.getElementById('sku-qr-code');
-                            if (canvas) {
-                                const pngUrl = canvas.toDataURL('image/png');
-                                const downloadLink = document.createElement('a');
-                                downloadLink.href = pngUrl;
-                                downloadLink.download = `${selectedStock.name}_${selectedStock.batch}_QR.png`;
-                                document.body.appendChild(downloadLink);
-                                downloadLink.click();
-                                document.body.removeChild(downloadLink);
+                        onClick={async () => {
+                            try {
+                                const dataStart = JSON.stringify({
+                                    id: selectedStock.id,
+                                    name: selectedStock.name,
+                                    batch: selectedStock.batch,
+                                    expiry: selectedStock.exp,
+                                    mrp: selectedStock.rate,
+                                    stock: selectedStock.stock,
+                                    sku: selectedStock.sku,
+                                    generic: selectedStock.generic,
+                                    company: selectedStock.company
+                                });
+                                const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(dataStart)}`;
+                                const response = await fetch(url);
+                                const blob = await response.blob();
+                                const blobUrl = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = blobUrl;
+                                link.download = `${selectedStock.name}_${selectedStock.batch}_QR.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                window.URL.revokeObjectURL(blobUrl);
+                            } catch (e) {
+                                console.error(e);
+                                Swal.fire('Error', 'Failed to download QR Code', 'error');
                             }
                         }}
                         className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -605,11 +631,12 @@ const StockList = () => {
                  </button>
              </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Adjust Stock Modal - Standardized */}
-      {showAdjustModal && selectedStock && (
+      {showAdjustModal && selectedStock && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 flex flex-col max-h-[85vh]">
             
@@ -730,7 +757,8 @@ const StockList = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
     </>

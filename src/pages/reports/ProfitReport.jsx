@@ -1,159 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, PieChart, Activity, Calendar, Download, X } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
 
 const ProfitReport = () => {
+    const navigate = useNavigate();
     const [showFilters, setShowFilters] = useState(false);
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
-    const [previewUrl, setPreviewUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // Mock Financial Data
-    const financials = {
-        revenue: 450000,
-        cogs: 320000, // Cost of Goods Sold
-        grossProfit: 130000,
-        expenses: 25000, // Rent, Salary, Utilities
-        netProfit: 105000
+    const [data, setData] = useState({
+        financials: {
+            revenue: 0,
+            cogs: 0,
+            grossProfit: 0,
+            expenses: 0,
+            netProfit: 0
+        },
+        margin: 0,
+        categoryProfit: []
+    });
+
+    useEffect(() => {
+        const fetchReportData = async () => {
+            try {
+                setLoading(true);
+                let query = '?';
+                if (dateRange.start) query += `startDate=${dateRange.start}&`;
+                if (dateRange.end) query += `endDate=${dateRange.end}`;
+
+                const response = await api.get(`/sales/profit${query}`);
+                if (response.data.success) {
+                    setData(response.data);
+                }
+            } catch (error) {
+                console.error("Error fetching profit report:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchReportData();
+    }, [dateRange]);
+
+    const { financials, margin, categoryProfit } = data;
+
+    const handleViewReport = () => {
+        navigate('/reports/profit/view');
     };
 
-    const margin = ((financials.netProfit / financials.revenue) * 100).toFixed(1);
-
-    const categoryProfit = [
-        { name: 'Tablets', revenue: 250000, profit: 80000, margin: 32 },
-        { name: 'Syrups', revenue: 120000, profit: 30000, margin: 25 },
-        { name: 'Injections', revenue: 50000, profit: 15000, margin: 30 },
-        { name: 'Surgicals', revenue: 30000, profit: 5000, margin: 16 },
-    ];
-
-    // PDF Export Function
-    const handleExportPDF = () => {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.width;
-        const pageHeight = doc.internal.pageSize.height;
-        let yPos = 20;
-
-        // Header
-        doc.setFillColor(0, 114, 66); // Primary color
-        doc.rect(0, 0, pageWidth, 35, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PROFIT & LOSS STATEMENT', pageWidth / 2, 15, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        const currentDate = new Date().toLocaleDateString('en-IN', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-        
-        let subTitle = `Generated on: ${currentDate}`;
-        if (dateRange.start && dateRange.end) {
-            subTitle += ` | Period: ${dateRange.start} to ${dateRange.end}`;
-        }
-        
-        doc.text(subTitle, pageWidth / 2, 25, { align: 'center' });
-
-        yPos = 45;
-
-        // Financial Overview Section
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Financial Overview', 14, yPos);
-        yPos += 10;
-
-        // Overview boxes
-        const statsData = [
-            ['Total Revenue', `₹${financials.revenue.toLocaleString('en-IN')}`],
-            ['Cost of Goods Sold (COGS)', `₹${financials.cogs.toLocaleString('en-IN')}`],
-            ['Operating Expenses', `₹${financials.expenses.toLocaleString('en-IN')}`],
-            ['Net Profit', `₹${financials.netProfit.toLocaleString('en-IN')}`]
-        ];
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Item', 'Amount']],
-            body: statsData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [79, 70, 229],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            alternateRowStyles: { 
-                fillColor: [245, 247, 250] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        yPos = doc.lastAutoTable.finalY + 15;
-
-        // Category Breakdown Section
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Category Profitability', 14, yPos);
-        yPos += 10;
-
-        const categoryTableData = categoryProfit.map(cat => [
-            cat.name,
-            `₹${cat.revenue.toLocaleString('en-IN')}`,
-            `₹${cat.profit.toLocaleString('en-IN')}`,
-            `${cat.margin}%`
-        ]);
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Category', 'Revenue', 'Profit', 'Margin']],
-            body: categoryTableData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [79, 70, 229],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            alternateRowStyles: { 
-                fillColor: [245, 247, 250] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        // Footer
-        const totalPages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(128, 128, 128);
-            doc.text(
-                `Page ${i} of ${totalPages}`,
-                pageWidth / 2,
-                pageHeight - 10,
-                { align: 'center' }
-            );
-            doc.text(
-                'KS4PharmaNet - Profitability Report',
-                14,
-                pageHeight - 10
-            );
-        }
-
-        // Generate Blob URL for Preview
-        const pdfBlob = doc.output('bloburl');
-        setPreviewUrl(pdfBlob);
-    };
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center p-20 min-h-[60vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10">
@@ -174,7 +76,7 @@ const ProfitReport = () => {
                         {dateRange.start ? `${dateRange.start} - ${dateRange.end || '...'}` : 'Filter Date'}
                     </button>
                      <button 
-                        onClick={handleExportPDF}
+                        onClick={handleViewReport}
                         className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-secondary flex items-center gap-2 shadow-md transition-all hover:shadow-lg"
                     >
                         <Download size={16} /> Preview & Download PDF
@@ -242,7 +144,7 @@ const ProfitReport = () => {
                     <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Cost of Goods (COGS)</p>
                     <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-2">₹{financials.cogs.toLocaleString()}</h3>
                      <div className="w-full bg-gray-100 dark:bg-gray-700 h-1.5 mt-4 rounded-full">
-                        <div className="bg-orange-400 h-1.5 rounded-full" style={{ width: `${(financials.cogs/financials.revenue)*100}%` }}></div>
+                        <div className="bg-orange-400 h-1.5 rounded-full" style={{ width: `${financials.revenue > 0 ? (financials.cogs/financials.revenue)*100 : 0}%` }}></div>
                     </div>
                 </div>
 
@@ -251,7 +153,7 @@ const ProfitReport = () => {
                     <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Operating Expenses</p>
                     <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-2">₹{financials.expenses.toLocaleString()}</h3>
                     <div className="w-full bg-gray-100 dark:bg-gray-700 h-1.5 mt-4 rounded-full">
-                        <div className="bg-red-400 h-1.5 rounded-full" style={{ width: `${(financials.expenses/financials.revenue)*100}%` }}></div>
+                        <div className="bg-red-400 h-1.5 rounded-full" style={{ width: `${financials.revenue > 0 ? (financials.expenses/financials.revenue)*100 : 0}%` }}></div>
                     </div>
                 </div>
 
@@ -288,7 +190,7 @@ const ProfitReport = () => {
                             <span className="w-24 text-sm font-bold text-gray-600 dark:text-gray-300">COGS</span>
                             <div className="flex-1 bg-gray-100 dark:bg-gray-700 h-8 rounded-lg overflow-hidden relative">
                                 <div className="absolute top-0 left-0 h-full bg-orange-400 opacity-30 w-full"></div>
-                                <div className="absolute top-0 left-0 h-full bg-orange-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${(financials.cogs/financials.revenue)*100}%` }}>
+                                <div className="absolute top-0 left-0 h-full bg-orange-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${financials.revenue > 0 ? (financials.cogs/financials.revenue)*100 : 0}%` }}>
                                     - ₹{financials.cogs.toLocaleString()}
                                 </div>
                             </div>
@@ -298,7 +200,7 @@ const ProfitReport = () => {
                             <span className="w-24 text-sm font-bold text-gray-600 dark:text-gray-300">Expenses</span>
                             <div className="flex-1 bg-gray-100 dark:bg-gray-700 h-8 rounded-lg overflow-hidden relative">
                                 <div className="absolute top-0 left-0 h-full bg-red-400 opacity-30 w-full"></div>
-                                <div className="absolute top-0 left-0 h-full bg-red-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${(financials.expenses/financials.revenue)*100}%` }}>
+                                <div className="absolute top-0 left-0 h-full bg-red-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${financials.revenue > 0 ? (financials.expenses/financials.revenue)*100 : 0}%` }}>
                                     - ₹{financials.expenses.toLocaleString()}
                                 </div>
                             </div>
@@ -307,7 +209,7 @@ const ProfitReport = () => {
                         <div className="flex items-center gap-4">
                             <span className="w-24 text-sm font-bold text-green-700 dark:text-green-400">Net Profit</span>
                             <div className="flex-1 bg-gray-100 dark:bg-gray-700 h-8 rounded-lg overflow-hidden relative border-2 border-green-500 border-dashed">
-                                 <div className="absolute top-0 left-0 h-full bg-green-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${(financials.netProfit/financials.revenue)*100}%` }}>
+                                 <div className="absolute top-0 left-0 h-full bg-green-500 flex items-center px-3 text-white text-xs font-bold" style={{ width: `${financials.revenue > 0 ? (financials.netProfit/financials.revenue)*100 : 0}%` }}>
                                     = ₹{financials.netProfit.toLocaleString()}
                                 </div>
                             </div>
@@ -332,7 +234,7 @@ const ProfitReport = () => {
                                 <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
                                     <div 
                                         className={`h-1.5 rounded-full ${cat.margin > 25 ? 'bg-green-500' : 'bg-orange-500'}`} 
-                                        style={{ width: `${cat.margin}%` }}
+                                        style={{ width: `${Math.min(parseFloat(cat.margin), 100)}%` }}
                                     ></div>
                                 </div>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Profit: ₹{cat.profit.toLocaleString()}</p>
@@ -341,50 +243,6 @@ const ProfitReport = () => {
                     </div>
                 </div>
             </div>
-
-            {/* PDF Preview Modal */}
-            {previewUrl && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-scale-in">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                                <Download size={20} className="text-primary" /> Report Preview
-                            </h3>
-                            <button 
-                                onClick={() => setPreviewUrl(null)}
-                                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                            >
-                                <X size={20} className="text-gray-500" />
-                            </button>
-                        </div>
-                        
-                        <div className="flex-1 bg-gray-100 p-4 overflow-hidden relative">
-                            <iframe 
-                                src={previewUrl} 
-                                className="w-full h-full rounded-xl shadow-inner border border-gray-200"
-                                title="PDF Preview"
-                            />
-                        </div>
-
-                        <div className="p-4 border-t bg-white flex justify-end gap-3">
-                            <button 
-                                onClick={() => setPreviewUrl(null)}
-                                className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
-                            >
-                                Close
-                            </button>
-                            <a 
-                                href={previewUrl} 
-                                download={`Profit_Report_${new Date().toISOString().split('T')[0]}.pdf`}
-                                className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-secondary hover:shadow-xl transition-all flex items-center gap-2"
-                                onClick={() => setPreviewUrl(null)}
-                            >
-                                <Download size={18} /> Download Final PDF
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

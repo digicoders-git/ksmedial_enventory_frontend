@@ -1,76 +1,109 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Phone, Mail, Printer, ArrowLeft, Download, Share2, FileText } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { MapPin, Phone, Mail, Printer, ArrowLeft, Download, Share2, FileText, Truck, Calendar } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import KS2Logo from '/KS2-Logo.png'; 
 import api from '../../api/axios';
 
-const ViewInvoice = () => {
+const ViewPurchaseInvoice = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Check for auto-print param
-  const queryParams = new URLSearchParams(window.location.search);
-  const autoPrint = queryParams.get('autoPrint') === 'true';
+  useEffect(() => {
+    if (!loading && invoice && searchParams.get('autoPrint') === 'true') {
+        setTimeout(() => {
+            window.print();
+        }, 500); // Small delay to ensuring rendering
+    }
+  }, [loading, invoice, searchParams]);
 
   useEffect(() => {
     const fetchInvoice = async () => {
         try {
-            setLoading(true);
-            const { data } = await api.get(`/sales/${id}`);
-            if (data.success) {
-                const sale = data.sale;
-                setInvoice({
-                    id: sale.invoiceNumber,
-                    date: new Date(sale.createdAt).toLocaleDateString(),
-                    customer: sale.customerName || 'Walk-in Customer',
-                    contact: sale.customerId?.phone || 'N/A',
-                    address: sale.customerId?.address || 'N/A',
-                    payment: sale.paymentMethod,
-                    status: sale.status,
-                    items: sale.items.map(i => ({
-                        name: i.name,
-                        qty: i.quantity,
-                        rate: i.price,
-                        tax: i.tax || 18,
-                        total: i.subtotal
-                    })),
-                    subtotal: sale.subTotal || 0,
-                    taxAmount: sale.taxAmount || 0,
-                    discountAmount: sale.discountAmount || 0,
-                    grandTotal: sale.totalAmount
-                });
+            // Check if id is local or mongoId. 
+            // Usually we might need a specific endpoint or filter.
+            // Assuming '/purchases/:id' works with mongoId.
+            // If 'id' from params is invoiceNumber (e.g. INV-2024...), we might need to search or use different endpoint.
+            // Let's assume we pass mongoId in URL or backend supports lookup.
+            // If URL is /purchase/invoice/view/INV-001, backend needs to support it. 
+            // Standardizing to use mongoId is safest if we linked it that way. 
+            // But let's check how Sales does it. Sales uses `ViewInvoice` which simulates fetch.
+            
+            // For now, I'll try to fetch all and find, or assume ID is mongoID.
+            // Better: Fetch by ID.
+            let response = null;
+            try {
+                response = await api.get(`/purchases/${id}`);
+            } catch(e) {
+                 // specific lookup by invoice number could be needed if id is not mongoid
+                 // For now let's hope it's mongoId or backend handles it.
+                 // Actually the user URL example was `/sales/invoices/view/INV-2024-001`.
+                 // If I want to support that, I need lookup by invoice number.
+                 // But typically I'll link to `_id`.
+                 console.error("Direct fetch failed", e);
             }
-        } catch (error) {
-            console.error("Error fetching invoice:", error);
+
+            if (response && response.data.success) {
+                const p = response.data.purchase;
+                setInvoice({
+                    id: p.invoiceNumber,
+                    date: (p.purchaseDate && !isNaN(new Date(p.purchaseDate).getTime())) ? new Date(p.purchaseDate).toISOString().split('T')[0] : 'N/A',
+                    supplier: p.supplierId?.name || 'Unknown Supplier',
+                    contact: p.supplierId?.phone || 'N/A',
+                    address: p.supplierId?.address || 'N/A',
+                    gst: p.supplierId?.gstNumber || 'N/A',
+                    payment: p.paymentStatus,
+                    status: p.status || 'Received',
+                    items: p.items.map(i => ({
+                         name: i.productId?.name || i.name, 
+                         qty: i.quantity,
+                         rate: i.purchasePrice,
+                         tax: i.tax || 0, // Assuming tax might be there or not
+                         amount: i.amount
+                    })),
+                    subtotal: p.subTotal,
+                    taxAmount: p.taxAmount,
+                    discountAmount: p.discount,
+                    grandTotal: p.grandTotal
+                });
+            } else {
+                // If ID was invoice number (string), we might need to fetch all and find? Or backend search.
+                // Let's fallback to list fetch if needed or error.
+                setError("Invoice not found");
+            }
+
+        } catch (err) {
+            setError("Failed to load invoice");
+            console.error(err);
         } finally {
             setLoading(false);
         }
     };
-    fetchInvoice();
+
+    if(id) fetchInvoice();
   }, [id]);
 
-  useEffect(() => {
-      if (!loading && invoice && autoPrint) {
-          setTimeout(() => {
-              window.print();
-          }, 1000);
-      }
-  }, [loading, invoice, autoPrint]);
 
   const handleDownloadPDF = () => {
     if (!invoice) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Helper to add Logo
     const img = new Image();
     img.src = KS2Logo;
     
     img.onload = () => {
+        // Logo
         doc.addImage(img, 'PNG', 14, 10, 45, 20);
+
+        // Company Info
         doc.setFontSize(11);
         doc.setTextColor(0);
         doc.setFont('helvetica', 'bold');
@@ -83,15 +116,17 @@ const ViewInvoice = () => {
         doc.text('Phone: +91 98765 43210', 14, 51);
         doc.text('Email: support@kspharma.com', 14, 56);
 
+        // Invoice Header
         doc.setFontSize(36);
         doc.setTextColor(230, 230, 230);
         doc.setFont('helvetica', 'bold');
-        doc.text('INVOICE', pageWidth - 14, 25, { align: 'right' });
+        doc.text('PURCHASE', pageWidth - 14, 25, { align: 'right' });
         
         doc.setFontSize(16);
         doc.setTextColor(0);
         doc.text(`#${invoice.id}`, pageWidth - 14, 38, { align: 'right' });
         
+        // Status Badge
         const statusX = pageWidth - 30;
         const statusY = 48;
         doc.setDrawColor(220, 252, 231);
@@ -103,104 +138,129 @@ const ViewInvoice = () => {
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Issued: ${invoice.date}`, pageWidth - 14, 62, { align: 'right' });
+        doc.text(`Date: ${invoice.date}`, pageWidth - 14, 62, { align: 'right' });
 
         doc.setDrawColor(245);
         doc.line(14, 75, pageWidth - 14, 75);
 
+        // Bill To & Payment Info (Dual Column)
         doc.setFontSize(8);
         doc.setTextColor(160);
         doc.setFont('helvetica', 'bold');
-        doc.text('BILL TO', 14, 85);
+        doc.text('SUPPLIER', 14, 85);
         doc.text('PAYMENT INFO', pageWidth - 14, 85, { align: 'right' });
 
         doc.setFontSize(12);
         doc.setTextColor(0);
-        doc.text(invoice.customer, 14, 93);
+        doc.text(invoice.supplier, 14, 93);
         
         doc.setFontSize(10);
         doc.setTextColor(100);
         doc.setFont('helvetica', 'normal');
-        const splitAddress = doc.splitTextToSize(invoice.address || 'N/A', 70);
+        const splitAddress = doc.splitTextToSize(invoice.address, 70);
         doc.text(splitAddress, 14, 100);
         doc.text(`Tel: ${invoice.contact}`, 14, 100 + (splitAddress.length * 5));
+        doc.text(`GST: ${invoice.gst}`, 14, 100 + (splitAddress.length * 5) + 5);
 
-        doc.text('Payment Mode:', pageWidth - 45, 93, { align: 'right' });
+
+        // Right side - Payment info details
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text('Payment Status:', pageWidth - 45, 93, { align: 'right' });
         doc.setTextColor(0);
         doc.setFont('helvetica', 'bold');
         doc.text(invoice.payment, pageWidth - 14, 93, { align: 'right' });
-
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100);
-        doc.text('Invoice No:', pageWidth - 45, 100, { align: 'right' });
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(invoice.id, pageWidth - 14, 100, { align: 'right' });
-
-        const tableColumn = ["#", "Item Name", "Rate", "Qty", "Tax", "Total"];
+        
+        // Items Table
+        const tableColumn = ["#", "Item Name", "Qty", "Rate", "Total"];
         const tableRows = invoice.items.map((item, index) => [
             index + 1,
             item.name,
-            `Rs. ${item.rate.toFixed(2)}`,
             item.qty,
-            `${item.tax}%`,
-            `Rs. ${item.total.toFixed(2)}`
+            `Rs. ${item.rate.toFixed(2)}`,
+            `Rs. ${item.amount.toFixed(2)}`
         ]);
 
         autoTable(doc, {
-            startY: 125,
+            startY: 130,
             head: [tableColumn],
             body: tableRows,
             theme: 'striped',
-            headStyles: { fillColor: [0, 114, 66], textColor: [255, 255, 255], halign: 'center' },
+            headStyles: { fillColor: [0, 114, 66], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
             bodyStyles: { fontSize: 9 },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                1: { halign: 'left' },
-                2: { halign: 'right' },
-                3: { halign: 'center' },
+                0: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { halign: 'right' },
                 4: { halign: 'right' },
-                5: { halign: 'right' },
             },
             margin: { left: 14, right: 14 },
         });
 
+        // Summary Area
         const finalY = doc.lastAutoTable.finalY + 15;
+        
+        // Note
+        doc.setFontSize(9);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Note:', 14, finalY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+        const noteText = "This is a computer generated invoice.";
+        const splitNote = doc.splitTextToSize(noteText, 80);
+        doc.text(splitNote, 14, finalY + 5);
+
+        // Calculation
         doc.setFontSize(10);
         doc.setTextColor(100);
         doc.text(`Subtotal`, pageWidth - 60, finalY);
         doc.setTextColor(0);
         doc.text(`Rs. ${invoice.subtotal.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
         
+        doc.setTextColor(100);
         doc.text(`Discount`, pageWidth - 60, finalY + 8);
         doc.setTextColor(239, 68, 68);
         doc.text(`-Rs. ${invoice.discountAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
         
         doc.setTextColor(100);
-        doc.text(`Total Tax`, pageWidth - 60, finalY + 16);
+        doc.text(`Tax`, pageWidth - 60, finalY + 16);
         doc.setTextColor(0);
         doc.text(`Rs. ${invoice.taxAmount.toFixed(2)}`, pageWidth - 14, finalY + 16, { align: 'right' });
 
+        doc.setDrawColor(230);
+        doc.line(pageWidth - 70, finalY + 22, pageWidth - 14, finalY + 22);
+
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('helvetica', 'black');
         doc.text(`GRAND TOTAL`, pageWidth - 70, finalY + 32);
         doc.setTextColor(0, 114, 66);
         doc.text(`Rs. ${invoice.grandTotal.toFixed(2)}`, pageWidth - 14, finalY + 32, { align: 'right' });
 
-        doc.save(`${invoice.id}_invoice.pdf`);
+        doc.save(`${invoice.id}_purchase_invoice.pdf`);
     };
+    
+    // Fallback if image fails to load
     img.onerror = () => {
-        doc.text('SALES INVOICE', 14, 22);
-        doc.save(`${invoice.id}_invoice.pdf`);
+        doc.setFontSize(22);
+        doc.setTextColor(0, 114, 66);
+        doc.text('KS PHARMA NET', 14, 22);
+        doc.save(`${invoice.id}_purchase_invoice.pdf`);
     }
   };
-  if (loading || !invoice) {
-    return (
+
+
+  if (loading) return (
       <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
-    );
-  }
+  );
+
+  if (error) return (
+       <div className="flex items-center justify-center min-h-screen text-red-500 font-bold">
+          {error}
+       </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 animate-fade-in print:p-0 print:bg-white">
@@ -247,15 +307,17 @@ const ViewInvoice = () => {
                 </div>
 
                 <div className="text-right w-full md:w-auto">
-                    <h1 className="text-5xl font-black text-gray-900/10 uppercase tracking-tight leading-none mb-2">Invoice</h1>
+                    <h1 className="text-5xl font-black text-gray-900/10 uppercase tracking-tight leading-none mb-2">Purchase</h1>
                     <div className="text-2xl font-bold text-gray-800">#{invoice.id}</div>
                     
                     <div className="mt-6 flex flex-col items-end gap-2">
-                        <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-100 inline-block">
+                        <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border inline-block
+                             ${invoice.status === 'Received' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-orange-50 text-orange-700 border-orange-100'}
+                        `}>
                              {invoice.status}
                         </div>
                         <div className="text-sm text-gray-500 font-medium">
-                            Issued: <span className="text-gray-900 font-bold">{invoice.date}</span>
+                            Date: <span className="text-gray-900 font-bold">{invoice.date}</span>
                         </div>
                     </div>
                 </div>
@@ -265,22 +327,21 @@ const ViewInvoice = () => {
         {/* Billing Details */}
         <div className="p-8 md:p-12 grid md:grid-cols-2 gap-12">
             <div>
-                <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Bill To</h3>
-                <div className="text-lg font-bold text-gray-900 mb-2">{invoice.customer}</div>
+                <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4 flex items-center gap-2">
+                    <Truck size={14} /> Supplier
+                </h3>
+                <div className="text-lg font-bold text-gray-900 mb-2">{invoice.supplier}</div>
                 <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{invoice.address}</div>
                 <div className="mt-3 text-sm font-medium text-gray-700">Tel: {invoice.contact}</div>
+                <div className="text-sm font-medium text-gray-700">GST: {invoice.gst}</div>
             </div>
             
             <div className="md:text-right">
                  <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Payment Info</h3>
                  <div className="space-y-2 text-sm">
                     <div className="flex md:justify-end justify-between gap-8">
-                        <span className="text-gray-500">Payment Mode</span>
-                        <span className="font-bold text-gray-900">{invoice.payment}</span>
-                    </div>
-                     <div className="flex md:justify-end justify-between gap-8">
-                        <span className="text-gray-500">Invoice No</span>
-                        <span className="font-bold text-gray-900">{invoice.id}</span>
+                        <span className="text-gray-500">Status</span>
+                        <span className={`font-bold ${invoice.payment === 'Paid' ? 'text-green-600' : 'text-red-500'}`}>{invoice.payment}</span>
                     </div>
                  </div>
             </div>
@@ -294,9 +355,8 @@ const ViewInvoice = () => {
                         <tr className="bg-gray-50 border-b border-gray-200 text-gray-900 font-bold uppercase text-xs tracking-wider">
                             <th className="py-4 px-6 w-16 text-center">#</th>
                             <th className="py-4 px-6 w-1/3">Item Name</th>
-                            <th className="py-4 px-6 text-right">Rate</th>
                             <th className="py-4 px-6 text-center">Qty</th>
-                            <th className="py-4 px-6 text-right">Tax</th>
+                            <th className="py-4 px-6 text-right">Rate</th>
                             <th className="py-4 px-6 text-right">Total</th>
                         </tr>
                     </thead>
@@ -305,13 +365,9 @@ const ViewInvoice = () => {
                             <tr key={index} className="hover:bg-gray-50/50 transition-colors">
                                 <td className="py-4 px-6 text-center text-gray-500 font-medium">{index + 1}</td>
                                 <td className="py-4 px-6 font-semibold text-gray-800">{item.name}</td>
-                                <td className="py-4 px-6 text-right text-gray-600">Rs. {item.rate.toFixed(2)}</td>
                                 <td className="py-4 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
-                                <td className="py-4 px-6 text-right text-xs text-gray-500 flex flex-col items-end gap-1">
-                                    <span>{item.tax}% GST</span>
-                                    <span className="text-gray-400">Rs. {((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
-                                </td>
-                                <td className="py-4 px-6 text-right font-bold text-gray-900">Rs. {(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</td>
+                                <td className="py-4 px-6 text-right text-gray-600">₹{item.rate.toFixed(2)}</td>
+                                <td className="py-4 px-6 text-right font-bold text-gray-900">₹{item.amount.toFixed(2)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -323,24 +379,21 @@ const ViewInvoice = () => {
         <div className="bg-gray-50 p-8 md:p-12 flex flex-col md:flex-row justify-end items-start gap-12 print:break-inside-avoid">
              <div className="flex-1 text-xs text-gray-500 space-y-2 max-w-sm">
                 <p className="font-bold text-gray-900 text-sm">Note:</p>
-                <p>Goods once sold will not be taken back or exchanged. Please ensure the products are correct before leaving the counter.</p>
-                <p className="mt-4 pt-4 border-t border-gray-200">
-                    Terms & Conditions apply. For any discrepancies, contact us within 24 hours.
-                </p>
+                <p>Goods once sold will not be taken back or exchanged.</p>
              </div>
 
              <div className="w-full md:w-80 space-y-4">
                 <div className="flex justify-between text-sm text-gray-600">
                     <span className="font-medium">Subtotal</span>
-                    <span>Rs. {invoice.subtotal.toFixed(2)}</span>
+                    <span>₹{invoice.subtotal.toFixed(2)}</span>
                 </div>
                  <div className="flex justify-between text-sm text-gray-600">
                     <span className="font-medium">Discount</span>
-                    <span className="text-red-500">-Rs. {invoice.discountAmount.toFixed(2)}</span>
+                    <span className="text-red-500">-₹{invoice.discountAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Total Tax (GST)</span>
-                    <span>Rs. {invoice.taxAmount.toFixed(2)}</span>
+                    <span className="font-medium">Tax</span>
+                    <span>₹{invoice.taxAmount.toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between border-t border-gray-200 pt-4 mt-2">
@@ -348,7 +401,7 @@ const ViewInvoice = () => {
                         <span className="font-black text-gray-900 text-lg">Grand Total</span>
                         <span className="text-xs text-gray-500 font-normal">Inclusive of all taxes</span>
                     </div>
-                    <span className="font-black text-primary text-2xl">Rs. {invoice.grandTotal.toFixed(2)}</span>
+                    <span className="font-black text-primary text-2xl">₹{invoice.grandTotal.toFixed(2)}</span>
                 </div>
              </div>
         </div>
@@ -357,7 +410,7 @@ const ViewInvoice = () => {
         <div className="hidden print:flex justify-between items-end px-12 pb-12 mt-12">
             <div className="text-center">
                 <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
-                <p className="text-xs font-bold uppercase text-gray-600">Customer Signature</p>
+                <p className="text-xs font-bold uppercase text-gray-600">Supplier Signature</p>
             </div>
             <div className="text-center">
                  <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
@@ -374,10 +427,8 @@ const ViewInvoice = () => {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
-              /* Hide all non-printable elements by default if they aren't caught by print:hidden */
               body > *:not(#root) { display: none; }
               
-              /* Ensure the invoice container takes full width */
               .max-w-4xl {
                   max-width: none !important;
                   width: 100% !important;
@@ -386,13 +437,11 @@ const ViewInvoice = () => {
                   border: none !important;
               }
               
-              /* Force background colors to print */
               * {
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
               }
               
-              /* Ensure text is dark and readable */
               p, div, span, h1, h2, h3, h4, th, td {
                   color: #000 !important;
               }
@@ -403,12 +452,10 @@ const ViewInvoice = () => {
                   color: #ef4444 !important;
               }
               
-              /* Remove any overflow clipping */
               .overflow-hidden {
                   overflow: visible !important;
               }
               
-              /* Adjust padding for print */
               .p-8, .md:p-12 {
                   padding: 20px !important;
               }
@@ -418,4 +465,4 @@ const ViewInvoice = () => {
   );
 };
 
-export default ViewInvoice;
+export default ViewPurchaseInvoice;

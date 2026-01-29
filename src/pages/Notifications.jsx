@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
-import { Bell, AlertTriangle, Info, CheckCircle, Clock, Trash2, Check } from 'lucide-react';
-
-
+import React, { useEffect, useState } from 'react';
+import { Bell, AlertTriangle, Info, CheckCircle, Clock, Trash2, Check, Loader2 } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
+import Swal from 'sweetalert2';
 
 const Notifications = () => {
-    // Mock Notifications with 'read' status
-    const [notifications, setNotifications] = useState([
-        { id: 1, type: 'critical', title: 'Critical Low Stock', message: 'Dolo 650 (Batch B001) is below threshold (5 units left).', time: '10 mins ago', read: false },
-        { id: 2, type: 'warning', title: 'Expiry Alert', message: 'Azithral 500 batches expiring in 15 days.', time: '2 hours ago', read: false },
-        { id: 3, type: 'info', title: 'Backup Successful', message: 'System data backup completed successfully.', time: 'Yesterday', read: true },
-        { id: 4, type: 'success', title: 'New Update Available', message: 'Version 2.4.0 is ready to install.', time: '2 days ago', read: true },
-        { id: 5, type: 'warning', title: 'Payment Pending', message: 'Invoice #INV-2024-001 is overdue by 3 days.', time: '3 days ago', read: false },
-    ]);
+    const { 
+        notifications, 
+        unreadCount, 
+        loading, 
+        fetchNotifications, 
+        markAsRead, 
+        markAllAsRead, 
+        deleteNotification, 
+        clearAll 
+    } = useNotifications();
 
     const [activeTab, setActiveTab] = useState('all');
+
+    useEffect(() => {
+        fetchNotifications();
+    }, [fetchNotifications]);
 
     const getIcon = (type) => {
         switch (type) {
@@ -32,22 +38,49 @@ const Notifications = () => {
             default: return 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/30 shadow-sm';
         }
     };
-    // Actions
-    const handleMarkAsRead = (id) => {
-        setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+
+    const formatTime = (date) => {
+        if (!date) return '';
+        const now = new Date();
+        const diff = now - new Date(date);
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes} mins ago`;
+        if (hours < 24) return `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(date).toLocaleDateString();
     };
 
-    const handleDelete = (id) => {
-        setNotifications(notifications.filter(n => n.id !== id));
+    const handleMarkAllRead = async () => {
+        await markAllAsRead();
+        Swal.fire({
+            icon: 'success',
+            title: 'Marked all as read',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
     };
 
-    const handleMarkAllRead = () => {
-        setNotifications(notifications.map(n => ({ ...n, read: true })));
-    };
+    const handleClearAll = async () => {
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: "You want to clear all notifications?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, clear all!'
+        });
 
-    const handleClearAll = () => {
-        if(window.confirm('Are you sure you want to clear all notifications?')) {
-            setNotifications([]);
+        if (result.isConfirmed) {
+            await clearAll();
+            Swal.fire('Cleared!', 'Your notifications have been cleared.', 'success');
         }
     };
 
@@ -59,7 +92,15 @@ const Notifications = () => {
         return true;
     });
 
-    const unreadCount = notifications.filter(n => !n.read).length;
+    if (loading && notifications.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh]">
+                <Loader2 className="animate-spin text-primary" size={48} />
+                <p className="mt-4 text-gray-500 font-medium animate-pulse">Loading updates...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="animate-fade-in-up max-w-4xl mx-auto space-y-6 pb-10">
             {/* Header */}
@@ -78,13 +119,15 @@ const Notifications = () => {
                 <div className="flex gap-2">
                     <button 
                         onClick={handleMarkAllRead}
-                        className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 dark:hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1"
+                        disabled={unreadCount === 0}
+                        className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 dark:hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Check size={16} /> Mark all read
                     </button>
                     <button 
                         onClick={handleClearAll}
-                        className="px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1"
+                        disabled={notifications.length === 0}
+                        className="px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Trash2 size={16} /> Clear all
                     </button>
@@ -118,9 +161,9 @@ const Notifications = () => {
                 {filteredNotifications.length > 0 ? (
                     filteredNotifications.map((notif) => (
                         <div 
-                            key={notif.id} 
+                            key={notif._id} 
                             className={`p-4 rounded-xl border flex items-start gap-4 transition-all hover:scale-[1.01] cursor-pointer group relative ${getBg(notif.type, notif.read)}`}
-                            onClick={() => handleMarkAsRead(notif.id)}
+                            onClick={() => !notif.read && markAsRead(notif._id)}
                         >
                             <div className="mt-1 p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm">
                                 {getIcon(notif.type)}
@@ -134,14 +177,14 @@ const Notifications = () => {
                                 </div>
                                 <p className={`text-sm mt-1 ${notif.read ? 'text-gray-500 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>{notif.message}</p>
                                 <p className="text-xs text-gray-400 mt-2 font-medium flex items-center gap-1">
-                                    <Clock size={12} /> {notif.time}
+                                    <Clock size={12} /> {formatTime(notif.createdAt)}
                                 </p>
                             </div>
                             
                             {/* Action Buttons */}
                             <div className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 flex bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg p-1 shadow-sm transition-opacity">
                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(notif.id); }}
+                                    onClick={(e) => { e.stopPropagation(); deleteNotification(notif._id); }}
                                     className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                     title="Delete"
                                 >

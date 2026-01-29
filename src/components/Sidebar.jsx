@@ -23,16 +23,19 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Swal from 'sweetalert2';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navigate = useNavigate();
   const { shop, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const [openMenus, setOpenMenus] = React.useState({});
 
   const toggleSubMenu = (label) => {
     setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
   };
+
 
   const handleLogout = () => {
     Swal.fire({
@@ -153,7 +156,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     },
 
     // 9. Notifications
-    { label: 'Notifications', icon: <Bell size={20} />, path: '/notifications', badge: 3 },
+    { label: 'Notifications', icon: <Bell size={20} />, path: '/notifications', badge: unreadCount },
+
 
     // 10. App Settings
     { label: 'App Settings', icon: <Cpu size={20} />, path: '/app-settings' },

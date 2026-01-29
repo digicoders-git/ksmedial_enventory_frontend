@@ -18,13 +18,26 @@ export const InventoryProvider = ({ children }) => {
                     id: p._id,
                     name: p.name,
                     stock: p.quantity || 0,
-                    rate: p.sellingPrice || 0,
+                    rate: p.sellingPrice || 0, // Keeping for backward compatibility
+                    mrp: p.sellingPrice || 0,
+                    purchasePrice: p.purchasePrice || 0,
                     category: p.category,
                     batch: p.batchNumber,
                     sku: p.sku,
                     exp: (p.expiryDate && !isNaN(new Date(p.expiryDate).getTime())) ? new Date(p.expiryDate).toISOString().split('T')[0] : '',
                     reorderLevel: p.reorderLevel || 10,
-                    brand: p.brand || 'Generic' 
+                    brand: p.brand || 'Generic',
+                    company: p.company || 'N/A',
+                    generic: p.genericName || 'N/A',
+                    unit: p.unit || 'Pc',
+                    status: p.status || 'Active',
+                    image: p.image || null,
+                    packing: p.packing || '',
+                    hsnCode: p.hsnCode || '',
+                    tax: p.tax || 0,
+                    description: p.description || '',
+                    isPrescriptionRequired: p.isPrescriptionRequired || false,
+                    rackLocation: p.rackLocation || '' 
                 }));
                 setInventory(mapped);
             }
@@ -35,8 +48,67 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
+    const fetchTransactions = async () => {
+         try {
+             // Fetch simplified sales for history AND log files
+             const [salesRes, logsRes] = await Promise.all([
+                 api.get('/sales?limit=50'),
+                 api.get('/products/logs')
+             ]);
+
+             let allTransactions = [];
+
+             if (salesRes.data.success) {
+                  const mappedSales = salesRes.data.sales.map(s => ({
+                      id: s._id,
+                      type: 'OUT', // Sales are OUT
+                      reason: 'Sale', // Default reason
+                      paymentMode: s.paymentMethod,
+                      date: s.createdAt,
+                      totalQty: s.items.reduce((acc, i) => acc + i.quantity, 0),
+                      items: s.items.map(i => ({
+                          name: i.name,
+                          qty: i.quantity,
+                          price: i.price, 
+                          batch: i.productId?.batchNumber || 'N/A', 
+                          sku: i.productId?.sku || 'N/A'
+                      })),
+                       totalAmount: s.totalAmount
+                  }));
+                  allTransactions = [...mappedSales];
+             }
+
+             if (logsRes.data.success) {
+                 const mappedLogs = logsRes.data.logs.map(l => ({
+                     id: l._id,
+                     type: l.type,
+                     reason: l.reason,
+                     note: l.note,
+                     date: l.date,
+                     totalQty: l.quantity,
+                     items: [{
+                         name: l.productName || 'Unknown Product',
+                         qty: l.quantity,
+                         batch: l.batchNumber || 'N/A',
+                         sku: 'N/A'
+                     }]
+                 }));
+                 allTransactions = [...allTransactions, ...mappedLogs];
+             }
+
+             // Sort by date desc
+             allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+             setTransactions(allTransactions);
+         } catch (error) {
+             console.error("Error fetching transactions:", error);
+         }
+    };
+
     useEffect(() => {
         fetchInventory();
+        fetchTransactions();
+        fetchSuppliers();
     }, []);
 
     // Derived statistics
@@ -46,56 +118,52 @@ export const InventoryProvider = ({ children }) => {
     const lowStockItems = inventory.filter(item => item.stock > 0 && item.stock <= (item.reorderLevel || 20)).length;
     const outOfStockItems = inventory.filter(item => item.stock === 0).length;
     
-    // Function to sell items
-    const sellItems = async (soldItems, metadata = {}) => {
+    // Function to sell items (Create or Update)
+    const sellItems = async (soldItems, metadata = {}, saleId = null) => {
         try {
             const saleItemsPayload = soldItems.map(s => {
                 const product = inventory.find(p => p.id === s.id);
-                if (!product) throw new Error(`Product ${s.name || s.id} not found`);
+                if (!product) throw new Error(`Product mapping failed`);
                 return {
                     productId: s.id,
                     name: product.name,
                     quantity: s.qty,
                     price: product.rate,
+                    tax: product.tax || 18,
                     subtotal: s.qty * product.rate
                 };
             });
 
-            const totalAmount = saleItemsPayload.reduce((acc, item) => acc + item.subtotal, 0);
-
             const payload = {
                 items: saleItemsPayload,
-                totalAmount,
-                subTotal: totalAmount, // Assuming no tax/discount logic in frontend for now, or calculate if needed
-                amountPaid: totalAmount,
-                customer: metadata.customer || 'Walk-in',
+                totalAmount: metadata.totalAmount, 
+                subTotal: metadata.subTotal,
+                tax: metadata.tax,
+                discount: metadata.discount || 0,
+                amountPaid: metadata.totalAmount,
+                customer: metadata.customer?._id || metadata.customer,
+                customerName: typeof metadata.customer === 'string' ? metadata.customer : metadata.customer?.name,
                 paymentMethod: metadata.paymentMode || 'Cash',
+                status: metadata.status || (metadata.paymentMode === 'Credit' ? 'Pending' : 'Paid'),
             };
 
-            const { data } = await api.post('/sales', payload);
+            const response = saleId 
+                ? await api.put(`/sales/${saleId}`, payload)
+                : await api.post('/sales', payload);
+
+            const { data } = response;
 
             if (data.success) {
                 await fetchInventory(); // Refresh stock
+                await fetchTransactions(); // Refresh history
                 
-                // Add to local transactions list for UI responsiveness if needed (or fetch transactions)
-                 const newTransaction = {
-                    id: data.sale._id,
-                    type: 'OUT',
-                    ...metadata,
-                    items: saleItemsPayload.map(s => ({
-                         ...s,
-                         batch: inventory.find(i=>i.id===s.productId)?.batch,
-                         sku: inventory.find(i=>i.id===s.productId)?.sku,
-                         category: inventory.find(i=>i.id===s.productId)?.category
-                    })),
-                    date: new Date(),
-                    totalQty: soldItems.reduce((acc, s) => acc + s.qty, 0)
+                return { 
+                    success: true, 
+                    message: saleId ? "Invoice updated successfully!" : "Sale processed successfully!",
+                    sale: data.sale 
                 };
-                setTransactions([newTransaction, ...transactions]);
-
-                return { success: true, message: "Sale processed successfully! Inventory updated." };
             } else {
-                return { success: false, message: data.message || "Sale failed" };
+                return { success: false, message: data.message || "Operation failed" };
             }
         } catch (error) {
             console.error(error);
@@ -103,17 +171,37 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
-    const adjustStock = async (id, type, quantity, reason) => {
+    const adjustStock = async (id, type, quantity, reason, note) => {
         try {
-            // Use specific endpoint if available, else update product
              const { data } = await api.put(`/products/${id}/adjust`, {
                  type,
                  quantity,
-                 reason
+                 reason,
+                 note
              });
 
              if(data.success) {
                  await fetchInventory();
+                 
+                 // Update transactions with new log
+                 if(data.log) {
+                     const newLog = {
+                         id: data.log._id,
+                         type: data.log.type,
+                         reason: data.log.reason,
+                         note: data.log.note,
+                         date: data.log.date,
+                         totalQty: data.log.quantity,
+                         items: [{
+                             name: data.log.productName,
+                             qty: data.log.quantity,
+                             batch: data.log.batchNumber,
+                             sku: 'N/A'
+                         }]
+                     };
+                     setTransactions(prev => [newLog, ...prev]);
+                 }
+
                  return { success: true, message: "Stock adjusted successfully" };
              }
              return { success: false, message: data.message };
@@ -123,14 +211,33 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
-    const [suppliers, setSuppliers] = useState([
-        { id: 1, name: "Health Distributors", contact: "9876543210", email: "info@healthdist.com", status: "Active" },
-        { id: 2, name: "Pharma World Ltd", contact: "9123456780", email: "sales@pharmaworld.com", status: "Active" },
-    ]);
+    const [suppliers, setSuppliers] = useState([]);
 
-    const addSupplier = (supplier) => {
-        // Implement API call for supplier
-        setSuppliers([...suppliers, { ...supplier, id: Date.now() }]);
+    const fetchSuppliers = async () => {
+        try {
+            const { data } = await api.get('/suppliers');
+            if (data.success) {
+                setSuppliers(data.suppliers.map(s => ({
+                    ...s,
+                    id: s._id
+                })));
+            }
+        } catch (error) {
+            console.error("Error fetching suppliers:", error);
+        }
+    };
+
+    const addSupplier = async (supplier) => {
+        try {
+            const { data } = await api.post('/suppliers', supplier);
+            if (data.success) {
+                fetchSuppliers();
+                return { success: true, message: 'Supplier added successfully' };
+            }
+            return { success: false, message: data.message };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Failed to add supplier' };
+        }
     };
 
     const deleteItem = async (id) => {
@@ -146,6 +253,36 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
+    const deleteTransaction = async (id) => {
+        try {
+            const { data } = await api.delete(`/sales/${id}`);
+            if (data.success) {
+                // If we want to restore stock, backend should handle it.
+                // Assuming backend restore logic is in place or user just wants to remove record.
+                await fetchTransactions(); // Refresh history
+                await fetchInventory(); // Refresh stock as restore happened
+                return { success: true, message: "Transaction deleted" };
+            }
+            return { success: false, message: data.message };
+        } catch (error) {
+             return { success: false, message: error.response?.data?.message || "Delete failed" };
+        }
+    };
+
+    const clearAllTransactions = async () => {
+        try {
+            const { data } = await api.delete('/sales');
+            if (data.success) {
+                await fetchTransactions();
+                await fetchInventory();
+                return { success: true, message: "All transactions cleared" };
+            }
+            return { success: false, message: data.message };
+        } catch (error) {
+             return { success: false, message: error.response?.data?.message || "Clear invalid" };
+        }
+    };
+
     const updateThreshold = async (id, newThreshold) => {
          // Need API update
          try {
@@ -154,7 +291,7 @@ export const InventoryProvider = ({ children }) => {
                  await fetchInventory();
                  return { success: true, message: "Reorder level updated" };
              }
-             return { false: true, message: "Update failed" };
+             return { success: false, message: "Update failed" };
          } catch(error) {
              console.error("Update threshold error:", error);
              return { success: false, message: "Update failed" };
@@ -195,6 +332,8 @@ export const InventoryProvider = ({ children }) => {
             sellItems,
             adjustStock,
             deleteItem,
+            deleteTransaction,
+            clearAllTransactions,
             transactions,
             suppliers,
             addSupplier,
@@ -208,7 +347,8 @@ export const InventoryProvider = ({ children }) => {
             },
             updateThreshold,
             generateSKU,
-            loading
+            loading,
+            fetchInventory
         }}>
             {children}
         </InventoryContext.Provider>

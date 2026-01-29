@@ -1,51 +1,26 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, MoreVertical, FileEdit, Trash2, Eye, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import QRCodeModal from '../../components/QRCodeModal';
-import api from '../../api/axios';
+import { useInventory } from '../../context/InventoryContext';
+
 
 const MedicineList = () => {
   const navigate = useNavigate();
+  const { inventory: medicines, deleteItem } = useInventory(); // Use inventory as medicines
 
   // Pagination & Search States
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [medicines, setMedicines] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true); // Handled by context implicitly via initial empty state
 
-  const fetchMedicines = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get('/products');
-      if (data.success) {
-        setMedicines(data.products.map(p => ({
-          id: p._id,
-          sku: p.sku,
-          name: p.name,
-          generic: p.genericName || 'N/A',
-          group: p.category || 'N/A',
-          company: p.company || 'N/A',
-          stock: p.quantity,
-          unit: p.unit || 'Pc',
-          mrp: p.sellingPrice,
-          rate: p.purchasePrice,
-          status: p.status || 'Active',
-          batch: p.batchNumber,
-          expiry: p.expiryDate
-        })));
-      }
-    } catch (error) {
-      console.error("Fetch medicines error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMedicines();
-  }, []);
+  // No need for explicit fetchMedicines, Context handles it globally
+  /*
+  const fetchMedicines = async () => { ... }
+  useEffect(() => { ... }, []); 
+  */
 
   // Filter & Pagination Logic
   const { filteredMedicines, totalPages, paginationInfo } = useMemo(() => {
@@ -122,14 +97,11 @@ const MedicineList = () => {
       confirmButtonText: 'Yes, delete it!'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        try {
-          const { data } = await api.delete(`/products/${id}`);
-          if (data.success) {
-            setMedicines(prev => prev.filter(m => m.id !== id));
-            Swal.fire('Deleted!', 'Medicine has been deleted.', 'success');
-          }
-        } catch (error) {
-          Swal.fire('Error', 'Failed to delete medicine', 'error');
+        const res = await deleteItem(id);
+        if (res.success) {
+           Swal.fire('Deleted!', 'Medicine has been deleted.', 'success');
+        } else {
+           Swal.fire('Error', res.message, 'error');
         }
       }
     });
@@ -265,14 +237,14 @@ const MedicineList = () => {
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.generic}</td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
-                      {item.group}
+                      {item.category}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.company}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex flex-col items-end">
-                      <span className="text-gray-800 dark:text-gray-200 font-bold">₹{item.mrp.toFixed(2)}</span>
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Rate: ₹{item.rate.toFixed(2)}</span>
+                      <span className="text-gray-800 dark:text-gray-200 font-bold">₹{item.mrp?.toFixed(2) || '0.00'}</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Rate: ₹{item.purchasePrice?.toFixed(2) || '0.00'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">

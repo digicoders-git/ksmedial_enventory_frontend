@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Tag, Edit3, Trash2, Activity, ChevronRight, X, Grid, List, FileText, Calendar, Box } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { useInventory } from '../../context/InventoryContext';
 import api from '../../api/axios';
 
 const MedicineCategories = () => {
-  const { inventory } = useInventory();
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const [isEditing, setIsEditing] = useState(false);
@@ -29,7 +27,7 @@ const MedicineCategories = () => {
           name: c.name,
           description: c.description,
           color: c.color,
-          count: inventory.filter(i => i.category === c.name).length, // Calc count from inventory
+          count: c.count || 0,
           icon: Activity
         })));
       }
@@ -42,7 +40,7 @@ const MedicineCategories = () => {
 
   useEffect(() => {
     fetchData();
-  }, [inventory]);
+  }, []);
 
   const [currentCategory, setCurrentCategory] = useState({ name: '', description: '', color: 'bg-blue-50 text-blue-600', parentId: '' });
 
@@ -361,17 +359,32 @@ const MedicineCategories = () => {
         <MedicineListModal 
           category={selectedCategoryForList} 
           onClose={() => setShowListModal(false)}
-          inventory={inventory}
         />
       )}
     </>
   );
 };
 
-const MedicineListModal = ({ category, onClose, inventory }) => {
-    const categoryMedicines = inventory.filter(item => 
-        item.category?.toLowerCase() === category.name.toLowerCase()
-    );
+const MedicineListModal = ({ category, onClose }) => {
+    const [categoryMedicines, setCategoryMedicines] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchItems = async () => {
+             try {
+                 // Fetch products for this category
+                 const { data } = await api.get(`/products?category=${encodeURIComponent(category.name)}`);
+                 if(data.success) {
+                     setCategoryMedicines(data.products);
+                 }
+             } catch (error) {
+                 console.error("Failed to load category items", error);
+             } finally {
+                 setLoading(false);
+             }
+        };
+        fetchItems();
+    }, [category]);
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -387,8 +400,14 @@ const MedicineListModal = ({ category, onClose, inventory }) => {
                         <div>
                             <h3 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">{category.name} Items</h3>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{categoryMedicines.length} Medicines Linked</span>
-                                <span className="text-gray-400 text-xs">Therapeutic category management</span>
+                                {loading ? (
+                                    <span className="text-primary text-xs font-bold animate-pulse">Loading items...</span>
+                                ) : (
+                                    <>
+                                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{categoryMedicines.length} Medicines Linked</span>
+                                        <span className="text-gray-400 text-xs">Therapeutic category management</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -401,11 +420,16 @@ const MedicineListModal = ({ category, onClose, inventory }) => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-0">
-                    {categoryMedicines.length > 0 ? (
+                <div className="flex-1 overflow-y-auto p-0 relative">
+                    {loading ? (
+                         <div className="flex flex-col items-center justify-center h-64">
+                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                             <p className="mt-4 text-gray-500 text-sm font-medium">Fetching medicines...</p>
+                         </div>
+                    ) : categoryMedicines.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-gray-50/50 dark:bg-gray-700/30 sticky top-0 backdrop-blur-sm">
+                                <thead className="bg-gray-50/50 dark:bg-gray-700/30 sticky top-0 backdrop-blur-sm z-10">
                                     <tr>
                                         <th className="px-8 py-4 font-black uppercase text-[10px] text-gray-500 tracking-widest border-b border-gray-100 dark:border-gray-700">Medicine Details</th>
                                         <th className="px-8 py-4 font-black uppercase text-[10px] text-gray-500 tracking-widest border-b border-gray-100 dark:border-gray-700">SKU / Batch</th>
@@ -416,7 +440,7 @@ const MedicineListModal = ({ category, onClose, inventory }) => {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {categoryMedicines.map((item) => (
-                                        <tr key={item.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-all">
+                                        <tr key={item._id || item.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-all">
                                             <td className="px-8 py-5">
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
@@ -427,17 +451,17 @@ const MedicineListModal = ({ category, onClose, inventory }) => {
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="flex flex-col gap-1">
-                                                    <span className="font-mono text-[10px] font-black text-blue-500 uppercase tracking-widest">{item.sku}</span>
-                                                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">BATCH: {item.batch}</span>
+                                                    <span className="font-mono text-[10px] font-black text-blue-500 uppercase tracking-widest">{item.sku || 'N/A'}</span>
+                                                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">BATCH: {item.batchNumber}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5 text-right font-black text-gray-800 dark:text-gray-100">
-                                                ₹{item.rate.toFixed(2)}
+                                                ₹{item.sellingPrice?.toFixed(2) || '0.00'}
                                             </td>
                                             <td className="px-8 py-5 text-right">
                                                 <div className="flex flex-col items-end gap-1">
-                                                    <span className={`text-base font-black ${item.stock <= (item.reorderLevel || 20) ? 'text-red-500' : 'text-gray-800 dark:text-gray-100'}`}>
-                                                        {item.stock}
+                                                    <span className={`text-base font-black ${item.quantity <= (item.reorderLevel || 20) ? 'text-red-500' : 'text-gray-800 dark:text-gray-100'}`}>
+                                                        {item.quantity}
                                                     </span>
                                                     <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Available Units</span>
                                                 </div>
@@ -445,7 +469,7 @@ const MedicineListModal = ({ category, onClose, inventory }) => {
                                             <td className="px-8 py-5 text-center">
                                                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full border border-gray-200 dark:border-gray-600">
                                                     <Calendar size={12} className="text-gray-400" />
-                                                    <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-tighter">{item.exp || 'N/A'}</span>
+                                                    <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-tighter">{item.expiryDate || 'N/A'}</span>
                                                 </div>
                                             </td>
                                         </tr>

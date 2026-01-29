@@ -1,261 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, AlertTriangle, TrendingDown, Layers, ArrowUpRight, ArrowDownRight, Filter, Download, Calendar, Search, X } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useNavigate } from 'react-router-dom';
+
+import api from '../../api/axios';
 
 const InventoryReport = () => {
+    const navigate = useNavigate();
     const [showFilters, setShowFilters] = useState(false);
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
-    const [previewUrl, setPreviewUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // Mock Data for Inventory Report
-    const stats = {
-        totalItems: 1240,
-        totalValue: 1540000,
-        lowStock: 45,
-        nearExpiry: 23
+    const [data, setData] = useState({
+        stats: {
+            totalItems: 0,
+            totalValue: 0,
+            lowStock: 0,
+            nearExpiry: 0
+        },
+        categoryData: [],
+        lowStockItems: [],
+        expiryItems: []
+    });
+
+    useEffect(() => {
+        const fetchReportData = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get('/products/report');
+                if (response.data.success) {
+                    setData(response.data);
+                }
+            } catch (error) {
+                console.error("Error fetching inventory report:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchReportData();
+    }, []);
+
+    const { stats, categoryData, lowStockItems, expiryItems } = data;
+
+    const handleViewReport = () => {
+        navigate('/reports/inventory/view');
     };
 
-    const categoryData = [
-        { name: 'Tablets', stock: 850, value: 850000, percent: 55 },
-        { name: 'Syrups', stock: 200, value: 320000, percent: 21 },
-        { name: 'Injections', stock: 150, value: 280000, percent: 18 },
-        { name: 'Surgicals', stock: 40, value: 90000, percent: 6 },
-    ];
-
-    const lowStockItems = [
-        { name: 'Dolo 650', stock: 15, min: 50, supplier: 'Micro Labs' },
-        { name: 'Azithral 500', stock: 8, min: 30, supplier: 'Alembic' },
-        { name: 'Pan 40', stock: 20, min: 100, supplier: 'Alkem' },
-    ];
-
-    const expiryItems = [
-        { name: 'Crosin Syrup', batch: 'B992', expiry: 'Jan 2024', stock: 10 },
-        { name: 'Montek LC', batch: 'M221', expiry: 'Feb 2024', stock: 45 },
-    ];
-
-    // PDF Export Function
-    const handleExportPDF = () => {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.width;
-        const pageHeight = doc.internal.pageSize.height;
-        let yPos = 20;
-
-        // Header
-        doc.setFillColor(0, 114, 66); // Primary color
-        doc.rect(0, 0, pageWidth, 35, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.text('INVENTORY REPORT', pageWidth / 2, 15, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        const currentDate = new Date().toLocaleDateString('en-IN', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-        
-        let subTitle = `Generated on: ${currentDate}`;
-        if (dateRange.start && dateRange.end) {
-            subTitle += ` | Period: ${dateRange.start} to ${dateRange.end}`;
-        }
-        
-        doc.text(subTitle, pageWidth / 2, 25, { align: 'center' });
-
-        yPos = 45;
-
-        // Overview Statistics Section
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Overview Statistics', 14, yPos);
-        yPos += 10;
-
-        // Stats boxes
-        const statsData = [
-            ['Total Stock Value', `₹${(stats.totalValue/100000).toFixed(2)} Lakh`],
-            ['Total Items', stats.totalItems.toString()],
-            ['Low Stock Alerts', stats.lowStock.toString()],
-            ['Near Expiry Items', stats.nearExpiry.toString()]
-        ];
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Metric', 'Value']],
-            body: statsData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [79, 70, 229],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            alternateRowStyles: { 
-                fillColor: [245, 247, 250] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        yPos = doc.lastAutoTable.finalY + 15;
-
-        // Category Breakdown Section
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Stock by Category', 14, yPos);
-        yPos += 10;
-
-        const categoryTableData = categoryData.map(cat => [
-            cat.name,
-            cat.stock.toString(),
-            `₹${cat.value.toLocaleString('en-IN')}`,
-            `${cat.percent}%`
-        ]);
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Category', 'Stock Qty', 'Value', 'Percentage']],
-            body: categoryTableData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [79, 70, 229],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            alternateRowStyles: { 
-                fillColor: [245, 247, 250] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        yPos = doc.lastAutoTable.finalY + 15;
-
-        // Check if we need a new page
-        if (yPos > pageHeight - 60) {
-            doc.addPage();
-            yPos = 20;
-        }
-
-        // Critical Low Stock Section
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(220, 38, 38); // Red color
-        doc.text('⚠ Critical Low Stock Items', 14, yPos);
-        doc.setTextColor(0, 0, 0);
-        yPos += 10;
-
-        const lowStockTableData = lowStockItems.map(item => [
-            item.name,
-            item.stock.toString(),
-            item.min.toString(),
-            item.supplier
-        ]);
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Item Name', 'Current Stock', 'Min Level', 'Supplier']],
-            body: lowStockTableData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [220, 38, 38],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            columnStyles: {
-                1: { textColor: [220, 38, 38], fontStyle: 'bold' }
-            },
-            alternateRowStyles: { 
-                fillColor: [254, 242, 242] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        yPos = doc.lastAutoTable.finalY + 15;
-
-        // Check if we need a new page
-        if (yPos > pageHeight - 60) {
-            doc.addPage();
-            yPos = 20;
-        }
-
-        // Expiring Soon Section
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(234, 88, 12); // Orange color
-        doc.text('⚠ Items Expiring Soon (30 Days)', 14, yPos);
-        doc.setTextColor(0, 0, 0);
-        yPos += 10;
-
-        const expiryTableData = expiryItems.map(item => [
-            item.name,
-            item.batch,
-            item.expiry,
-            item.stock.toString()
-        ]);
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Item Name', 'Batch No.', 'Expiry Date', 'Stock']],
-            body: expiryTableData,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [234, 88, 12],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 11
-            },
-            bodyStyles: { 
-                fontSize: 10,
-                textColor: [50, 50, 50]
-            },
-            columnStyles: {
-                2: { textColor: [234, 88, 12], fontStyle: 'bold' }
-            },
-            alternateRowStyles: { 
-                fillColor: [255, 247, 237] 
-            },
-            margin: { left: 14, right: 14 }
-        });
-
-        // Footer on last page
-        const totalPages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(128, 128, 128);
-            doc.text(
-                `Page ${i} of ${totalPages}`,
-                pageWidth / 2,
-                pageHeight - 10,
-                { align: 'center' }
-            );
-            doc.text(
-                'KS4PharmaNet - Inventory Management System',
-                14,
-                pageHeight - 10
-            );
-        }
-
-        // Generate Blob URL for Preview
-        const pdfBlob = doc.output('bloburl');
-        setPreviewUrl(pdfBlob);
-    };
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center p-20 min-h-[60vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10">
@@ -276,7 +73,7 @@ const InventoryReport = () => {
                         {dateRange.start ? `${dateRange.start} - ${dateRange.end || '...'}` : 'Filter Date'}
                     </button>
                      <button 
-                        onClick={handleExportPDF}
+                        onClick={handleViewReport}
                         className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-secondary flex items-center gap-2 shadow-md transition-all hover:shadow-lg"
                     >
                         <Download size={16} /> Preview & Download PDF
@@ -468,49 +265,6 @@ const InventoryReport = () => {
                     </div>
                 </div>
             </div>
-            {/* PDF Preview Modal */}
-            {previewUrl && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-scale-in">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                                <Download size={20} className="text-primary" /> Report Preview
-                            </h3>
-                            <button 
-                                onClick={() => setPreviewUrl(null)}
-                                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                            >
-                                <X size={20} className="text-gray-500" />
-                            </button>
-                        </div>
-                        
-                        <div className="flex-1 bg-gray-100 p-4 overflow-hidden relative">
-                            <iframe 
-                                src={previewUrl} 
-                                className="w-full h-full rounded-xl shadow-inner border border-gray-200"
-                                title="PDF Preview"
-                            />
-                        </div>
-
-                        <div className="p-4 border-t bg-white flex justify-end gap-3">
-                            <button 
-                                onClick={() => setPreviewUrl(null)}
-                                className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
-                            >
-                                Close
-                            </button>
-                            <a 
-                                href={previewUrl} 
-                                download={`Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`}
-                                className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-secondary hover:shadow-xl transition-all flex items-center gap-2"
-                                onClick={() => setPreviewUrl(null)}
-                            >
-                                <Download size={18} /> Download Final PDF
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
 
     );

@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, History, Filter, Download, Eye, MoreVertical, Calendar, Printer, Edit2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, History, Filter, Download, Eye, MoreVertical, Calendar, Printer, Edit2, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const PurchaseReturn = () => {
+    const navigate = useNavigate();
     const [view, setView] = useState('list'); // 'list' or 'create'
     const [searchTerm, setSearchTerm] = useState('');
     const [showViewModal, setShowViewModal] = useState(false);
@@ -10,276 +13,243 @@ const PurchaseReturn = () => {
     const [selectedReturn, setSelectedReturn] = useState(null);
     const [editFormData, setEditFormData] = useState(null);
     
+    // --- LIST STATE ---
+    const [returnHistory, setReturnHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage] = useState(10);
+    const [totalEntries, setTotalEntries] = useState(0);
+    const [stats, setStats] = useState({
+        totalReturnsAmount: 0,
+        pendingAdjustmentCount: 0,
+        totalReturns: 0
+    });
+
     // --- CREATE RETURN STATE ---
     const [invoiceSearch, setInvoiceSearch] = useState('');
     const [invoiceData, setInvoiceData] = useState(null);
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
 
-    // Mock Data for Return History (Debit Notes)
-    const [returnHistory, setReturnHistory] = useState([
-        { 
-            id: 'DN-2024-001', 
-            date: '2024-01-21', 
-            supplier: 'Sun Pharma Distributors', 
-            invoiceRef: 'PUR-2024-001', 
-            amount: 2500.00, 
-            status: 'Adjusted', 
-            items: 2,
-            gst: '27AABCU9603R1ZN',
-            phone: '9876543210',
-            address: '123, Industrial Area, Mumbai',
-            reason: 'Damaged items received',
-            itemsList: [
-                { name: 'Amoxyclav 625', qty: 10, rate: 85.00, batch: 'AM-909', amount: 850 },
-                { name: 'Pantop 40', qty: 37, rate: 45.00, batch: 'P-112', amount: 1650 }
-            ]
-        },
-        { 
-            id: 'DN-2024-002', 
-            date: '2024-01-18', 
-            supplier: 'Global Medicos', 
-            invoiceRef: 'PUR-2024-003', 
-            amount: 1200.00, 
-            status: 'Pending', 
-            items: 1,
-            gst: '27AABCU9603R1ZN',
-            phone: '9988776655',
-            address: '789, Medical Hub, Delhi',
-            reason: 'Expired stock',
-            itemsList: [
-                { name: 'Cetrizen 10mg', qty: 480, rate: 2.50, batch: 'CT-22', amount: 1200 }
-            ]
-        },
-    ]);
+    const [suppliers, setSuppliers] = useState([]);
+    const [selectedSupplier, setSelectedSupplier] = useState('');
 
-    // Mock Database for Searching Purchase Invoice (to return items from)
-    const mockPurchaseInvoices = [
-        { 
-            id: 'PUR-2024-001', 
-            supplier: 'Sun Pharma Distributors', 
-            date: '2024-01-20', 
-            items: [
-                { id: 201, name: 'Amoxyclav 625', qty: 50, rate: 85.00, batch: 'AM-909' },
-                { id: 202, name: 'Pantop 40', qty: 100, rate: 45.00, batch: 'P-112' }
-            ]
-        },
-        {
-            id: 'PUR-2024-005',
-            supplier: 'Alpha Drugs',
-            date: '2024-01-12',
-            items: [
-                 { id: 203, name: 'Cetrizen 10mg', qty: 500, rate: 2.50, batch: 'CT-22' }
-            ]
+    const fetchReturns = useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data } = await api.get('/purchase-returns', {
+                params: {
+                    pageNumber: currentPage,
+                    pageSize: itemsPerPage,
+                    keyword: searchTerm
+                }
+            });
+            if (data.success) {
+                setReturnHistory(data.returns);
+                setTotalPages(data.pages);
+                setTotalEntries(data.total);
+                if (data.stats) {
+                    setStats(data.stats);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching returns:", error);
+        } finally {
+            setLoading(false);
         }
-    ];
+    }, [currentPage, itemsPerPage, searchTerm]);
+
+    const fetchSuppliers = useCallback(async () => {
+        try {
+             // Assuming your existing suppliers endpoint supports returning a simple list or all items
+             // If not, we might need pagination or a specific 'all' query logic.
+             // For now, let's try fetching without pagination params if supported, or large limit.
+            const { data } = await api.get('/suppliers?limit=1000'); 
+            if (data.success) {
+                setSuppliers(data.suppliers);
+            }
+        } catch (error) {
+            console.error("Failed to fetch suppliers", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (view === 'list') {
+            fetchReturns();
+        }
+        if (view === 'create') {
+            fetchSuppliers();
+        }
+    }, [fetchReturns, fetchSuppliers, view]);
 
     // --- METHODS ---
 
-    const handleInvoiceSearch = (e) => {
+    const handleInvoiceSearch = async (e) => {
         e.preventDefault();
-        const found = mockPurchaseInvoices.find(inv => inv.id.toLowerCase() === invoiceSearch.toLowerCase());
-        if (found) {
-            setInvoiceData(found);
-            setReturnItems([]);
-            Swal.fire({
-                icon: 'success',
-                title: 'Invoice Found',
-                text: `Loaded items from ${found.supplier}`,
-                timer: 1000,
-                showConfirmButton: false
+        const trimmedSearch = invoiceSearch.trim();
+        if (!trimmedSearch) return;
+
+        try {
+            console.log("Searching for invoice:", trimmedSearch);
+            const { data } = await api.get('/purchases', {
+                params: { keyword: trimmedSearch }
             });
-        } else {
-            Swal.fire('Not Found', 'Purchase Invoice number not found.', 'error');
-            setInvoiceData(null);
+
+            console.log("Search results:", data);
+
+            if (data.success && data.purchases && data.purchases.length > 0) {
+                // Find exact match if possible, otherwise take the first
+                const found = data.purchases.find(p => p.invoiceNumber === trimmedSearch) || data.purchases[0];
+                
+                console.log("Found invoice:", found);
+
+                // Fetch full purchase details
+                const detailRes = await api.get(`/purchases/${found._id}`);
+                
+                if (detailRes.data.success) {
+                    const purchaseData = detailRes.data.purchase;
+
+                    setInvoiceData(purchaseData);
+                    setReturnItems([]);
+                    
+                    if (purchaseData.supplierId) {
+                         Swal.fire({
+                            icon: 'success',
+                            title: 'Invoice Found',
+                            text: `Loaded items from ${purchaseData.supplierId.name || 'Unknown Supplier'}`,
+                            timer: 1000,
+                            showConfirmButton: false
+                        });
+                        setSelectedSupplier('');
+                    } else {
+                        // ORPHAN INVOICE HANDLING
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Orphan Invoice',
+                            text: 'This invoice has no active supplier. Please select a supplier manually below.',
+                            timer: 2000
+                        });
+                        setSelectedSupplier('');
+                    }
+                }
+            } else {
+                Swal.fire('Not Found', 'Purchase Invoice number not found.', 'error');
+                setInvoiceData(null);
+            }
+        } catch (error) {
+            console.error("Search Error:", error);
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to search invoice';
+            Swal.fire('Error', errorMsg, 'error');
         }
     };
 
     const toggleReturnItem = (item) => {
-        const exists = returnItems.find(r => r.id === item.id);
+        const itemObj = item.productId || item;
+        const exists = returnItems.find(r => r.productId === (itemObj._id || itemObj.id));
         if (exists) {
-            setReturnItems(returnItems.filter(r => r.id !== item.id));
+            setReturnItems(returnItems.filter(r => r.productId !== (itemObj._id || itemObj.id)));
         } else {
-            setReturnItems([...returnItems, { ...item, returnQty: 1 }]); 
+            setReturnItems([...returnItems, { 
+                productId: itemObj._id || itemObj.id, 
+                name: itemObj.name,
+                batchNumber: item.batchNumber, 
+                purchasePrice: item.purchasePrice,
+                returnQuantity: 1,
+                maxQty: item.quantity 
+            }]); 
         }
     };
 
-    const updateReturnQty = (id, newQty, maxQty) => {
+    const updateReturnQty = (productId, newQty, maxQty) => {
         if (newQty < 1 || newQty > maxQty) return;
-        setReturnItems(returnItems.map(item => item.id === id ? { ...item, returnQty: newQty } : item));
+        setReturnItems(returnItems.map(item => item.productId === productId ? { ...item, returnQuantity: newQty } : item));
     };
 
     const calculateRefund = () => {
-        return returnItems.reduce((acc, item) => acc + (item.rate * item.returnQty), 0);
+        return returnItems.reduce((acc, item) => acc + (item.purchasePrice * item.returnQuantity), 0);
     };
 
-    const processReturn = () => {
+    const processReturn = async () => {
+        // Use invoice supplier logic OR manual selection
+        const finalSupplierId = invoiceData?.supplierId?._id || selectedSupplier;
+        
+        if (!finalSupplierId) {
+             Swal.fire('Error', 'Missing Supplier Information. Please select a supplier to continue.', 'error');
+             return;
+        }
+
         if (returnItems.length === 0) {
             Swal.fire('Error', 'Please select at least one item to return.', 'warning');
             return;
         }
 
+        const totalValue = calculateRefund();
+
         Swal.fire({
             title: 'Create Debit Note?',
-            text: `Total Value: ₹${calculateRefund().toFixed(2)}`,
+            text: `Total Value: ₹${totalValue.toFixed(2)}`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Generate Debit Note',
             confirmButtonColor: '#4F46E5'
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                Swal.fire('Success', 'Debit Note created successfully.', 'success');
-                setView('list');
-                setInvoiceData(null);
-                setInvoiceSearch('');
-                setReturnItems([]);
+                try {
+                    const returnNumber = `DN-${Date.now().toString().slice(-6)}`;
+                    const payload = {
+                        purchaseId: invoiceData._id,
+                        supplierId: finalSupplierId,
+                        items: returnItems.map(i => ({
+                            productId: i.productId,
+                            batchNumber: i.batchNumber,
+                            returnQuantity: i.returnQuantity,
+                            purchasePrice: i.purchasePrice,
+                            amount: i.purchasePrice * i.returnQuantity
+                        })),
+                        totalAmount: totalValue,
+                        reason: reason,
+                        returnNumber: returnNumber
+                    };
+
+                    const { data } = await api.post('/purchase-returns', payload);
+
+                    if (data.success) {
+                        Swal.fire('Success', 'Debit Note created successfully.', 'success');
+                        setView('list');
+                        setInvoiceData(null);
+                        setInvoiceSearch('');
+                        setReturnItems([]);
+                        setReason('');
+                        setSelectedSupplier(''); // Reset manual selection
+                        fetchReturns();
+                    }
+                } catch (error) {
+                    console.error("Create Return Error: ", error);
+                    const errorMsg = error.response?.data?.message || 'Failed to create return';
+                    const errorDetails = error.response?.data?.details;
+                    
+                    Swal.fire({
+                        title: 'Error', 
+                        html: errorDetails ? `${errorMsg}<br/><br/><small>${errorDetails.join('<br/>')}</small>` : errorMsg,
+                        icon: 'error'
+                    });
+                }
             }
         });
     };
 
-    const handleView = (returnItem) => {
-        setSelectedReturn(returnItem);
-        setShowViewModal(true);
+    const handleView = (returnId) => {
+        navigate(`/purchase/return/view/${returnId}`);
     };
 
     const handlePrint = (returnItem) => {
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Debit Note - ${returnItem.id}</title>
-                <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1f2937; }
-                    .invoice-container { max-width: 800px; margin: 0 auto; border: 2px solid #e5e7eb; }
-                    .header { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); padding: 25px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #B91C1C; }
-                    .logo-section { display: flex; align-items: center; gap: 15px; }
-                    .logo { width: 60px; height: 60px; background: white; border-radius: 8px; padding: 8px; }
-                    .company-info { color: white; }
-                    .company-name { font-size: 24px; font-weight: bold; margin-bottom: 3px; }
-                    .company-tagline { font-size: 12px; opacity: 0.9; }
-                    .doc-info { text-align: right; color: white; }
-                    .doc-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-                    .doc-date { font-size: 11px; opacity: 0.9; }
-                    .content { padding: 30px; }
-                    .debit-header { background: #FEF2F2; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #EF4444; }
-                    .debit-number { font-size: 26px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
-                    .details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
-                    .detail-item { padding: 15px; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; }
-                    .detail-label { font-size: 10px; font-weight: bold; color: #6B7280; text-transform: uppercase; margin-bottom: 6px; }
-                    .detail-value { font-size: 14px; font-weight: 600; color: #1f2937; }
-                    .items-section { margin-bottom: 25px; }
-                    .section-title { font-size: 13px; font-weight: bold; color: #6B7280; text-transform: uppercase; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #E5E7EB; }
-                    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                    .items-table th { background: #F9FAFB; padding: 10px; text-align: left; font-size: 11px; color: #6B7280; text-transform: uppercase; border-bottom: 2px solid #E5E7EB; }
-                    .items-table td { padding: 10px; border-bottom: 1px solid #E5E7EB; font-size: 13px; }
-                    .total-section { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); padding: 25px; border-radius: 8px; text-align: center; color: white; margin-top: 25px; }
-                    .total-label { font-size: 12px; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-                    .total-amount { font-size: 36px; font-weight: bold; }
-                    .footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #E5E7EB; text-align: center; color: #6B7280; font-size: 11px; }
-                    @media print { body { padding: 0; } .invoice-container { border: none; } }
-                </style>
-            </head>
-            <body>
-                <div class="invoice-container">
-                    <div class="header">
-                        <div class="logo-section">
-                            <img src="/KS2-Logo.png" alt="KS2 Logo" class="logo" />
-                            <div class="company-info">
-                                <div class="company-name">KS4 PharmaNet</div>
-                                <div class="company-tagline">Pharmacy Management System</div>
-                            </div>
-                        </div>
-                        <div class="doc-info">
-                            <div class="doc-title">Debit Note</div>
-                            <div class="doc-date">${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
-                        </div>
-                    </div>
-                    <div class="content">
-                        <div class="debit-header">
-                            <div class="debit-number">${returnItem.id}</div>
-                            <div style="color: #6B7280; font-size: 14px;">Date: ${returnItem.date} | Ref: ${returnItem.invoiceRef}</div>
-                        </div>
-                        <div class="details-grid">
-                            <div class="detail-item">
-                                <div class="detail-label">Supplier Name</div>
-                                <div class="detail-value">${returnItem.supplier}</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Phone Number</div>
-                                <div class="detail-value">${returnItem.phone}</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">GST Number</div>
-                                <div class="detail-value">${returnItem.gst}</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Status</div>
-                                <div class="detail-value">${returnItem.status}</div>
-                            </div>
-                            <div class="detail-item" style="grid-column: 1 / -1;">
-                                <div class="detail-label">Supplier Address</div>
-                                <div class="detail-value">${returnItem.address}</div>
-                            </div>
-                            <div class="detail-item" style="grid-column: 1 / -1;">
-                                <div class="detail-label">Reason for Return</div>
-                                <div class="detail-value">${returnItem.reason}</div>
-                            </div>
-                        </div>
-                        <div class="items-section">
-                            <div class="section-title">📦 Returned Items</div>
-                            <table class="items-table">
-                                <thead>
-                                    <tr>
-                                        <th>Item Name</th>
-                                        <th>Batch</th>
-                                        <th>Qty</th>
-                                        <th>Rate</th>
-                                        <th style="text-align: right;">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${returnItem.itemsList.map(item => `
-                                        <tr>
-                                            <td><strong>${item.name}</strong></td>
-                                            <td>${item.batch}</td>
-                                            <td>${item.qty}</td>
-                                            <td>₹${item.rate.toFixed(2)}</td>
-                                            <td style="text-align: right;"><strong>₹${item.amount.toFixed(2)}</strong></td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="total-section">
-                            <div class="total-label">Total Debit Amount</div>
-                            <div class="total-amount">₹${returnItem.amount.toLocaleString('en-IN')}</div>
-                        </div>
-                        <div class="footer">
-                            <p><strong>Printed on:</strong> ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}</p>
-                            <p>This is a computer-generated document and does not require a signature.</p>
-                            <p style="margin-top: 10px; color: #EF4444; font-weight: bold;">KS4 PharmaNet © ${new Date().getFullYear()}</p>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 250);
+        navigate(`/purchase/return/view/${returnItem._id}?autoPrint=true`);
     };
 
     const handleEdit = (returnItem) => {
         setEditFormData({
             ...returnItem,
-            date: returnItem.date,
-            supplier: returnItem.supplier,
-            amount: returnItem.amount,
             status: returnItem.status,
             reason: returnItem.reason
         });
@@ -287,56 +257,72 @@ const PurchaseReturn = () => {
         setShowEditModal(true);
     };
 
-    const handleEditSubmit = (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
-        setReturnHistory(returnHistory.map(item => 
-            item.id === selectedReturn.id ? { ...item, ...editFormData } : item
-        ));
-        setShowEditModal(false);
-        Swal.fire({
-            title: 'Updated!',
-            text: 'Debit note has been updated successfully.',
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-        });
+        try {
+            const { data } = await api.put(`/purchase-returns/${selectedReturn._id}`, {
+                status: editFormData.status,
+                reason: editFormData.reason
+            });
+
+            if (data.success) {
+                setShowEditModal(false);
+                fetchReturns();
+                Swal.fire({
+                    title: 'Updated!',
+                    text: 'Debit note has been updated successfully.',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update debit note', 'error');
+        }
     };
 
-    const handleDelete = (returnItem) => {
+    const handleDelete = (returnId, returnNumber) => {
         Swal.fire({
             title: 'Are you sure?',
-            text: `Do you want to delete debit note ${returnItem.id}? This action cannot be undone!`,
+            text: `Do you want to delete debit note ${returnNumber}? This action cannot be undone!`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#EF4444',
             cancelButtonColor: '#6B7280',
             confirmButtonText: 'Yes, delete it!',
             cancelButtonText: 'Cancel'
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                setReturnHistory(returnHistory.filter(item => item.id !== returnItem.id));
-                Swal.fire({
-                    title: 'Deleted!',
-                    text: 'Debit note has been deleted successfully.',
-                    icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                try {
+                    const { data } = await api.delete(`/purchase-returns/${returnId}`);
+                    if (data.success) {
+                        fetchReturns();
+                        Swal.fire({
+                            title: 'Deleted!',
+                            text: 'Debit note has been deleted successfully.',
+                            icon: 'success',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Failed to delete debit note', 'error');
+                }
             }
         });
     };
 
     // --- RENDER HELPERS ---
     const getStatusStyle = (status) => {
-        return status === 'Adjusted' || status === 'Refunded' 
-            ? 'bg-green-100 text-green-700 border-green-200' 
-            : 'bg-orange-100 text-orange-700 border-orange-200';
+        switch(status) {
+            case 'Adjusted': return 'bg-green-100 text-green-700 border-green-200';
+            case 'Refunded': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Pending': return 'bg-orange-100 text-orange-700 border-orange-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
     };
 
-    const filteredReturns = returnHistory.filter(item => 
-        item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
         <>
@@ -344,87 +330,100 @@ const PurchaseReturn = () => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                            <RotateCcw className="text-primary" /> Purchase Return (Debit Note)
+                        <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-4">
+                            <div className="p-2 bg-red-500/10 rounded-2xl">
+                                <RotateCcw className="text-red-500" size={32} />
+                            </div>
+                            Purchase Returns
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage returns to suppliers and track debit notes.</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium pl-1">Generate debit notes and manage supplier returns effectively.</p>
                     </div>
-                    <div className="flex gap-2">
-                        {view === 'list' ? (
-                            <button 
-                                onClick={() => setView('create')}
-                                className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-secondary shadow-md active:scale-95 transition-all flex items-center gap-2"
-                            >
-                                <Plus size={18} /> New Debit Note
-                            </button>
-                        ) : (
-                             <button 
-                                onClick={() => setView('list')}
-                                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-all flex items-center gap-2"
-                            >
-                                <History size={18} /> View History
-                            </button>
-                        )}
+                    <div>
+                         <button 
+                            onClick={() => setView(view === 'list' ? 'create' : 'list')}
+                            className={`px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wide transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg
+                                ${view === 'list' 
+                                    ? 'bg-primary text-white hover:bg-secondary shadow-primary/20' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700 shadow-sm'}`}
+                        >
+                            {view === 'list' ? <><Plus size={18} /> New Debit Note</> : <><History size={18} /> View History</>}
+                        </button>
                     </div>
                 </div>
+
+                {/* Stats Section */}
+                {view === 'list' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest">Total Returned</p>
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-1">₹{stats.totalReturnsAmount.toLocaleString()}</h3>
+                                <div className="flex items-center gap-1 text-red-500 text-[10px] font-bold mt-1 uppercase">
+                                    <AlertOctagon size={12} /> Total Debit Value
+                                </div>
+                            </div>
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl">
+                                <RotateCcw size={24} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest">Pending Adjustments</p>
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-1">{stats.pendingAdjustmentCount}</h3>
+                                <div className="flex items-center gap-1 text-orange-500 text-[10px] font-bold mt-1 uppercase">
+                                    <Clock size={12} /> Needs Verification
+                                </div>
+                            </div>
+                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl">
+                                <AlertOctagon size={24} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest">Total Debit Notes</p>
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-1">{stats.totalReturns}</h3>
+                                <div className="flex items-center gap-1 text-blue-500 text-[10px] font-bold mt-1 uppercase">
+                                    <FileText size={12} /> All Records
+                                </div>
+                            </div>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl">
+                                <FileText size={24} />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* VIEW: LIST HISTORY */}
                 {view === 'list' && (
                     <div className="space-y-6 animate-fade-in">
-                        {/* Stats */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
-                                <div>
-                                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Total Debit Notes</p>
-                                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">₹3,700.00</h3>
-                                    <div className="flex items-center gap-1 text-red-500 text-xs font-medium mt-1">
-                                        <RotateCcw size={14} /> {returnHistory.length} Returns
-                                    </div>
+                        {/* Filters & Actions Toolbox */}
+                        <div className="space-y-4">
+                            {/* Top Row: Search & Actions */}
+                            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                                <div className="relative w-full lg:w-1/2">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search by debit note number or supplier..." 
+                                        value={searchTerm}
+                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm font-medium text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                    />
                                 </div>
-                                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl">
-                                    <FileText size={24} />
-                                </div>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
-                                <div>
-                                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Pending Adjustments</p>
-                                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">₹1,200.00</h3>
-                                    <div className="flex items-center gap-1 text-orange-500 text-xs font-medium mt-1">
-                                        <AlertOctagon size={14} /> 1 Pending
-                                    </div>
-                                </div>
-                                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl">
-                                    <History size={24} />
-                                </div>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow">
-                                <div>
-                                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Adjusted Amount</p>
-                                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">₹2,500.00</h3>
-                                    <div className="flex items-center gap-1 text-green-500 text-xs font-medium mt-1">
-                                        <CheckCircle size={14} /> Completed
-                                    </div>
-                                </div>
-                                <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl">
-                                    <CheckCircle size={24} />
+                                <div className="flex items-center gap-3 w-full lg:w-auto">
+                                    <button 
+                                        className="flex-1 lg:flex-none px-6 py-3.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                    >
+                                        <Download size={18} /> Export List
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Table */}
-                        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex gap-4">
-                                <div className="relative flex-1 max-w-md">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search debit note, supplier..." 
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                                    />
-                                </div>
-                            </div>
+                        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-gray-50 dark:bg-gray-750 border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 uppercase font-semibold">
@@ -432,68 +431,98 @@ const PurchaseReturn = () => {
                                             <th className="px-6 py-4">Debit Note #</th>
                                             <th className="px-6 py-4">Date</th>
                                             <th className="px-6 py-4">Supplier</th>
-                                            <th className="px-6 py-4">Inv Ref</th>
+                                            <th className="px-6 py-4">Ref Invoice</th>
                                             <th className="px-6 py-4">Amount</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                                        {filteredReturns.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
-                                                <td className="px-6 py-4 font-bold text-gray-700 dark:text-gray-200">{item.id}</td>
-                                                <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{item.date}</td>
-                                                <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-100">{item.supplier}</td>
-                                                <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">{item.invoiceRef}</td>
-                                                <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">₹{item.amount.toFixed(2)}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusStyle(item.status)}`}>
-                                                        {item.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button 
-                                                            onClick={() => handleView(item)}
-                                                            className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all" 
-                                                            title="View Details"
-                                                        >
-                                                            <Eye size={16} />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handlePrint(item)}
-                                                            className="p-1.5 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-all" 
-                                                            title="Print Debit Note"
-                                                        >
-                                                            <Printer size={16} />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleEdit(item)}
-                                                            className="p-1.5 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-all" 
-                                                            title="Edit"
-                                                        >
-                                                            <Edit2 size={16} />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDelete(item)}
-                                                            className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all" 
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan="7" className="px-6 py-20 text-center">
+                                                     <div className="flex flex-col items-center gap-3">
+                                                         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                                                         <span className="text-gray-500 font-bold uppercase tracking-widest text-xs">Fetching records...</span>
+                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
-                                        {filteredReturns.length === 0 && (
+                                        ) : (
+                                            returnHistory.map((item) => (
+                                                <tr key={item._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
+                                                    <td className="px-6 py-4 font-black text-gray-900 dark:text-white uppercase antialiased">{item.returnNumber}</td>
+                                                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-medium">{new Date(item.returnDate).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">{item.supplierId?.name || 'Unknown'}</td>
+                                                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">{item.purchaseId?.invoiceNumber || 'N/A'}</td>
+                                                    <td className="px-6 py-4 font-black text-primary">₹{item.totalAmount.toLocaleString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyle(item.status)}`}>
+                                                            {item.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <button 
+                                                                onClick={() => handleView(item._id)}
+                                                                className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all" 
+                                                                title="View"
+                                                            >
+                                                                <Eye size={18} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handlePrint(item)}
+                                                                className="p-2 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl transition-all" 
+                                                                title="Print"
+                                                            >
+                                                                <Printer size={18} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleEdit(item)}
+                                                                className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-all" 
+                                                                title="Update"
+                                                            >
+                                                                <Edit2 size={18} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDelete(item._id, item.returnNumber)}
+                                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all" 
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                        {!loading && returnHistory.length === 0 && (
                                             <tr>
-                                                <td colSpan="7" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
-                                                    No debit notes found matching your criteria.
+                                                <td colSpan="7" className="px-6 py-16 text-center">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <History size={40} className="text-gray-300 dark:text-gray-600" />
+                                                        <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs">No return records found</p>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+                            
+                            {/* Pagination */}
+                            <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    Displaying <span className="text-gray-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalEntries)}</span> of {totalEntries}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="p-2 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
+                                    <div className="flex items-center gap-1">
+                                        {[...Array(totalPages)].map((_, i) => (
+                                            <button key={i+1} onClick={() => paginate(i+1)} className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${currentPage === i+1 ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{i+1}</button>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30 transition-all"><ChevronRight size={16} /></button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -501,23 +530,25 @@ const PurchaseReturn = () => {
 
                 {/* VIEW: CREATE RETURN */}
                 {view === 'create' && (
-                    <div className="space-y-6 animate-fade-in">
+                    <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
                         {/* Search Section */}
-                         <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center text-center">
-                            <FileText size={48} className="text-gray-200 dark:text-gray-700 mb-4" />
-                            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Locate Purchase Invoice</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-md">Enter the original Purchase Invoice number to fetch items for return.</p>
+                         <div className="bg-white dark:bg-gray-800 p-10 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center text-center">
+                            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                                <FileText size={40} className="text-primary" />
+                            </div>
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Locate Purchase Invoice</h3>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 max-w-md font-medium">Enter the original Purchase Invoice number to fetch items for return. This will automatically deduct stock upon generation.</p>
                             
-                            <form onSubmit={handleInvoiceSearch} className="flex gap-2 w-full max-w-md relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                            <form onSubmit={handleInvoiceSearch} className="flex gap-2 w-full max-w-lg relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                                 <input 
                                     type="text" 
-                                    placeholder="e.g. PUR-2024-001" 
+                                    placeholder="e.g. PUR-12345" 
                                     value={invoiceSearch}
                                     onChange={(e) => setInvoiceSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-mono font-bold uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-inner text-lg"
                                 />
-                                <button type="submit" className="px-6 py-3 bg-gray-800 dark:bg-gray-700 text-white font-bold rounded-xl hover:bg-black dark:hover:bg-gray-600 active:scale-95 transition-all">
+                                <button type="submit" className="px-8 py-4 bg-gray-900 dark:bg-gray-700 text-white font-black rounded-2xl hover:bg-black dark:hover:bg-gray-600 active:scale-95 transition-all outline-none uppercase tracking-widest text-xs">
                                     Fetch
                                 </button>
                             </form>
@@ -525,55 +556,88 @@ const PurchaseReturn = () => {
 
                         {/* Result Section */}
                         {invoiceData && (
-                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-scale-up">
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-scale-up text-left">
                                 {/* Invoice Info Header */}
-                                <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex justify-between items-center">
-                                    <div>
-                                        <h3 className="font-bold text-gray-800 dark:text-white text-lg">Invoice #{invoiceData.id}</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
-                                            <User size={14} /> {invoiceData.supplier} &bull; {invoiceData.date}
-                                        </p>
+                                <div className="p-8 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750/50 flex justify-between items-center text-left">
+                                    <div className="text-left w-full">
+                                        <div className="flex items-center gap-3">
+                                            <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-lg">Source Invoice</span>
+                                            <h3 className="font-black text-gray-900 dark:text-white text-xl">#{invoiceData.invoiceNumber}</h3>
+                                        </div>
+                                        
+                                        {!invoiceData.supplierId ? (
+                                            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl animate-pulse">
+                                                <p className="text-red-500 font-bold text-xs uppercase tracking-wide flex items-center gap-2 mb-2">
+                                                    <AlertOctagon size={16} /> Missing Supplier Data
+                                                </p>
+                                                <select 
+                                                    value={selectedSupplier} 
+                                                    onChange={(e) => setSelectedSupplier(e.target.value)}
+                                                    className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20"
+                                                >
+                                                    <option value="">-- Select Supplier Manually --</option>
+                                                    {suppliers.map(sup => (
+                                                        <option key={sup._id} value={sup._id}>{sup.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1.5 font-medium">
+                                                <User size={14} className="text-primary" /> {invoiceData.supplierId.name} &bull; <Calendar size={14} className="text-primary" /> {new Date(invoiceData.purchaseDate).toLocaleDateString()}
+                                            </p>
+                                        )}
                                     </div>
-                                    <button onClick={() => setInvoiceData(null)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400">
-                                        <X size={24} />
+                                    <button onClick={() => setInvoiceData(null)} className="ml-4 text-gray-400 hover:text-red-500 dark:hover:text-red-400 bg-white dark:bg-gray-700 p-2 rounded-xl shadow-sm transition-all hover:rotate-90">
+                                        <X size={20} />
                                     </button>
                                 </div>
 
-                                <div className="p-6">
-                                    <h4 className="font-bold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-                                        <AlertOctagon size={18} className="text-orange-500" /> Select Items to Return
-                                    </h4>
+                                <div className="p-8 text-left">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h4 className="font-black text-gray-800 dark:text-white flex items-center gap-2 uppercase tracking-wide text-sm">
+                                            <AlertOctagon size={18} className="text-orange-500" /> Select Items to Return
+                                        </h4>
+                                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">{returnItems.length} Items Selected</span>
+                                    </div>
                                     
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {invoiceData.items.map((item) => {
-                                            const isSelected = returnItems.find(r => r.id === item.id);
+                                            const itemObj = item.productId || item;
+                                            const isSelected = returnItems.find(r => r.productId === (itemObj._id || itemObj.id));
                                             return (
-                                                <div key={item.id} className={`p-4 rounded-xl border transition-all flex items-center justify-between group
-                                                    ${isSelected ? 'border-primary bg-green-50 dark:bg-green-900/20' : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600'}`}>
+                                                <div key={item._id} className={`p-5 rounded-2xl border transition-all flex items-center justify-between group
+                                                    ${isSelected 
+                                                        ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-lg shadow-primary/5' 
+                                                        : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-750 hover:border-gray-200 dark:hover:border-gray-600'}`}>
                                                     
-                                                    <div className="flex items-center gap-4">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={!!isSelected}
-                                                            onChange={() => toggleReturnItem(item)}
-                                                            className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary cursor-pointer"
-                                                        />
-                                                        <div>
-                                                            <p className="font-bold text-gray-800 dark:text-white">{item.name}</p>
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400">Batch: {item.batch} | Rate: ₹{item.rate}</p>
+                                                    <div className="flex items-center gap-5">
+                                                        <div 
+                                                            onClick={() => toggleReturnItem(item)}
+                                                            className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer
+                                                                ${isSelected ? 'bg-primary border-primary' : 'border-gray-200 dark:border-gray-600 bg-transparent'}`}
+                                                        >
+                                                            {isSelected && <CheckCircle size={14} className="text-white" />}
+                                                        </div>
+                                                        <div className="text-left" onClick={() => toggleReturnItem(item)}>
+                                                            <p className="font-black text-gray-900 dark:text-white text-base">{itemObj.name || 'Unknown'}</p>
+                                                            <div className="flex items-center gap-3 mt-1">
+                                                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Batch: {item.batchNumber}</span>
+                                                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Rate: ₹{item.purchasePrice}</span>
+                                                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Input Stock: {item.quantity}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
 
                                                     {isSelected && (
-                                                        <div className="flex items-center gap-4 animate-fade-in">
-                                                            <div className="flex items-center bg-white dark:bg-gray-700 border border-primary/30 rounded-lg h-9">
-                                                                <button onClick={() => updateReturnQty(item.id, isSelected.returnQty - 1, item.qty)} className="px-3 hover:bg-green-50 dark:hover:bg-green-900/20 text-primary h-full font-bold">-</button>
-                                                                <span className="w-10 text-center text-sm font-bold text-gray-800 dark:text-white">{isSelected.returnQty}</span>
-                                                                <button onClick={() => updateReturnQty(item.id, isSelected.returnQty + 1, item.qty)} className="px-3 hover:bg-green-50 dark:hover:bg-green-900/20 text-primary h-full font-bold">+</button>
+                                                        <div className="flex items-center gap-6 animate-fade-in pl-6 border-l border-primary/20">
+                                                            <div className="flex items-center bg-white dark:bg-gray-800 border border-primary/20 p-1 rounded-xl h-11">
+                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity - 1, item.quantity)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">-</button>
+                                                                <span className="w-10 text-center text-sm font-black text-gray-900 dark:text-white leading-none">{isSelected.returnQuantity}</span>
+                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity + 1, item.quantity)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">+</button>
                                                             </div>
-                                                            <div className="text-right w-24">
-                                                                <p className="text-xs text-gray-500 dark:text-gray-400">Debit Amount</p>
-                                                                <p className="font-bold text-primary">₹{(item.rate * isSelected.returnQty).toFixed(2)}</p>
+                                                            <div className="text-right w-28 shrink-0">
+                                                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase leading-none mb-1.5">Debit Amount</p>
+                                                                <p className="font-black text-primary text-lg">₹{(item.purchasePrice * isSelected.returnQuantity).toLocaleString()}</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -583,27 +647,27 @@ const PurchaseReturn = () => {
                                     </div>
                                 </div>
 
-                                <div className="p-6 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-6 items-start md:items-end justify-between">
-                                    <div className="w-full md:w-1/2">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Reason for Return</label>
+                                <div className="p-8 bg-gray-50 dark:bg-gray-750/50 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-10 items-start md:items-end justify-between">
+                                    <div className="w-full md:w-1/2 text-left">
+                                        <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-3">Reason for Return</label>
                                         <textarea 
-                                            rows="2" 
-                                            placeholder="e.g. Expired, Damaged, Wrong Item ordered..." 
+                                            rows="3" 
+                                            placeholder="Specify the reason (e.g. Near expiry, stock adjustment, damaged...)" 
                                             value={reason}
                                             onChange={(e) => setReason(e.target.value)}
-                                            className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                            className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 font-bold transition-all shadow-sm"
                                         ></textarea>
                                     </div>
                                     
                                     <div className="w-full md:w-auto text-right">
-                                        <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Total Debit Value</p>
-                                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">₹{calculateRefund().toFixed(2)}</h2>
+                                        <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Grand Refund Total</p>
+                                        <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-6">₹{calculateRefund().toLocaleString()}</h2>
                                         <button 
                                             onClick={processReturn}
                                             disabled={returnItems.length === 0}
-                                            className="w-full md:w-auto px-8 py-3 bg-primary text-white font-bold rounded-xl hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            className="w-full md:w-auto px-10 py-4 bg-primary text-white font-black rounded-2xl hover:bg-secondary shadow-xl shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
                                         >
-                                            <RotateCcw size={18} /> Create Debit Note
+                                            <RotateCcw size={20} /> Generate Debit Note
                                         </button>
                                     </div>
                                 </div>
@@ -615,80 +679,110 @@ const PurchaseReturn = () => {
 
             {/* View Modal */}
             {showViewModal && selectedReturn && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl animate-scale-up border border-white/20 dark:border-gray-700 overflow-hidden max-h-[90vh] flex flex-col">
-                        <div className="relative bg-red-500 h-24">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md animate-fade-in text-left">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-3xl shadow-2xl animate-scale-up border border-white/20 dark:border-gray-700 overflow-hidden max-h-[90vh] flex flex-col">
+                        {/* Modal Header Decoration */}
+                        <div className="relative bg-red-600 h-32 shrink-0">
+                            <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-500 opacity-90"></div>
                             <button 
                                 onClick={() => setShowViewModal(false)} 
-                                className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-sm"
+                                className="absolute top-6 right-6 text-white/80 hover:text-white bg-black/20 hover:bg-black/40 p-2.5 rounded-2xl backdrop-blur-sm transition-all z-10"
                             >
                                 <X size={20} />
                             </button>
-                            <div className="absolute -bottom-10 left-8 p-1 bg-white dark:bg-gray-800 rounded-2xl shadow-md">
-                                <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center text-red-600 dark:text-red-400">
-                                    <RotateCcw size={40} />
+                            <div className="absolute -bottom-12 left-10 p-1.5 bg-white dark:bg-gray-800 rounded-3xl shadow-xl">
+                                <div className="w-24 h-24 bg-red-50 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400">
+                                    <RotateCcw size={48} />
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="pt-12 px-8 pb-8 overflow-y-auto">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedReturn.id}</h3>
-                            <div className="flex gap-2 mt-2">
-                                <span className={`px-2.5 py-0.5 rounded-md text-xs font-bold border ${getStatusStyle(selectedReturn.status)}`}>
-                                    {selectedReturn.status}
-                                </span>
-                                <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                                    Ref: {selectedReturn.invoiceRef}
-                                </span>
+                        <div className="pt-16 px-10 pb-10 overflow-y-auto custom-scrollbar">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h3 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{selectedReturn.returnNumber}</h3>
+                                    <div className="flex gap-2 mt-2">
+                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyle(selectedReturn.status)}`}>
+                                            Status: {selectedReturn.status}
+                                        </span>
+                                        <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
+                                            Ref: {selectedReturn.purchaseId?.invoiceNumber}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="text-left sm:text-right">
+                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Return Issued On</p>
+                                    <p className="text-base font-bold text-gray-800 dark:text-white">{new Date(selectedReturn.returnDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                </div>
                             </div>
 
-                            <div className="mt-6 space-y-4">
-                                <div className="flex items-start gap-4">
-                                    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-gray-500 dark:text-gray-400"><User size={18} /></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Supplier</p>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-white">{selectedReturn.supplier}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">GST: {selectedReturn.gst}</p>
+                            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <section className="space-y-4">
+                                    <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-700 pb-2">Supplier Details</h4>
+                                    <div className="flex items-start gap-4">
+                                        <div className="bg-primary/5 dark:bg-primary/10 p-3 rounded-2xl text-primary"><User size={20} /></div>
+                                        <div>
+                                            <p className="text-base font-bold text-gray-800 dark:text-white">{selectedReturn.supplierId?.name}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{selectedReturn.supplierId?.phone}</p>
+                                            <p className="text-[10px] text-primary font-black uppercase tracking-wider mt-1.5 bg-primary/5 px-2 py-0.5 rounded-md inline-block">GST: {selectedReturn.supplierId?.gstNumber}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-gray-500 dark:text-gray-400"><Calendar size={18} /></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Return Date</p>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-white">{selectedReturn.date}</p>
+                                    <div className="pl-14">
+                                         <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed">"{selectedReturn.supplierId?.address}"</p>
                                     </div>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-gray-500 dark:text-gray-400"><AlertOctagon size={18} /></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Reason</p>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-white">{selectedReturn.reason}</p>
+                                </section>
+
+                                <section className="space-y-4">
+                                    <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-700 pb-2">Internal Note</h4>
+                                    <div className="p-4 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100/50 dark:border-orange-900/30 rounded-2xl">
+                                        <div className="flex gap-3">
+                                            <AlertOctagon size={16} className="text-orange-500 shrink-0" />
+                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-relaxed italic">
+                                                {selectedReturn.reason || 'No specific return reason provided.'}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-gray-500 dark:text-gray-400"><FileText size={18} /></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Items Returned</p>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-white">{selectedReturn.items} Items</p>
-                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Itemized Table */}
+                            <div className="mt-10">
+                                <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-4">Returned Inventory</h4>
+                                <div className="border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-gray-50 dark:bg-gray-750 text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                                            <tr>
+                                                <th className="px-5 py-3">Product</th>
+                                                <th className="px-5 py-3">Batch</th>
+                                                <th className="px-5 py-3 text-center">Qty</th>
+                                                <th className="px-5 py-3 text-right">Debit Amt</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                                            {selectedReturn.items.map((item, idx) => (
+                                                <tr key={idx} className="bg-white dark:bg-gray-800">
+                                                    <td className="px-5 py-4 font-bold text-gray-800 dark:text-gray-200">{item.productId?.name}</td>
+                                                    <td className="px-5 py-4 font-mono text-xs text-gray-500 dark:text-gray-400 uppercase">{item.batchNumber}</td>
+                                                    <td className="px-5 py-4 text-center font-black text-gray-700 dark:text-gray-300">{item.returnQuantity}</td>
+                                                    <td className="px-5 py-4 text-right font-black text-red-600 dark:text-red-400">₹{item.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                             
-                            <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Total Debit Amount</p>
-                                    <p className="text-xl font-black text-red-600 dark:text-red-400">₹{selectedReturn.amount.toLocaleString()}</p>
+                            <div className="mt-10 pt-8 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 dark:bg-gray-750/50 -mx-10 px-10 pb-2">
+                                <div className="py-4">
+                                    <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] leading-none mb-2">Total Adjusted Value</p>
+                                    <p className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter">₹{selectedReturn.totalAmount.toLocaleString()}</p>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-3 py-4 w-full sm:w-auto">
                                     <button 
                                         onClick={() => handlePrint(selectedReturn)}
-                                        className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-secondary transition-colors flex items-center gap-2 shadow-lg shadow-primary/20"
+                                        className="flex-1 sm:flex-none px-8 py-3.5 bg-gray-900 dark:bg-gray-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 shadow-xl"
                                     >
-                                        <Printer size={16} />
-                                        Print
-                                    </button>
-                                    <button className="px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm font-bold rounded-xl hover:bg-black dark:hover:bg-gray-600 transition-colors">
-                                        Download
+                                        <Printer size={18} /> Print Voucher
                                     </button>
                                 </div>
                             </div>
@@ -697,75 +791,50 @@ const PurchaseReturn = () => {
                 </div>
             )}
 
-            {/* Edit Debit Note Modal */}
+            {/* Edit Modal */}
             {showEditModal && editFormData && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 flex flex-col max-h-[85vh]">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-700/50 rounded-t-2xl">
-                            <h3 className="font-bold text-gray-800 dark:text-white text-lg">Edit Debit Note - {selectedReturn.id}</h3>
-                            <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:shadow-md dark:shadow-none">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md animate-fade-in text-left">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 overflow-hidden">
+                        <div className="px-8 py-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-750/50">
+                            <div>
+                                <h3 className="font-black text-gray-900 dark:text-white text-xl uppercase tracking-tighter">Modify Debit Note</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Ref: {selectedReturn.returnNumber}</p>
+                            </div>
+                            <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all p-2 rounded-xl bg-white dark:bg-gray-700 shadow-sm border border-gray-100 dark:border-gray-600 hover:rotate-90">
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                            <form id="edit-return-form" onSubmit={handleEditSubmit} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Return Date</label>
-                                        <input 
-                                            type="date" 
-                                            value={editFormData.date}
-                                            onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Supplier Name</label>
-                                        <input 
-                                            type="text" 
-                                            value={editFormData.supplier}
-                                            onChange={(e) => setEditFormData({...editFormData, supplier: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Debit Amount (₹)</label>
-                                        <input 
-                                            type="number" 
-                                            step="0.01"
-                                            value={editFormData.amount}
-                                            onChange={(e) => setEditFormData({...editFormData, amount: parseFloat(e.target.value)})}
-                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Status</label>
+                        <div className="p-8">
+                             <form id="edit-return-form" onSubmit={handleEditSubmit} className="space-y-6 text-left">
+                                <div className="space-y-6">
+                                     <div className="space-y-3">
+                                        <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block ml-1">Current Status</label>
                                         <select 
                                             value={editFormData.status}
                                             onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
+                                            className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-sm text-gray-800 dark:text-white transition-all appearance-none cursor-pointer"
                                         >
-                                            <option value="Adjusted">Adjusted</option>
-                                            <option value="Pending">Pending</option>
-                                            <option value="Refunded">Refunded</option>
+                                            <option value="Pending">🕒 Pending Review</option>
+                                            <option value="Adjusted">✅ Adjusted in A/C</option>
+                                            <option value="Refunded">💸 Amount Refunded</option>
                                         </select>
                                     </div>
-                                    <div className="col-span-1 md:col-span-2 space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Reason for Return</label>
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block ml-1">Update Reason</label>
                                         <textarea 
-                                            rows="3"
+                                            rows="4"
+                                            placeholder="Update the return reason or add internal notes..."
                                             value={editFormData.reason}
                                             onChange={(e) => setEditFormData({...editFormData, reason: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                                            placeholder="e.g. Damaged, Expired, Wrong Item..."
+                                            className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none font-bold text-sm text-gray-800 dark:text-white resize-none transition-all shadow-inner focus:ring-4 focus:ring-primary/10 placeholder:text-gray-400"
                                         ></textarea>
                                     </div>
                                 </div>
-                            </form>
+                             </form>
                         </div>
-                        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-700/50 rounded-b-2xl sticky bottom-0 z-10">
-                            <button onClick={() => setShowEditModal(false)} className="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-gray-700 text-sm">Cancel</button>
-                            <button type="submit" form="edit-return-form" className="px-8 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all text-sm">Update Debit Note</button>
+                        <div className="p-8 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-750/50">
+                            <button onClick={() => setShowEditModal(false)} className="px-6 py-3.5 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-500 font-bold hover:bg-white dark:hover:bg-gray-700 text-xs uppercase tracking-widest transition-all">Discard</button>
+                            <button type="submit" form="edit-return-form" className="px-10 py-3.5 rounded-2xl bg-primary text-white font-black hover:bg-secondary shadow-xl shadow-primary/20 active:scale-95 transition-all text-xs uppercase tracking-widest">Submit Update</button>
                         </div>
                     </div>
                 </div>
