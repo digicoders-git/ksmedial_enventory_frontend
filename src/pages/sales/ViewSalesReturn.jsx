@@ -12,6 +12,22 @@ const ViewSalesReturn = () => {
   const navigate = useNavigate();
   const [returnNote, setReturnNote] = useState(null);
 
+  // QR Code Logic
+  const qrData = returnNote ? encodeURIComponent(`
+SALES RETURN (CREDIT NOTE)
+-------------------------------
+Return No: ${returnNote.id}
+Ref Invoice: ${returnNote.originalInvoiceId}
+Date: ${returnNote.date}
+Customer: ${returnNote.customer}
+Refund Amount: Rs. ${returnNote.refundAmount.toFixed(2)}
+Status: ${returnNote.status}
+-------------------------------
+KS Pharma Net - Authorized Document
+  `.trim()) : '';
+
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
   const handleDownloadPDF = () => {
     if (!returnNote) return;
 
@@ -26,159 +42,172 @@ const ViewSalesReturn = () => {
         // Logo
         doc.addImage(img, 'PNG', 14, 10, 45, 20);
 
-        // Company Info
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text('KS Pharma Net', 14, 40);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.text('123, Health Avenue, Medical District', 14, 46);
-        doc.text('Phone: +91 98765 43210', 14, 51);
-        doc.text('Email: support@kspharma.com', 14, 56);
+        // QR Code for PDF
+        const qrImg = new Image();
+        qrImg.crossOrigin = "anonymous";
+        qrImg.src = qrCodeUrl;
 
-        // Credit Note Header
-        doc.setFontSize(32);
-        doc.setTextColor(220, 38, 38); // Red-600
-        doc.setFont('helvetica', 'bold');
-        doc.text('CREDIT NOTE', pageWidth - 14, 25, { align: 'right' });
-        
-        doc.setFontSize(16);
-        doc.setTextColor(0);
-        doc.text(`#${returnNote.id}`, pageWidth - 14, 38, { align: 'right' });
+        qrImg.onload = () => {
+            // QR in top right
+            doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
+            doc.setFontSize(7);
+            doc.setTextColor(150);
+            doc.text('VERIFY RETURN', pageWidth - 29, 78, { align: 'center' });
 
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text('Ref Invoice: ', pageWidth - 45, 45, { align: 'right' });
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(returnNote.originalInvoiceId, pageWidth - 14, 45, { align: 'right' });
-        
-        // Status Badge
-        const statusX = pageWidth - 35;
-        const statusY = 52;
-        doc.setDrawColor(254, 242, 242);
-        doc.setFillColor(254, 242, 242);
-        doc.roundedRect(statusX, statusY, 21, 6, 1, 1, 'FD');
-        doc.setTextColor(185, 28, 28);
-        doc.setFontSize(8);
-        doc.text(returnNote.status.toUpperCase(), statusX + 10.5, statusY + 4.2, { align: 'center' });
+            // Company Info
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'bold');
+            doc.text(returnNote.shop?.shopName || 'KS Pharma Net', 14, 40);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            doc.text(returnNote.shop?.address || '123, Health Avenue, Medical District', 14, 46);
+            doc.text(`Phone: ${returnNote.shop?.contactNumber || '+91 98765 43210'}`, 14, 51);
+            doc.text(`Email: ${returnNote.shop?.email || 'support@kspharma.com'}`, 14, 56);
 
-        doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 65, { align: 'right' });
+            // Credit Note Header
+            doc.setFontSize(32);
+            doc.setTextColor(220, 38, 38); // Red-600
+            doc.setFont('helvetica', 'bold');
+            doc.text('CREDIT NOTE', pageWidth - 14, 25, { align: 'right' });
+            
+            doc.setFontSize(16);
+            doc.setTextColor(0);
+            doc.text(`#${returnNote.id}`, pageWidth - 14, 38, { align: 'right' });
 
-        doc.setDrawColor(245);
-        doc.line(14, 75, pageWidth - 14, 75);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text('Ref Invoice: ', pageWidth - 45, 45, { align: 'right' });
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'bold');
+            doc.text(returnNote.originalInvoiceId, pageWidth - 14, 45, { align: 'right' });
+            
+            // Status Badge
+            const statusX = pageWidth - 35;
+            const statusY = 52;
+            doc.setDrawColor(254, 242, 242);
+            doc.setFillColor(254, 242, 242);
+            doc.roundedRect(statusX, statusY, 21, 6, 1, 1, 'FD');
+            doc.setTextColor(185, 28, 28);
+            doc.setFontSize(8);
+            doc.text(returnNote.status.toUpperCase(), statusX + 10.5, statusY + 4.2, { align: 'center' });
 
-        // Details Row
-        doc.setFontSize(8);
-        doc.setTextColor(160);
-        doc.setFont('helvetica', 'bold');
-        doc.text('CUSTOMER DETAILS', 14, 85);
-        doc.text('RETURN REASON', pageWidth - 14, 85, { align: 'right' });
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 65, { align: 'right' });
 
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.text(returnNote.customer, 14, 93);
-        
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.setFont('helvetica', 'normal');
-        const splitAddress = doc.splitTextToSize(returnNote.address, 70);
-        doc.text(splitAddress, 14, 100);
-        doc.text(`Tel: ${returnNote.contact}`, 14, 100 + (splitAddress.length * 5));
+            doc.setDrawColor(245);
+            doc.line(14, 75, pageWidth - 14, 75);
 
-        // Right side - Reason Box
-        const reasonY = 93;
-        const reasonText = `"${returnNote.reason}"`;
-        const reasonWidth = doc.getTextWidth(reasonText) + 10;
-        doc.setDrawColor(230);
-        doc.setFillColor(250, 250, 250);
-        doc.roundedRect(pageWidth - reasonWidth - 14, reasonY - 5, reasonWidth, 10, 1, 1, 'FD');
-        doc.setTextColor(50);
-        doc.text(reasonText, pageWidth - 14 - (reasonWidth/2), reasonY + 1.5, { align: 'center' });
+            // Details Row
+            doc.setFontSize(8);
+            doc.setTextColor(160);
+            doc.setFont('helvetica', 'bold');
+            doc.text('CUSTOMER DETAILS', 14, 85);
+            doc.text('RETURN REASON', pageWidth - 14, 85, { align: 'right' });
 
-        // Items Table
-        const tableColumn = ["#", "Item Name", "Rate", "Ret Qty", "Tax", "Total"];
-        const tableRows = returnNote.items.map((item, index) => [
-            index + 1,
-            item.name,
-            `Rs. ${item.rate.toFixed(2)}`,
-            item.qty,
-            `${item.tax}%`,
-            `Rs. ${(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}`
-        ]);
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.text(returnNote.customer, 14, 93);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.setFont('helvetica', 'normal');
+            const splitAddress = doc.splitTextToSize(returnNote.address, 70);
+            doc.text(splitAddress, 14, 100);
+            doc.text(`Tel: ${returnNote.contact}`, 14, 100 + (splitAddress.length * 5));
 
-        autoTable(doc, {
-            startY: 125,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'striped',
-            headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', halign: 'center' },
-            bodyStyles: { fontSize: 9 },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                1: { halign: 'left' },
-                2: { halign: 'right' },
-                3: { halign: 'center' },
-                4: { halign: 'right' },
-                5: { halign: 'right' },
-            },
-            margin: { left: 14, right: 14 },
-        });
+            // Right side - Reason Box
+            const reasonY = 93;
+            const reasonText = `"${returnNote.reason}"`;
+            const reasonWidth = doc.getTextWidth(reasonText) + 10;
+            doc.setDrawColor(230);
+            doc.setFillColor(250, 250, 250);
+            doc.roundedRect(pageWidth - reasonWidth - 14, reasonY - 5, reasonWidth, 10, 1, 1, 'FD');
+            doc.setTextColor(50);
+            doc.text(reasonText, pageWidth - 14 - (reasonWidth/2), reasonY + 1.5, { align: 'center' });
 
-        // Summary Area
-        const finalY = doc.lastAutoTable.finalY + 15;
-        
-        // Note
-        doc.setFontSize(9);
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Declaration:', 14, finalY);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100);
-        const declaration = "We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct.";
-        const splitDecl = doc.splitTextToSize(declaration, 80);
-        doc.text(splitDecl, 14, finalY + 5);
+            // Items Table
+            const tableColumn = ["#", "Item Name", "Rate", "Ret Qty", "Tax", "Total"];
+            const tableRows = returnNote.items.map((item, index) => [
+                index + 1,
+                item.name,
+                `Rs. ${item.rate.toFixed(2)}`,
+                item.qty,
+                `${item.tax}%`,
+                `Rs. ${(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}`
+            ]);
 
-        // Calculation
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Subtotal (Refund)`, pageWidth - 65, finalY);
-        doc.setTextColor(0);
-        doc.text(`Rs. ${returnNote.subtotal.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
-        
-        doc.setTextColor(100);
-        doc.text(`Reversed Tax`, pageWidth - 65, finalY + 8);
-        doc.setTextColor(0);
-        doc.text(`Rs. ${returnNote.taxAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
+            autoTable(doc, {
+                startY: 125,
+                head: [tableColumn],
+                body: tableRows,
+                theme: 'striped',
+                headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', halign: 'center' },
+                bodyStyles: { fontSize: 9 },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 10 },
+                    1: { halign: 'left' },
+                    2: { halign: 'right' },
+                    3: { halign: 'center' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' },
+                },
+                margin: { left: 14, right: 14 },
+            });
 
-        doc.setDrawColor(230);
-        doc.line(pageWidth - 75, finalY + 14, pageWidth - 14, finalY + 14);
+            // Summary Area
+            const finalY = doc.lastAutoTable.finalY + 15;
+            
+            // Note
+            doc.setFontSize(9);
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Declaration:', 14, finalY);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(100);
+            const declaration = "We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct.";
+            const splitDecl = doc.splitTextToSize(declaration, 80);
+            doc.text(splitDecl, 14, finalY + 5);
 
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'black');
-        doc.setTextColor(185, 28, 28); // Red-700
-        doc.text(`TOTAL REFUND`, pageWidth - 75, finalY + 24);
-        doc.text(`- Rs. ${returnNote.refundAmount.toFixed(2)}`, pageWidth - 14, finalY + 24, { align: 'right' });
+            // Calculation
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Subtotal (Refund)`, pageWidth - 65, finalY);
+            doc.setTextColor(0);
+            doc.text(`Rs. ${returnNote.subtotal.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
+            
+            doc.setTextColor(100);
+            doc.text(`Reversed Tax`, pageWidth - 65, finalY + 8);
+            doc.setTextColor(0);
+            doc.text(`Rs. ${returnNote.taxAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
 
-        // Signature Lines
-        const sigY = 265;
-        doc.setDrawColor(150);
-        doc.line(30, sigY, 80, sigY);
-        doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
-        
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Customer Signature', 55, sigY + 5, { align: 'center' });
-        doc.text('Authorized Signatory', pageWidth - 55, sigY + 5, { align: 'center' });
+            doc.setDrawColor(230);
+            doc.line(pageWidth - 75, finalY + 14, pageWidth - 14, finalY + 14);
 
-        doc.save(`${returnNote.id}_credit_note.pdf`);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'black');
+            doc.setTextColor(185, 28, 28); // Red-700
+            doc.text(`TOTAL REFUND`, pageWidth - 75, finalY + 24);
+            doc.text(`- Rs. ${returnNote.refundAmount.toFixed(2)}`, pageWidth - 14, finalY + 24, { align: 'right' });
+
+            // Signature Lines
+            const sigY = 265;
+            doc.setDrawColor(150);
+            doc.line(30, sigY, 80, sigY);
+            doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
+            
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Customer Signature', 55, sigY + 5, { align: 'center' });
+            doc.text('Authorized Signatory', pageWidth - 55, sigY + 5, { align: 'center' });
+
+            doc.save(`${returnNote.id}_credit_note.pdf`);
+        };
     };
     
     // Fallback if image fails to load
@@ -218,7 +247,8 @@ const ViewSalesReturn = () => {
                     })),
                     subtotal: ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
                     taxAmount: ret.totalAmount - ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-                    refundAmount: ret.totalAmount
+                    refundAmount: ret.totalAmount,
+                    shop: data.shop
                 });
             }
         } catch (error) {
@@ -273,10 +303,10 @@ const ViewSalesReturn = () => {
                 <div className="flex flex-col gap-4">
                     <img src="/KS2-Logo.png" alt="Logo" className="h-20 w-auto object-contain" />
                     <div className="space-y-1.5 text-sm text-gray-500">
-                        <h2 className="text-xl font-bold text-gray-900">KS Pharma Net</h2>
-                        <div className="flex items-center gap-2"><MapPin size={14} className="text-red-500"/> 123, Health Avenue, Medical District</div>
-                        <div className="flex items-center gap-2"><Phone size={14} className="text-red-500"/> +91 98765 43210</div>
-                        <div className="flex items-center gap-2"><Mail size={14} className="text-red-500"/> support@kspharma.com</div>
+                    <h2 className="text-xl font-bold text-gray-900">{returnNote.shop?.shopName || 'KS Pharma Net'}</h2>
+                    <div className="flex items-center gap-2"><MapPin size={14} className="text-red-500"/> {returnNote.shop?.address || '123, Health Avenue, Medical District'}</div>
+                    <div className="flex items-center gap-2"><Phone size={14} className="text-red-500"/> {returnNote.shop?.contactNumber || '+91 98765 43210'}</div>
+                    <div className="flex items-center gap-2"><Mail size={14} className="text-red-500"/> {returnNote.shop?.email || 'support@kspharma.com'}</div>
                     </div>
                 </div>
 
@@ -285,9 +315,17 @@ const ViewSalesReturn = () => {
                     <div className="text-xl font-bold text-gray-800">#{returnNote.id}</div>
                     <div className="text-sm text-gray-500 mt-1">Ref Invoice: <span className="font-bold text-gray-900">{returnNote.originalInvoiceId}</span></div>
                     
-                    <div className="mt-6 flex flex-col items-end gap-2">
-                        <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-red-100 inline-block">
-                             {returnNote.status}
+                    <div className="mt-6 flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Verify Return</span>
+                                <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
+                                    <img src={qrCodeUrl} alt="Return QR" className="w-16 h-16" />
+                                </div>
+                            </div>
+                            <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-red-100 inline-block">
+                                 {returnNote.status}
+                            </div>
                         </div>
                         <div className="text-sm text-gray-500 font-medium">
                             Date: <span className="text-gray-900 font-bold">{returnNote.date}</span>
@@ -319,27 +357,36 @@ const ViewSalesReturn = () => {
             <div className="border rounded-xl overflow-hidden border-gray-200">
                 <table className="w-full text-left text-sm">
                     <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-900 font-bold uppercase text-xs tracking-wider">
+                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px] tracking-widest">
                             <th className="py-4 px-6 w-16 text-center">#</th>
-                            <th className="py-4 px-6 w-1/3">Item Name</th>
+                            <th className="py-4 px-6 w-1/3 text-left">Item Name</th>
                             <th className="py-4 px-6 text-center">Returned Qty</th>
-                            <th className="py-4 px-6 text-right">Rate</th>
+                            <th className="py-4 px-6 text-center">Rate</th>
                             <th className="py-4 px-6 text-right">Tax</th>
                             <th className="py-4 px-6 text-right">Total Refund</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {returnNote.items.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="py-4 px-6 text-center text-gray-500 font-medium">{index + 1}</td>
-                                <td className="py-4 px-6 font-semibold text-gray-800">{item.name}</td>
-                                <td className="py-4 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
-                                <td className="py-4 px-6 text-right text-gray-600">Rs. {item.rate.toFixed(2)}</td>
-                                <td className="py-4 px-6 text-right text-xs text-gray-500 flex flex-col items-end gap-1">
-                                    <span>{item.tax}% GST</span>
-                                    <span className="text-gray-400">Rs. {((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
+                            <tr key={index} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50">
+                                <td className="py-6 px-6 text-center text-gray-400 font-medium">{index + 1}</td>
+                                <td className="py-6 px-6 font-bold text-gray-800">{item.name}</td>
+                                <td className="py-6 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
+                                <td className="py-6 px-6 text-center text-gray-500 font-medium">
+                                    <div className="flex flex-col items-center">
+                                         <span className="text-[10px] text-gray-400 uppercase">Rs.</span>
+                                         <span>{item.rate.toFixed(2)}</span>
+                                    </div>
                                 </td>
-                                <td className="py-4 px-6 text-right font-bold text-red-600">- Rs. {(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</td>
+                                <td className="py-6 px-6 text-right text-gray-500 flex flex-col items-end gap-1">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[10px] text-gray-400 uppercase font-bold">{item.tax}% GST</span>
+                                        <span className="text-[11px] text-gray-400">Rs. {((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
+                                    </div>
+                                </td>
+                                <td className="py-6 px-6 text-right">
+                                    <span className="font-bold text-red-600 text-base">- Rs. {(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</span>
+                                </td>
                             </tr>
                         ))}
                     </tbody>

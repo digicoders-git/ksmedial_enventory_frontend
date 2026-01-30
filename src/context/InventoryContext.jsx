@@ -37,7 +37,8 @@ export const InventoryProvider = ({ children }) => {
                     tax: p.tax || 0,
                     description: p.description || '',
                     isPrescriptionRequired: p.isPrescriptionRequired || false,
-                    rackLocation: p.rackLocation || '' 
+                    rackLocation: p.rackLocation || '',
+                    createdAt: p.createdAt
                 }));
                 setInventory(mapped);
             }
@@ -50,19 +51,25 @@ export const InventoryProvider = ({ children }) => {
 
     const fetchTransactions = async () => {
          try {
-             // Fetch simplified sales for history AND log files
-             const [salesRes, logsRes] = await Promise.all([
+             // Fetch data from multiple sources for a unified history
+             const [salesRes, logsRes, purchaseRes, saleReturnRes, purchaseReturnRes] = await Promise.all([
                  api.get('/sales?limit=50'),
-                 api.get('/products/logs')
+                 api.get('/products/logs'),
+                 api.get('/purchases?pageSize=50'),
+                 api.get('/sales/returns?limit=50'),
+                 api.get('/purchase-returns?pageSize=50')
              ]);
 
              let allTransactions = [];
 
+             // 1. Sales (OUT)
              if (salesRes.data.success) {
                   const mappedSales = salesRes.data.sales.map(s => ({
                       id: s._id,
-                      type: 'OUT', // Sales are OUT
-                      reason: 'Sale', // Default reason
+                      type: 'OUT',
+                      source: 'SALE',
+                      reason: 'Sale', 
+                      reference: s.invoiceNumber,
                       paymentMode: s.paymentMethod,
                       date: s.createdAt,
                       totalQty: s.items.reduce((acc, i) => acc + i.quantity, 0),
@@ -73,15 +80,17 @@ export const InventoryProvider = ({ children }) => {
                           batch: i.productId?.batchNumber || 'N/A', 
                           sku: i.productId?.sku || 'N/A'
                       })),
-                       totalAmount: s.totalAmount
+                      totalAmount: s.totalAmount
                   }));
-                  allTransactions = [...mappedSales];
+                  allTransactions = [...allTransactions, ...mappedSales];
              }
 
+             // 2. Inventory Logs (Manual IN/OUT)
              if (logsRes.data.success) {
                  const mappedLogs = logsRes.data.logs.map(l => ({
                      id: l._id,
                      type: l.type,
+                     source: 'ADJUSTMENT',
                      reason: l.reason,
                      note: l.note,
                      date: l.date,
@@ -96,12 +105,78 @@ export const InventoryProvider = ({ children }) => {
                  allTransactions = [...allTransactions, ...mappedLogs];
              }
 
+             // 3. Purchases (IN)
+             if (purchaseRes.data.success) {
+                 const mappedPurchases = purchaseRes.data.purchases.map(p => ({
+                     id: p._id,
+                     type: 'IN',
+                     source: 'PURCHASE',
+                     reason: 'Purchase',
+                     reference: p.invoiceNumber,
+                     date: p.purchaseDate || p.createdAt,
+                     totalQty: p.items.reduce((acc, i) => acc + i.quantity, 0),
+                     items: p.items.map(i => ({
+                         name: i.name || 'Product',
+                         qty: i.quantity,
+                         price: i.purchasePrice,
+                         batch: i.batchNumber || 'N/A',
+                         sku: 'N/A'
+                     })),
+                     totalAmount: p.grandTotal
+                 }));
+                 allTransactions = [...allTransactions, ...mappedPurchases];
+             }
+
+             // 4. Sales Returns (IN)
+             if (saleReturnRes.data.success) {
+                 const mappedSaleReturns = saleReturnRes.data.returns.map(r => ({
+                     id: r._id,
+                     type: 'IN',
+                     source: 'SALE_RETURN',
+                     reason: 'Sale Return',
+                     reference: r.returnNumber,
+                     date: r.createdAt,
+                     totalQty: r.items.reduce((acc, i) => acc + i.quantity, 0),
+                     items: r.items.map(i => ({
+                         name: i.name || 'Product',
+                         qty: i.quantity,
+                         price: i.price || 0,
+                         batch: i.batchNumber || 'N/A',
+                         sku: 'N/A'
+                     })),
+                     totalAmount: r.totalAmount
+                 }));
+                 allTransactions = [...allTransactions, ...mappedSaleReturns];
+             }
+
+             // 5. Purchase Returns (OUT)
+             if (purchaseReturnRes.data.success) {
+                 const mappedPurchaseReturns = purchaseReturnRes.data.returns.map(r => ({
+                     id: r._id,
+                     type: 'OUT',
+                     source: 'PURCHASE_RETURN',
+                     reason: 'Purchase Return',
+                     reference: r.returnNumber,
+                     date: r.createdAt,
+                     totalQty: r.items.reduce((acc, i) => acc + (i.returnQuantity || i.quantity), 0),
+                     items: r.items.map(i => ({
+                         name: i.productId?.name || 'Product',
+                         qty: i.returnQuantity || i.quantity,
+                         price: i.purchasePrice || 0,
+                         batch: 'N/A',
+                         sku: 'N/A'
+                     })),
+                     totalAmount: r.totalAmount
+                 }));
+                 allTransactions = [...allTransactions, ...mappedPurchaseReturns];
+             }
+
              // Sort by date desc
              allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
              setTransactions(allTransactions);
          } catch (error) {
-             console.error("Error fetching transactions:", error);
+             console.error("Error fetching unified transactions:", error);
          }
     };
 
@@ -160,7 +235,8 @@ export const InventoryProvider = ({ children }) => {
                 return { 
                     success: true, 
                     message: saleId ? "Invoice updated successfully!" : "Sale processed successfully!",
-                    sale: data.sale 
+                    sale: data.sale,
+                    saleId: data.sale?._id // Return the ID for viewing
                 };
             } else {
                 return { success: false, message: data.message || "Operation failed" };
@@ -208,6 +284,31 @@ export const InventoryProvider = ({ children }) => {
 
         } catch (error) {
              return { success: false, message: error.response?.data?.message || error.message };
+        }
+    };
+
+    const bulkAdjustStock = async (items, type, reason, note) => {
+        try {
+            const results = await Promise.all(items.map(item => 
+                api.put(`/products/${item.id}/adjust`, {
+                    type,
+                    quantity: item.qty || item.quantity,
+                    reason,
+                    note
+                })
+            ));
+
+            const allSuccess = results.every(r => r.data.success);
+            if (allSuccess) {
+                await fetchInventory();
+                await fetchTransactions();
+                const firstLogId = results[0]?.data?.log?._id;
+                return { success: true, message: "Bulk stock adjustment completed", logId: firstLogId };
+            }
+            return { success: false, message: "Some adjustments failed" };
+        } catch (error) {
+            console.error("Bulk adjust error:", error);
+            return { success: false, message: error.response?.data?.message || error.message };
         }
     };
 
@@ -331,6 +432,7 @@ export const InventoryProvider = ({ children }) => {
             inventory, 
             sellItems,
             adjustStock,
+            bulkAdjustStock,
             deleteItem,
             deleteTransaction,
             clearAllTransactions,

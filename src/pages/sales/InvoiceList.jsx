@@ -71,6 +71,7 @@ const InvoiceList = () => {
             case 'Pending': return 'bg-orange-100 text-orange-700 border-orange-200';
             case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
             case 'Returned': return 'bg-purple-100 text-purple-700 border-purple-200';
+            case 'Partial': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
             default: return 'bg-gray-100 text-gray-600';
         }
     };

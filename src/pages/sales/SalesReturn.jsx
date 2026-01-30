@@ -57,11 +57,12 @@ const SalesReturn = () => {
         if (preId) {
             setInvoiceSearch(preId);
             setView('create');
-            // We can optionally trigger search here
+            // Programmatically trigger search
+            handleInvoiceSearch(null, preId);
         }
     }, []);
 
-    // --- Create Return Logic ---
+    // ... Create Return Logic ...
     const [invoiceSearch, setInvoiceSearch] = useState('');
     const [invoiceSuggestions, setInvoiceSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -93,15 +94,15 @@ const SalesReturn = () => {
     }, [invoiceSearch]);
 
     // Search Invoice Logic
-    const handleInvoiceSearch = async (e) => {
+    const handleInvoiceSearch = async (e, directId = null) => {
         if (e) e.preventDefault();
-        const search = invoiceSearch.trim();
+        const search = directId || invoiceSearch.trim();
         if (!search) return;
         
         try {
-            Swal.fire({ title: 'Searching...', didOpen: () => Swal.showLoading() });
+            if (!directId) Swal.fire({ title: 'Searching...', didOpen: () => Swal.showLoading() });
             const { data } = await api.get(`/sales/${search}`);
-            Swal.close();
+            if (!directId) Swal.close();
             
             if (data.success) {
                 const sale = data.sale;
@@ -116,7 +117,8 @@ const SalesReturn = () => {
                         name: item.name,
                         qty: item.quantity,
                         price: item.price,
-                        sku: item.productId.sku
+                        tax: item.tax || 0,
+                        sku: item.productId?.sku || 'N/A'
                     }))
                 });
                 setReturnItems([]);
@@ -143,8 +145,10 @@ const SalesReturn = () => {
     };
 
     const calculateRefund = () => {
-        const subtotal = returnItems.reduce((acc, item) => acc + (item.price * item.returnQty), 0);
-        return subtotal * 1.18; // Adding 18% GST estimate
+        return returnItems.reduce((acc, item) => {
+            const itemTax = (item.price * item.returnQty * (item.tax / 100));
+            return acc + (item.price * item.returnQty) + itemTax;
+        }, 0);
     };
 
     const handleFullReturn = () => {
@@ -179,6 +183,7 @@ const SalesReturn = () => {
                             name: item.name,
                             quantity: item.returnQty,
                             price: item.price,
+                            tax: item.tax,
                             subtotal: item.price * item.returnQty
                         })),
                         totalAmount: refundAmount,

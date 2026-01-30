@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Tag, Edit3, Trash2, Activity, ChevronRight, X, Grid, List, FileText, Calendar, Box } from 'lucide-react';
+import { Plus, Search, Tag, Edit3, Trash2, Activity, ChevronRight, X, Grid, List, FileText, Calendar, Box, UploadCloud, RefreshCw, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
+import Papa from 'papaparse';
 
 const MedicineCategories = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -10,7 +11,10 @@ const MedicineCategories = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showListModal, setShowListModal] = useState(false);
   const [selectedCategoryForList, setSelectedCategoryForList] = useState(null);
-
+  const [uploading, setUploading] = useState(false);
+  const [bulkData, setBulkData] = useState([]);
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -119,6 +123,115 @@ const MedicineCategories = () => {
       setShowListModal(true);
   };
 
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim(),
+        complete: (results) => {
+            const parsedData = results.data.map((row, index) => {
+                const normalizedRow = {};
+                Object.keys(row).forEach(key => {
+                    normalizedRow[key.toLowerCase().replace(/[^a-z0-9]/g, '')] = row[key];
+                });
+
+                const name = normalizedRow.name || normalizedRow.categoryname || normalizedRow.category || '';
+                const description = normalizedRow.description || normalizedRow.info || normalizedRow.desc || '';
+
+                return {
+                    id: index + 1,
+                    name: String(name).trim(),
+                    description: String(description).trim(),
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                };
+            }).filter(c => c.name);
+            
+            if (parsedData.length > 0) {
+                setBulkData(parsedData);
+                setIsBulkMode(true);
+                Swal.fire('Success', `${parsedData.length} categories parsed successfully.`, 'success');
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Parsing Failed',
+                    text: 'No valid category data found. Ensure your CSV has a "Name" column.',
+                    footer: '<div class="text-xs text-center">Supported Headers: Name, Description</div>'
+                });
+            }
+            setUploading(false);
+        },
+        error: (error) => {
+            console.error("CSV Parse Error:", error);
+            Swal.fire('Error', 'Failed to parse CSV file.', 'error');
+            setUploading(false);
+        }
+    });
+  };
+
+  const clearBulkData = () => {
+      setBulkData([]);
+      setIsBulkMode(false);
+  };
+
+  const handleBulkSave = async () => {
+      Swal.fire({
+          title: 'Processing Bulk Upload',
+          text: `Saving ${bulkData.length} categories...`,
+          allowOutsideClick: false,
+          didOpen: () => {
+              Swal.showLoading();
+          }
+      });
+
+      let successCount = 0;
+      let failCount = 0;
+      let errorMessages = [];
+
+      for (const item of bulkData) {
+          try {
+              const { data } = await api.post('/categories', {
+                  name: item.name,
+                  description: item.description,
+                  color: item.color
+              });
+              if (data.success) successCount++;
+              else {
+                  failCount++;
+                  errorMessages.push(`${item.name}: ${data.message}`);
+              }
+          } catch (err) {
+              failCount++;
+              errorMessages.push(`${item.name}: ${err.response?.data?.message || err.message}`);
+          }
+      }
+
+      Swal.fire({
+          icon: failCount === 0 ? 'success' : (successCount > 0 ? 'warning' : 'error'),
+          title: 'Bulk Upload Finished',
+          html: `
+            <div class="text-center">
+                <p class="font-bold text-lg mb-2 text-emerald-600">Successfully added: ${successCount}</p>
+                ${failCount > 0 ? `<p class="font-bold text-red-500 mb-4">Failed: ${failCount}</p>` : ''}
+                ${errorMessages.length > 0 ? `
+                    <div class="text-left text-xs bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
+                        <p class="font-black mb-2 uppercase border-b pb-1">Error Logs:</p>
+                        ${errorMessages.map(msg => `<p class="mb-1">• ${msg}</p>`).join('')}
+                    </div>
+                ` : ''}
+            </div>
+          `
+      }).then(() => {
+          if (successCount > 0) {
+              fetchData();
+              clearBulkData();
+          }
+      });
+  };
+
   const IconWrapper = ({ icon: Icon, colorClass }) => (
     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass}`}>
       {Icon ? <Icon size={20} /> : <Activity size={20} />}
@@ -137,13 +250,42 @@ const MedicineCategories = () => {
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Therapeutic Categories</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Classify medicines by their therapeutic use.</p>
           </div>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-secondary shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all text-sm"
-          >
-            <Plus size={18} />
-            <span>Add Category</span>
-          </button>
+          <div className="flex gap-3">
+             <div className="relative">
+                <input 
+                    type="file" 
+                    accept=".csv" 
+                    id="csv-upload" 
+                    className="hidden" 
+                    onChange={handleCSVUpload}
+                    disabled={uploading}
+                />
+                {!isBulkMode ? (
+                  <label 
+                      htmlFor="csv-upload"
+                      className="px-5 py-2.5 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-bold hover:bg-primary/5 cursor-pointer transition-all text-sm flex items-center gap-2"
+                  >
+                      {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                      <span>Bulk Upload</span>
+                  </label>
+                ) : (
+                  <button 
+                    onClick={handleBulkSave}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-200 active:scale-95 transition-all text-sm flex items-center gap-2"
+                  >
+                    <Check size={18} />
+                    <span>Save {bulkData.length} Categories</span>
+                  </button>
+                )}
+              </div>
+            <button 
+              onClick={() => handleOpenModal()}
+              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-secondary shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all text-sm"
+            >
+              <Plus size={18} />
+              <span>Add Category</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters & View Toggle */}
@@ -174,6 +316,61 @@ const MedicineCategories = () => {
                 </button>
             </div>
         </div>
+
+        {/* Bulk Preview Table */}
+        {isBulkMode && (
+          <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900/30 overflow-hidden animate-fade-in ring-1 ring-emerald-500/10">
+               <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 border-b border-emerald-100 dark:border-emerald-900/20 flex justify-between items-center text-sm">
+                   <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold">
+                       <FileText size={18} />
+                       <span>Category Batch Preview ({bulkData.length} items)</span>
+                   </div>
+                   <button 
+                       onClick={clearBulkData}
+                       className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 flex items-center gap-1 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 shadow-sm transition-all"
+                   >
+                       <X size={12} /> Discard Batch
+                   </button>
+               </div>
+               <div className="overflow-x-auto">
+                   <table className="w-full text-left text-xs">
+                       <thead className="bg-gray-50/50 dark:bg-gray-700/50 text-gray-400 font-black uppercase tracking-widest border-b border-gray-100 dark:border-gray-700">
+                           <tr>
+                               <th className="px-6 py-3">Category Name</th>
+                               <th className="px-6 py-3">Description</th>
+                               <th className="px-6 py-3 text-center">Action</th>
+                           </tr>
+                       </thead>
+                       <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                           {bulkData.slice(0, 10).map((row) => (
+                               <tr key={row.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                                   <td className="px-6 py-3 font-bold text-gray-800 dark:text-gray-100">
+                                       <div className="flex items-center gap-2">
+                                          <div className={`w-2 h-2 rounded-full ${row.color}`}></div>
+                                          {row.name}
+                                       </div>
+                                   </td>
+                                   <td className="px-6 py-3 text-gray-500 dark:text-gray-400 truncate max-w-xs">{row.description}</td>
+                                   <td className="px-6 py-3 text-center">
+                                       <button 
+                                          onClick={() => setBulkData(bulkData.filter(b => b.id !== row.id))} 
+                                          className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                       >
+                                           <X size={14} />
+                                       </button>
+                                   </td>
+                               </tr>
+                           ))}
+                           {bulkData.length > 10 && (
+                               <tr>
+                                   <td colSpan="3" className="px-6 py-3 text-center text-gray-400 italic font-medium">... and {bulkData.length - 10} more therapeutic categories ...</td>
+                               </tr>
+                           )}
+                       </tbody>
+                   </table>
+               </div>
+          </div>
+        )}
 
         {/* Content */}
         {viewMode === 'grid' ? (

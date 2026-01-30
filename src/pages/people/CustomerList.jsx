@@ -3,6 +3,8 @@ import { Search, User, Phone, MapPin, MoreVertical, Plus, Filter, FileText, Arro
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
+import Papa from 'papaparse';
+import { UploadCloud } from 'lucide-react';
 
 const CustomerList = () => {
     const navigate = useNavigate();
@@ -26,6 +28,11 @@ const CustomerList = () => {
     const [selectedCustomerHistory, setSelectedCustomerHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState(null);
+
+    // Bulk Upload State
+    const [bulkData, setBulkData] = useState([]);
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const handleViewHistory = async (customer) => {
         setSelectedCustomerForHistory(customer);
@@ -115,6 +122,7 @@ const CustomerList = () => {
     };
 
     const handleAddCustomer = () => {
+        if (isBulkMode) return;
         Swal.fire({
             title: 'Add New Customer',
             html: `
@@ -151,6 +159,111 @@ const CustomerList = () => {
             }
         });
     }
+
+    const handleCSVUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: (header) => header.trim(),
+            complete: (results) => {
+                const parsedData = results.data.map((row, index) => {
+                    // Normalize keys to lowercase for flexible matching
+                    const normalizedRow = {};
+                    Object.keys(row).forEach(key => {
+                        normalizedRow[key.toLowerCase().replace(/[^a-z0-9]/g, '')] = row[key];
+                    });
+
+                    // Flexible mapping
+                    const name = normalizedRow.name || normalizedRow.customername || normalizedRow.fullname || normalizedRow.customer || '';
+                    const phone = normalizedRow.phone || normalizedRow.mobile || normalizedRow.mobilenumber || normalizedRow.contact || normalizedRow.phonenumber || '';
+                    const address = normalizedRow.address || normalizedRow.location || normalizedRow.city || normalizedRow.fulladdress || '';
+                    const pendingAmount = normalizedRow.balance || normalizedRow.pending || normalizedRow.openingbalance || normalizedRow.due || normalizedRow.pendingamount || 0;
+
+                    return {
+                        id: index + 1,
+                        name: String(name).trim(),
+                        phone: String(phone).trim(),
+                        address: String(address).trim(),
+                        pendingAmount: Number(pendingAmount) || 0
+                    };
+                }).filter(c => c.name && c.phone); // Basic validation
+                
+                if (parsedData.length > 0) {
+                    setBulkData(parsedData);
+                    setIsBulkMode(true);
+                    Swal.fire('Success', `${parsedData.length} valid customers parsed.`, 'success');
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Upload Failed',
+                        text: 'No valid customer data found. Please ensure your CSV has headers like "Name" and "Phone".',
+                        footer: '<div class="text-xs text-center">Supported Headers: Name, Phone, Mobile, Address, Balance</div>'
+                    });
+                }
+                setUploading(false);
+            },
+            error: (error) => {
+                console.error("CSV Parse Error:", error);
+                Swal.fire('Error', 'Failed to parse CSV file.', 'error');
+                setUploading(false);
+            }
+        });
+    };
+
+    const handleBulkSave = async () => {
+        if (bulkData.length === 0) return;
+
+        Swal.fire({
+            title: 'Processing Bulk Upload',
+            text: `Saving ${bulkData.length} customers...`,
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const customer of bulkData) {
+            try {
+                const payload = { ...customer };
+                delete payload.id;
+
+                const { data } = await api.post('/customers', payload);
+                if (data.success) successCount++;
+                else failCount++;
+            } catch (err) {
+                failCount++;
+            }
+        }
+
+        Swal.fire({
+            icon: failCount === 0 ? 'success' : 'info',
+            title: 'Bulk Upload Finished',
+            text: `Successfully added ${successCount} customers. ${failCount > 0 ? `Failed: ${failCount}` : ''}`,
+        }).then(() => {
+            if (successCount > 0) {
+                fetchCustomers();
+                clearBulkData();
+            }
+        });
+    };
+
+    const removeBulkRow = (id) => {
+        const updated = bulkData.filter(row => row.id !== id);
+        setBulkData(updated);
+        if (updated.length === 0) setIsBulkMode(false);
+    };
+
+    const clearBulkData = () => {
+        setBulkData([]);
+        setIsBulkMode(false);
+    };
 
     const handleDelete = (id, name) => {
         Swal.fire({
@@ -207,7 +320,8 @@ const CustomerList = () => {
     };
 
     return (
-        <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10 px-4">
+        <>
+            <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10 px-4">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -219,25 +333,49 @@ const CustomerList = () => {
                 <div className="flex gap-2 w-full sm:w-auto">
                     <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl flex gap-1 border border-gray-200 dark:border-gray-700 mr-2">
                         <button 
+                            disabled={isBulkMode}
                             onClick={() => setViewMode('card')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'} disabled:opacity-50`}
                             title="Card View"
                         >
                             <LayoutGrid size={18} />
                         </button>
                         <button 
+                            disabled={isBulkMode}
                             onClick={() => setViewMode('table')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'} disabled:opacity-50`}
                             title="Table View"
                         >
                             <List size={18} />
                         </button>
                     </div>
+
+                    {!isBulkMode && (
+                        <div className="relative">
+                            <input 
+                                type="file" 
+                                accept=".csv" 
+                                id="csv-upload" 
+                                className="hidden" 
+                                onChange={handleCSVUpload}
+                                disabled={uploading}
+                            />
+                            <label 
+                                htmlFor="csv-upload"
+                                className={`px-4 py-2 rounded-xl border-2 border-dashed border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/10 cursor-pointer transition-all text-sm flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                {uploading ? <Loader className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                                <span className="hidden sm:inline">Bulk Upload</span>
+                            </label>
+                        </div>
+                    )}
+
                     <button 
-                        onClick={handleAddCustomer}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                        onClick={isBulkMode ? handleBulkSave : handleAddCustomer}
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
                     >
-                        <Plus size={18} /> Add Customer
+                        {isBulkMode ? <CheckCircle size={18} /> : <Plus size={18} />}
+                        {isBulkMode ? `Save ${bulkData.length} Customers` : 'Add Customer'}
                     </button>
                 </div>
             </div>
@@ -312,8 +450,9 @@ const CustomerList = () => {
                     {['All', 'Pending', 'Top'].map((type) => (
                         <button
                             key={type}
+                            disabled={isBulkMode}
                             onClick={() => handleFilterChange(type)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50
                                 ${filterType === type 
                                     ? 'bg-gray-800 dark:bg-emerald-600 text-white shadow-md' 
                                     : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
@@ -324,11 +463,58 @@ const CustomerList = () => {
                 </div>
             </div>
 
+            {/* Bulk Preview Table */}
+            {isBulkMode && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900/30 overflow-hidden animate-scale-up">
+                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold">
+                            <FileText size={20} />
+                            <span>Bulk Customer Preview ({bulkData.length} entries)</span>
+                        </div>
+                        <button 
+                            onClick={clearBulkData}
+                            className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 shadow-sm"
+                        >
+                            <X size={14} /> Cancel Bulk Task
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-bold">
+                                <tr>
+                                    <th className="px-6 py-4">Customer Name</th>
+                                    <th className="px-6 py-4">Phone Number</th>
+                                    <th className="px-6 py-4">Address</th>
+                                    <th className="px-6 py-4 text-right">Opening Balance</th>
+                                    <th className="px-6 py-4 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {bulkData.map((row) => (
+                                    <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">{row.name}</td>
+                                        <td className="px-6 py-4 font-mono text-gray-500 dark:text-gray-400">{row.phone}</td>
+                                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{row.address || '-'}</td>
+                                        <td className="px-6 py-4 text-right font-black text-orange-600">₹{row.pendingAmount.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button onClick={() => removeBulkRow(row.id)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all">
+                                                <X size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+
             {loading ? (
                  <div className="flex items-center justify-center py-20">
                     <Loader className="animate-spin text-emerald-600" size={40} />
                 </div>
-            ) : (
+            ) : !isBulkMode ? (
                 <>
                 {/* List View Toggle */}
                 {viewMode === 'card' ? (
@@ -480,10 +666,10 @@ const CustomerList = () => {
                     </div>
                 )}
                 </>
-            )}
+            ) : null}
 
             {/* Pagination Controls */}
-            {totalEntries > 0 && (
+            {totalEntries > 0 && !isBulkMode && (
                 <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm p-4 mt-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
@@ -540,8 +726,8 @@ const CustomerList = () => {
                 </div>
             )}
 
-            
-            {/* History Modal */}
+            </div>
+            {/* History Modal moved outside animated container to avoid transform clipping */}
             {showHistoryModal && selectedCustomerForHistory && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-scale-up">
@@ -640,7 +826,7 @@ const CustomerList = () => {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 };
 

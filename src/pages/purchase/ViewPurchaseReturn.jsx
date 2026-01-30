@@ -22,6 +22,21 @@ const ViewPurchaseReturn = () => {
     }
   }, [loading, returnNote, searchParams]);
 
+  // Generate QR Data for scanning
+  const qrData = returnNote ? encodeURIComponent(`
+DEBIT NOTE (PURCHASE RETURN)
+-------------------------------
+Return No: ${returnNote.id}
+Ref Invoice: ${returnNote.invoiceRef}
+Date: ${returnNote.date}
+Supplier: ${returnNote.supplier}
+Refund Amount: Rs. ${returnNote.totalAmount.toFixed(2)}
+-------------------------------
+Verified System Document
+  `.trim()) : '';
+
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
   useEffect(() => {
     const fetchReturn = async () => {
         try {
@@ -73,8 +88,19 @@ const ViewPurchaseReturn = () => {
     img.src = KS2Logo;
     
     img.onload = () => {
-        // Logo
-        doc.addImage(img, 'PNG', 14, 10, 45, 20);
+        // Add QR Code to PDF
+        const qrImg = new Image();
+        qrImg.crossOrigin = "anonymous";
+        qrImg.src = qrCodeUrl;
+
+        qrImg.onload = () => {
+            doc.addImage(img, 'PNG', 14, 10, 45, 20);
+
+            // QR Code in Top Right corner of PDF
+            doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
+            doc.setFontSize(7);
+            doc.setTextColor(150);
+            doc.text('SCAN TO VERIFY', pageWidth - 29, 78, { align: 'center' });
 
         // Company Details
         doc.setFontSize(11);
@@ -180,7 +206,8 @@ const ViewPurchaseReturn = () => {
         doc.text(`Rs. ${returnNote.totalAmount.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
 
         doc.save(`${returnNote.id}_debit_note.pdf`);
-    };
+        }; // End qrImg.onload
+    }; // End img.onload
     
     // Fallback if image fails
     img.onerror = () => {
@@ -260,10 +287,18 @@ const ViewPurchaseReturn = () => {
                     <h1 className="text-5xl font-black text-gray-900/10 uppercase tracking-tight leading-none mb-2 print:text-4xl">Debit Note</h1>
                     <div className="text-3xl font-bold text-red-600">#{returnNote.id}</div>
                     
-                    <div className="mt-6 flex flex-col items-end gap-2">
-                         <div className="px-3 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-xs font-bold uppercase inline-block print:border-red-500 print:text-red-600">
-                             Return
-                        </div>
+                    <div className="mt-6 flex flex-col items-end gap-3">
+                         <div className="flex items-center gap-3">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Verify Return</span>
+                                <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
+                                    <img src={qrCodeUrl} alt="Return QR" className="w-16 h-16" />
+                                </div>
+                            </div>
+                            <div className="px-3 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-xs font-bold uppercase inline-block print:border-red-500 print:text-red-600">
+                                 Return
+                            </div>
+                         </div>
                         <div className="text-sm text-gray-500 font-medium">
                             Date: <span className="text-gray-900 font-bold">{returnNote.date}</span>
                         </div>

@@ -359,10 +359,10 @@ const InventoryDashboard = () => {
                    </div>
                    <div>
                      <p className="text-sm font-black text-gray-800 dark:text-white line-clamp-1 tracking-tight">
-                       {tx.items.map(i => i.name).join(', ')}
+                       {tx.items[0]?.name}{tx.items.length > 1 ? ` +${tx.items.length - 1} more` : ''}
                      </p>
                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase">
-                        {tx.totalQty} Units &bull; {new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {tx.totalQty} Units &bull; <span className="text-primary">{tx.source || tx.reason}</span> &bull; {new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                      </p>
                    </div>
                  </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Download, Search, ChevronDown, BarChart3, FileText } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Download, Search, ChevronDown, BarChart3, FileText, Printer } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
 
 const StatsHistory = () => {
@@ -8,28 +8,9 @@ const StatsHistory = () => {
   const location = useLocation();
   const { type = 'products', title = 'History' } = location.state || {};
 
-  // Try to get context, but provide fallback if not available
-  let contextData = null;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    contextData = useInventory();
-  } catch {
-    // Context not available, will use mock data
-  }
+  const { inventory, transactions } = useInventory();
 
-  // Use context data if available, otherwise use mock data
-  const inventory = contextData?.inventory || [
-    { id: 1, name: 'Dolo 650', batch: 'B001', exp: '2024-12', rate: 30, stock: 150, category: 'Tablet' },
-    { id: 2, name: 'Azithral 500', batch: 'A102', exp: '2025-06', rate: 120, stock: 80, category: 'Tablet' },
-    { id: 3, name: 'Pan 40', batch: 'P005', exp: '2024-10', rate: 90, stock: 200, category: 'Tablet' },
-    { id: 4, name: 'Crosin Syrup', batch: 'C999', exp: '2024-08', rate: 45, stock: 40, category: 'Syrup' },
-    { id: 5, name: 'Montek LC', batch: 'M777', exp: '2025-01', rate: 150, stock: 10, category: 'Tablet' },
-    { id: 6, name: 'Telma 40', batch: 'T555', exp: '2024-11', rate: 110, stock: 0, category: 'Tablet' },
-    { id: 7, name: 'Allegra 120', batch: 'A333', exp: '2025-03', rate: 180, stock: 25, category: 'Tablet' },
-    { id: 8, name: 'Shelcal 500', batch: 'S666', exp: '2024-09', rate: 110, stock: 300, category: 'Tablet' },
-  ];
 
-  const transactions = contextData?.transactions || [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
@@ -46,10 +27,10 @@ const StatsHistory = () => {
 
     switch(type) {
       case 'products':
-        inventory.forEach((item, idx) => {
+        inventory.forEach((item) => {
           data.push({
-            id: `prod-${idx}`,
-            date: new Date(now - Math.random() * 30 * 24 * 60 * 60 * 1000),
+            id: `prod-${item.id}`,
+            date: item.createdAt ? new Date(item.createdAt) : now,
             type: 'ADDED',
             productName: item.name,
             category: item.category,
@@ -82,17 +63,17 @@ const StatsHistory = () => {
         break;
 
       case 'alerts':
-        inventory.filter(item => item.stock < 50).forEach((item, idx) => {
+        inventory.filter(item => item.stock <= (item.reorderLevel || 20)).forEach((item, idx) => {
           data.push({
             id: `alert-${idx}`,
-            date: new Date(now - Math.random() * 7 * 24 * 60 * 60 * 1000),
+            date: item.updatedAt ? new Date(item.updatedAt) : now, // Last time it was low
             type: item.stock === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK',
             productName: item.name,
             currentStock: item.stock,
-            threshold: 20,
+            threshold: item.reorderLevel || 20,
             batch: item.batch,
-            severity: item.stock === 0 ? 'critical' : item.stock < 10 ? 'high' : 'medium',
-            details: `Stock level: ${item.stock} units (Threshold: 20 units)`
+            severity: item.stock === 0 ? 'critical' : item.stock < (item.reorderLevel / 2) ? 'high' : 'medium',
+            details: `Stock level: ${item.stock} units (Threshold: ${item.reorderLevel || 20} units)`
           });
         });
         break;
@@ -103,34 +84,20 @@ const StatsHistory = () => {
             tx.items.forEach((item, itemIdx) => {
               data.push({
                 id: `move-${idx}-${itemIdx}`,
+                originalId: tx.id,
                 date: tx.date,
                 type: tx.type,
+                source: tx.source,
                 productName: item.name,
-                quantity: item.quantity,
+                quantity: item.qty || item.quantity,
+                amount: tx.totalAmount,
                 batch: item.batch || 'N/A',
                 user: tx.user || 'System',
-                reference: tx.reference || `TXN-${1000 + idx}`,
-                details: `${tx.type === 'IN' ? 'Received' : 'Dispatched'} ${item.quantity} units`
+                reference: tx.reference || (tx.id ? `TXN-${tx.id.slice(-6).toUpperCase()}` : `TXN-${1000 + idx}`),
+                details: `${tx.reason || (tx.type === 'IN' ? 'Restocked' : 'Dispatched')} - ${item.qty || item.quantity} units ${tx.reference ? '[Ref: '+tx.reference+']' : ''}`
               });
             });
           });
-        } else {
-          for(let i = 0; i < 15; i++) {
-            const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
-            const isIn = Math.random() > 0.5;
-            const qty = Math.floor(Math.random() * 30) + 1;
-            data.push({
-              id: `move-${i}`,
-              date: new Date(now - Math.random() * 15 * 24 * 60 * 60 * 1000),
-              type: isIn ? 'IN' : 'OUT',
-              productName: randomItem.name,
-              quantity: qty,
-              batch: randomItem.batch,
-              user: ['Admin', 'Manager', 'Staff'][Math.floor(Math.random() * 3)],
-              reference: `TXN-${1000 + i}`,
-              details: `${isIn ? 'Received' : 'Dispatched'} ${qty} units`
-            });
-          }
         }
         break;
 
@@ -233,7 +200,13 @@ const StatsHistory = () => {
     setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getTypeBadge = (itemType) => {
+  const getTypeBadge = (itemType, source) => {
+    if (source === 'SALE') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (source === 'PURCHASE') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (source === 'SALE_RETURN') return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (source === 'PURCHASE_RETURN') return 'bg-orange-50 text-orange-700 border-orange-200';
+    if (source === 'ADJUSTMENT') return 'bg-amber-50 text-amber-700 border-amber-200';
+
     const badges = {
       'ADDED': 'bg-blue-50 text-blue-700 border-blue-200',
       'INCREASE': 'bg-green-50 text-green-700 border-green-200',
@@ -459,16 +432,33 @@ const StatsHistory = () => {
                   className="p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50/50 transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1">
-                    <span className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${getTypeBadge(item.type)}`}>
-                      {item.type}
-                    </span>
+                    <div className="flex flex-col gap-1 items-start">
+                        <span className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-black border ${getTypeBadge(item.type, item.source)}`}>
+                            {item.source || item.type}
+                        </span>
+                    </div>
                     <div className="flex-1">
                       <h4 className="font-bold text-gray-800">{item.productName}</h4>
                       <p className="text-sm text-gray-500 mt-0.5">{item.details}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    {item.amount && (
+                    <div className="flex items-center gap-6">
+                      {item.source && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (item.source === 'SALE') navigate(`/sales/invoices/view/${item.originalId}`);
+                            else if (item.source === 'PURCHASE') navigate(`/purchase/invoices/view/${item.originalId}`);
+                            else if (item.source === 'SALE_RETURN') navigate(`/sales/return/view/${item.originalId}`);
+                            else if (item.source === 'ADJUSTMENT' || item.source === 'PURCHASE_RETURN') navigate(`/inventory/stock-out/view/${item.originalId}`);
+                          }}
+                          className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          title="View Document"
+                        >
+                          <Printer size={18} />
+                        </button>
+                      )}
+                      {item.amount && (
                       <div className="text-right">
                         <p className="text-xs text-gray-400 font-semibold">Amount</p>
                         <p className="text-lg font-bold text-emerald-600">₹{item.amount.toLocaleString()}</p>

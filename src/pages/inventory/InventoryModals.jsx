@@ -26,10 +26,10 @@ export const AdjustStockModal = ({ isOpen, onClose }) => {
 
   const filteredItems = inventory.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.batch.toLowerCase().includes(searchTerm.toLowerCase())
+    (item.batch || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAdjust = (e) => {
+  const handleAdjust = async (e) => {
     e.preventDefault();
     if (!selectedItem || !quantity) {
         Swal.fire({ icon: 'error', title: 'Error', text: 'Please select an item and enter quantity' });
@@ -43,8 +43,7 @@ export const AdjustStockModal = ({ isOpen, onClose }) => {
     }
 
     const type = adjustmentType === 'add' ? 'add' : 'subtract';
-    const finalReason = note ? `${reason} - ${note}` : reason;
-    const result = adjustStock(selectedItem.id, type, qtyNum, finalReason);
+    const result = await adjustStock(selectedItem.id, type, qtyNum, reason, note);
 
     if (result.success) {
         Swal.fire({

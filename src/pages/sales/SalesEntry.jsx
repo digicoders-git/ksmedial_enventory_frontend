@@ -208,7 +208,16 @@ const SalesEntry = () => {
         }
     };
 
-    const handleProcessSale = () => {
+  const subTotal = cart.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+  const totalTax = cart.reduce((sum, item) => {
+      const prod = inventory.find(p => p.id === item.id);
+      const taxRate = prod?.tax || 18;
+      return sum + (item.qty * item.rate * (taxRate / 100));
+  }, 0);
+  const discountAmount = 0; // Can be made dynamic with a state
+  const grandTotal = subTotal + totalTax - discountAmount;
+
+  const handleProcessSale = () => {
     if (cart.length === 0) {
       Swal.fire('Empty Cart', 'Please add items to process sale.', 'info');
       return;
@@ -248,9 +257,9 @@ const SalesEntry = () => {
                 customer: selectedCustomer || (customerSearch ? { name: customerSearch } : 'Walk-in'), 
                 paymentMode,
                 totalAmount: grandTotal,
-                subTotal: totalAmount,
-                tax,
-                discount
+                subTotal: subTotal,
+                tax: totalTax,
+                discount: discountAmount
             };
             
             const response = await sellItems(saleData, metadata, isEditing ? id : null);
@@ -293,15 +302,6 @@ const SalesEntry = () => {
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     c.phone?.includes(customerSearch)
   );
-
-  const subTotal = cart.reduce((sum, item) => sum + (item.qty * item.rate), 0);
-  const totalTax = cart.reduce((sum, item) => {
-      const prod = inventory.find(p => p.id === item.id);
-      const taxRate = prod?.tax || 18;
-      return sum + (item.qty * item.rate * (taxRate / 100));
-  }, 0);
-  const discountAmount = 0; // Can be made dynamic with a state
-  const grandTotal = subTotal + totalTax - discountAmount;
 
   return (
     <div className="flex flex-col gap-6 p-2 lg:p-4 bg-gray-50/50 dark:bg-gray-900 min-h-[calc(100vh-5rem)] text-gray-800 dark:text-gray-100 font-sans">
@@ -440,7 +440,7 @@ const SalesEntry = () => {
                        )}
                    </div>
                    
-                   {showCustomerDropdown && (customerSearch || customers.length > 0) && !selectedCustomer && (
+                   {showCustomerDropdown && customerSearch.trim().length > 0 && !selectedCustomer && (
                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto">
                            {filteredCustomers.length > 0 ? (
                                filteredCustomers.map(c => (

@@ -18,6 +18,7 @@ import UnitsManagement from './pages/inventory/UnitsManagement';
 import StockAdjustment from './pages/inventory/StockAdjustment';
 import StatsHistory from './pages/inventory/StatsHistory';
 import ExpiryReport from './pages/inventory/ExpiryReport';
+import ViewStockOut from './pages/inventory/ViewStockOut';
 
 // Medicine Pages (Re-mapped to existing files in inventory folder for now to avoid move conflicts)
 import MedicineList from './pages/inventory/MedicineList';
@@ -173,6 +174,7 @@ function App() {
         <Route path="/sales/invoices/view/:id" element={<ViewInvoice />} />
         <Route path="/purchase/invoices/view/:id" element={<ViewPurchaseInvoice />} />
         <Route path="/sales/return/view/:id" element={<ViewSalesReturn />} />
+        <Route path="/inventory/stock-out/view/:id" element={<ViewStockOut />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

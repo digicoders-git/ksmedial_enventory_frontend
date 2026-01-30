@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Plus, Trash2, ArrowRight, Printer, FileText, CheckCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 import { useInventory } from '../../context/InventoryContext';
 
 const InventoryStockOut = () => {
-  const { inventory, sellItems, transactions, deleteTransaction, clearAllTransactions } = useInventory(); // Use Context
+  const navigate = useNavigate();
+  const { inventory, sellItems, bulkAdjustStock, transactions, deleteTransaction, clearAllTransactions } = useInventory(); // Use Context
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [stockOutReason, setStockOutReason] = useState('Sale');
@@ -82,7 +84,7 @@ const InventoryStockOut = () => {
     }
     
     Swal.fire({
-      title: 'Confirm Stock Out?',
+      title: `Confirm ${stockOutReason === 'Sale' ? 'Sale' : 'Stock Out'}?`,
       html: `
         <div class="text-left text-sm">
            <p><strong>Reason:</strong> ${stockOutReason}</p>
@@ -97,16 +99,39 @@ const InventoryStockOut = () => {
       confirmButtonColor: 'var(--color-primary)'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        // Use context sellItems
-        const soldItems = cart.map(item => ({ id: item.id, qty: item.qty }));
-        const saleResult = await sellItems(soldItems, { 
-            customer, 
-            paymentMode: stockOutReason === 'Sale' ? paymentMode : null,
-            reason: stockOutReason
-        });
+        let saleResult;
+        if (stockOutReason === 'Sale') {
+            const soldItems = cart.map(item => ({ id: item.id, qty: item.qty }));
+            saleResult = await sellItems(soldItems, { 
+                customer, 
+                paymentMode,
+                totalAmount: calculateTotal(),
+                subTotal: calculateTotal(),
+                tax: 0 // Simplified for now
+            });
+        } else {
+            // Use bulkAdjustStock for other reasons
+            saleResult = await bulkAdjustStock(cart, 'deduct', stockOutReason, `Manual Stock Out: ${customer.name || 'N/A'}`);
+        }
         
         if (saleResult.success) {
-            Swal.fire('Success', 'Stock deducted successfully!', 'success');
+            Swal.fire({
+                icon: 'success',
+                title: 'Stock Processed!',
+                text: 'Stock has been updated successfully.',
+                showCancelButton: true,
+                confirmButtonText: 'View Invoice',
+                cancelButtonText: 'Done',
+                confirmButtonColor: '#007242'
+            }).then((navResult) => {
+                if (navResult.isConfirmed) {
+                    if (stockOutReason === 'Sale' && saleResult.saleId) {
+                        navigate(`/sales/invoices/view/${saleResult.saleId}`);
+                    } else if (saleResult.logId) {
+                        navigate(`/inventory/stock-out/view/${saleResult.logId}`);
+                    }
+                }
+            });
             setCart([]);
             setCustomer({ name: '', phone: '' });
         } else {
@@ -441,30 +466,46 @@ const InventoryStockOut = () => {
                                 </span>
                             </td>
                             <td className="px-4 py-4 text-center">
-                                <button 
-                                    onClick={() => {
-                                        Swal.fire({
-                                            title: 'Delete History?',
-                                            text: "This will undo the stock deduction.",
-                                            icon: 'warning',
-                                            showCancelButton: true,
-                                            confirmButtonColor: '#d33',
-                                            confirmButtonText: 'Yes, Delete'
-                                        }).then(async (result) => {
-                                            if (result.isConfirmed) {
-                                                const res = await deleteTransaction(tx.id);
-                                                if (res.success) {
-                                                    Swal.fire('Deleted!', 'Transaction removed.', 'success');
-                                                } else {
-                                                    Swal.fire('Error', res.message, 'error');
-                                                }
+                                <div className="flex items-center justify-center gap-1">
+                                    <button 
+                                        onClick={() => {
+                                            if (tx.reason === 'Sale') {
+                                                navigate(`/sales/invoices/view/${tx.id}`);
+                                            } else {
+                                                navigate(`/inventory/stock-out/view/${tx.id}`);
                                             }
-                                        });
-                                    }}
-                                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                        }}
+                                        className="p-2 text-primary hover:text-secondary rounded-lg hover:bg-primary/5 transition-all"
+                                        title="View Invoice"
+                                    >
+                                        <Printer size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            Swal.fire({
+                                                title: 'Delete History?',
+                                                text: "This will undo the stock deduction.",
+                                                icon: 'warning',
+                                                showCancelButton: true,
+                                                confirmButtonColor: '#d33',
+                                                confirmButtonText: 'Yes, Delete'
+                                            }).then(async (result) => {
+                                                if (result.isConfirmed) {
+                                                    const res = await deleteTransaction(tx.id);
+                                                    if (res.success) {
+                                                        Swal.fire('Deleted!', 'Transaction removed.', 'success');
+                                                    } else {
+                                                        Swal.fire('Error', res.message, 'error');
+                                                    }
+                                                }
+                                            });
+                                        }}
+                                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}

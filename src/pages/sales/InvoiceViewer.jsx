@@ -4,6 +4,22 @@ import { MapPin, Phone, Mail, Globe } from 'lucide-react';
 export const InvoiceViewer = ({ invoice, onClose, onPrint }) => {
   if (!invoice) return null;
 
+  // Generate QR Data for scanning
+  const qrData = encodeURIComponent(`
+INVOICE DETAILS - KS Pharma Net
+-------------------------------
+Invoice No: ${invoice.id}
+Date: ${invoice.date}
+Customer: ${invoice.customer}
+Total Amount: Rs. ${invoice.amount.toFixed(2)}
+Payment: ${invoice.payment}
+Status: ${invoice.status}
+-------------------------------
+Thank you for your business!
+  `.trim());
+
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:bg-white print:fixed print:inset-0">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col print:h-auto print:shadow-none print:w-full print:max-w-none print:rounded-none overflow-hidden">
@@ -42,10 +58,20 @@ export const InvoiceViewer = ({ invoice, onClose, onPrint }) => {
                     <div className="flex items-center gap-2"><Mail size={14} /> support@kspharma.com</div>
                  </div>
               </div>
-              <div className="text-right">
-                <h1 className="text-4xl font-black text-gray-900 mb-2 uppercase tracking-tight text-primary">Invoice</h1>
-                <p className="text-sm font-bold text-gray-500">#{invoice.id}</p>
-                <div className="mt-4 inline-block bg-gray-50 rounded-lg p-3 text-left border border-gray-100">
+              <div className="text-right flex flex-col items-end gap-2">
+                <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Verify Invoice</span>
+                        <div className="p-1 bg-white border border-gray-100 rounded-lg">
+                            <img src={qrCodeUrl} alt="Verify bill" className="w-16 h-16" />
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <h1 className="text-4xl font-black text-gray-900 mb-2 uppercase tracking-tight text-primary">Invoice</h1>
+                        <p className="text-sm font-bold text-gray-500">#{invoice.id}</p>
+                    </div>
+                </div>
+                <div className="mt-2 inline-block bg-gray-50 rounded-lg p-3 text-left border border-gray-100">
                    <div className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Date Issued</div>
                    <div className="font-bold text-gray-900">{invoice.date}</div>
                 </div>

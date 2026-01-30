@@ -61,6 +61,22 @@ const ViewInvoice = () => {
       }
   }, [loading, invoice, autoPrint]);
 
+  // Generate QR Data for scanning
+  const qrData = invoice ? encodeURIComponent(`
+INVOICE DETAILS - KS Pharma Net
+-------------------------------
+Invoice No: ${invoice.id}
+Date: ${invoice.date}
+Customer: ${invoice.customer}
+Total Amount: Rs. ${invoice.grandTotal.toFixed(2)}
+Payment: ${invoice.payment}
+Status: ${invoice.status}
+-------------------------------
+Thank you for your business!
+  `.trim()) : '';
+
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
   const handleDownloadPDF = () => {
     if (!invoice) return;
 
@@ -70,10 +86,22 @@ const ViewInvoice = () => {
     img.src = KS2Logo;
     
     img.onload = () => {
-        doc.addImage(img, 'PNG', 14, 10, 45, 20);
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
+        // Add QR Code to PDF
+        const qrImg = new Image();
+        qrImg.crossOrigin = "anonymous";
+        qrImg.src = qrCodeUrl;
+        
+        qrImg.onload = () => {
+            doc.addImage(img, 'PNG', 14, 10, 45, 20);
+            // QR Code in Top Right corner of PDF
+            doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
+            doc.setFontSize(7);
+            doc.setTextColor(150);
+            doc.text('SCAN TO VERIFY', pageWidth - 29, 78, { align: 'center' });
+
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'bold');
         doc.text('KS Pharma Net', 14, 40);
         
         doc.setFont('helvetica', 'normal');
@@ -188,11 +216,13 @@ const ViewInvoice = () => {
         doc.text(`Rs. ${invoice.grandTotal.toFixed(2)}`, pageWidth - 14, finalY + 32, { align: 'right' });
 
         doc.save(`${invoice.id}_invoice.pdf`);
-    };
+        }; // End qrImg.onload
+    }; // End img.onload
+
     img.onerror = () => {
         doc.text('SALES INVOICE', 14, 22);
         doc.save(`${invoice.id}_invoice.pdf`);
-    }
+    };
   };
   if (loading || !invoice) {
     return (
@@ -250,9 +280,17 @@ const ViewInvoice = () => {
                     <h1 className="text-5xl font-black text-gray-900/10 uppercase tracking-tight leading-none mb-2">Invoice</h1>
                     <div className="text-2xl font-bold text-gray-800">#{invoice.id}</div>
                     
-                    <div className="mt-6 flex flex-col items-end gap-2">
-                        <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-100 inline-block">
-                             {invoice.status}
+                    <div className="mt-6 flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Verify Invoice</span>
+                                <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
+                                    <img src={qrCodeUrl} alt="Invoice QR" className="w-16 h-16" />
+                                </div>
+                            </div>
+                            <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-100 inline-block">
+                                 {invoice.status}
+                            </div>
                         </div>
                         <div className="text-sm text-gray-500 font-medium">
                             Issued: <span className="text-gray-900 font-bold">{invoice.date}</span>
