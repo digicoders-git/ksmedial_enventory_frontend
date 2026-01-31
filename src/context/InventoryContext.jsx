@@ -450,7 +450,8 @@ export const InventoryProvider = ({ children }) => {
             updateThreshold,
             generateSKU,
             loading,
-            fetchInventory
+            fetchInventory,
+            fetchTransactions
         }}>
             {children}
         </InventoryContext.Provider>

@@ -256,20 +256,20 @@ const UnitsManagement = () => {
                           <span className="text-xs font-medium text-green-600 dark:text-green-400">Active</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2">
                           <button 
                             onClick={() => handleOpenModal(unit)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
+                            className="p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-all active:scale-95 shadow-sm border border-blue-100 dark:border-blue-800/20"
                             title="Edit"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={16} strokeWidth={2.5} />
                           </button>
                           <button 
                             onClick={() => handleDelete(unit._id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                            className="p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-all active:scale-95 shadow-sm border border-red-100 dark:border-red-800/20"
                             title="Delete"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={16} strokeWidth={2.5} />
                           </button>
                         </div>
                       </td>

@@ -356,12 +356,11 @@ const InventoryStockOut = () => {
     
     {/* Recent Transactions Section */}
     <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden mb-10">
-        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <FileText size={18} className="text-gray-500" /> Recent Stock Out History
-            </h3>
-            
-            <div className="flex items-center gap-4">
+        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full md:w-auto">
+                <h3 className="font-black text-gray-800 dark:text-white flex items-center gap-2 italic tracking-tight">
+                    <FileText size={20} className="text-primary" /> RECENT STOCK OUT HISTORY
+                </h3>
                 {transactions.length > 0 && (
                      <button
                         onClick={() => {
@@ -383,32 +382,40 @@ const InventoryStockOut = () => {
                                 }
                             });
                         }}
-                        className="text-xs font-bold text-red-500 hover:text-red-700 underline"
+                        className="text-[10px] font-black uppercase text-red-500 hover:text-red-700 underline tracking-widest sm:mt-1"
                      >
                         Clear History
                      </button>
                 )}
-
-            {/* Simple Pagination Info */}
-             <div className="flex items-center gap-2">
-                <button 
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="p-1 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-semibold disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-                >
-                    Prev
-                </button>
-                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
-                    Page {currentPage} of {totalPages || 1}
-                </span>
-                <button 
-                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                     disabled={currentPage >= totalPages}
-                     className="p-1 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs font-semibold disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-                >
-                    Next
-                </button>
             </div>
+            
+            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                {/* Simplified Pagination Info */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                    <button 
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm active:scale-90"
+                        title="Previous Page"
+                    >
+                        <ArrowRight size={16} className="rotate-180" />
+                    </button>
+                    
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-3 py-1.5 rounded-xl shadow-sm">
+                        <span className="text-xs font-black text-gray-700 dark:text-gray-300">
+                             {currentPage} <span className="text-gray-400">/</span> {totalPages || 1}
+                        </span>
+                    </div>
+
+                    <button 
+                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                         disabled={currentPage >= totalPages}
+                         className="p-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm active:scale-90"
+                         title="Next Page"
+                    >
+                        <ArrowRight size={16} />
+                    </button>
+                </div>
             </div>
         </div>
         <div className="overflow-x-auto">

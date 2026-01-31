@@ -286,27 +286,27 @@ const InvoiceList = () => {
             </div>
 
             {/* Filters & Search */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full sm:w-96">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col xl:flex-row gap-4 justify-between items-center px-5 py-5">
+                <div className="relative w-full xl:w-96">
+                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
                    <input 
                      type="text" 
                      placeholder="Search invoice or customer..." 
                      value={searchTerm}
                      onChange={(e) => handleSearchChange(e.target.value)}
-                     className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-white"
+                     className="w-full pl-11 pr-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm text-gray-700 dark:text-white placeholder:text-gray-400 font-medium"
                    />
                 </div>
                 
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                <div className="flex items-center gap-1.5 bg-gray-100/50 dark:bg-gray-900/50 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 w-full xl:w-auto overflow-x-auto no-scrollbar">
                     {['All', 'Paid', 'Pending', 'Cancelled', 'Returned'].map((status) => (
                         <button
                             key={status}
                             onClick={() => handleStatusChange(status)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                            className={`flex-1 xl:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
                                 ${statusFilter === status 
-                                    ? 'bg-primary text-white shadow-md' 
-                                    : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50'}`}
+                                    ? 'bg-white dark:bg-gray-600 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10' 
+                                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700'}`}
                         >
                             {status}
                         </button>
@@ -319,16 +319,16 @@ const InvoiceList = () => {
                 <div className="overflow-x-auto min-h-[300px]">
                     <div className={loading ? 'opacity-50 transition-opacity' : ''}>
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-750 border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 uppercase font-semibold">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-200 font-black uppercase text-[10px] tracking-widest">
                                 <tr>
-                                    <th className="px-6 py-4">Invoice No</th>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Customer</th>
-                                    <th className="px-6 py-4 text-center">Items</th>
-                                    <th className="px-6 py-4">Amount</th>
-                                    <th className="px-6 py-4">Payment</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                                    <th className="px-6 py-5">Invoice No</th>
+                                    <th className="px-6 py-5">Date</th>
+                                    <th className="px-6 py-5">Customer</th>
+                                    <th className="px-6 py-5 text-center">Items</th>
+                                    <th className="px-6 py-5">Amount</th>
+                                    <th className="px-6 py-5">Payment</th>
+                                    <th className="px-6 py-5">Status</th>
+                                    <th className="px-6 py-5 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -393,33 +393,72 @@ const InvoiceList = () => {
 
                 {/* Pagination Controls */}
                 {totalItems > 0 && (
-                  <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Showing <span className="font-bold">{startIndex}</span> - <span className="font-bold">{endIndex}</span> of <span className="font-bold">{totalItems}</span> invoices
+                  <div className="px-6 py-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                        
+                        {/* Info & Limit Selector */}
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium order-2 sm:order-1">
+                                Showing <span className="font-black text-gray-800 dark:text-gray-200">{startIndex}</span> - <span className="font-black text-gray-800 dark:text-gray-200">{endIndex}</span> of <span className="font-black text-gray-800 dark:text-gray-200">{totalItems}</span> invoices
                             </p>
-                            <label className="text-xs text-gray-500 uppercase font-bold">Show:</label>
-                            <select 
-                                value={itemsPerPage}
-                                onChange={(e) => handleItemsPerPageChange(e.target.value)}
-                                className="px-2 py-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm outline-none"
-                            >
-                                {[5, 10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
-                            </select>
+                            
+                            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm order-1 sm:order-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Show:</label>
+                                <select 
+                                    value={itemsPerPage}
+                                    onChange={(e) => handleItemsPerPageChange(e.target.value)}
+                                    className="bg-transparent border-none text-sm font-black text-primary outline-none cursor-pointer focus:ring-0 p-0"
+                                >
+                                    {[5, 10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                           <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50">
-                               <ChevronLeft size={18} />
+
+                        {/* Page Numbers */}
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                           <button 
+                                onClick={() => goToPage(currentPage - 1)} 
+                                disabled={currentPage === 1} 
+                                className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
+                                title="Previous Page"
+                           >
+                               <ChevronLeft size={18} strokeWidth={2.5} />
                            </button>
-                           {[...Array(totalPages)].map((_, i) => (
-                               <button key={i} onClick={() => goToPage(i + 1)} className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${currentPage === i + 1 ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
-                                   {i + 1}
-                               </button>
-                           ))}
-                           <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50">
-                               <ChevronRight size={18} />
+
+                           <div className="flex items-center gap-1 sm:gap-1.5">
+                               {[...Array(totalPages)].map((_, i) => {
+                                   const pg = i + 1;
+                                   // Logic to show limited pages with ellipsis if needed
+                                   if (totalPages <= 7 || (pg === 1 || pg === totalPages || (pg >= currentPage - 1 && pg <= currentPage + 1))) {
+                                       return (
+                                           <button 
+                                               key={i} 
+                                               onClick={() => goToPage(pg)} 
+                                               className={`min-w-[36px] sm:min-w-[40px] h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center shadow-sm active:scale-95
+                                                   ${currentPage === pg 
+                                                       ? 'bg-primary text-white shadow-primary/20 scale-105' 
+                                                       : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:border-primary/50 border border-gray-200 dark:border-gray-600'}`}
+                                           >
+                                               {pg}
+                                           </button>
+                                       );
+                                   } else if (pg === currentPage - 2 || pg === currentPage + 2) {
+                                       return <span key={i} className="px-1 text-gray-400 font-black">...</span>;
+                                   }
+                                   return null;
+                               })}
+                           </div>
+
+                           <button 
+                                onClick={() => goToPage(currentPage + 1)} 
+                                disabled={currentPage === totalPages} 
+                                className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
+                                title="Next Page"
+                           >
+                               <ChevronRight size={18} strokeWidth={2.5} />
                            </button>
                         </div>
+                    </div>
                   </div>
                 )}
             </div>

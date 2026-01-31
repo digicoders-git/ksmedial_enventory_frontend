@@ -105,13 +105,13 @@ const StockAdjustment = () => {
     <div className="animate-fade-in-up max-w-[1000px] mx-auto pb-10">
       
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
-           <ClipboardList size={24} />
+      <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 mb-8">
+        <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl shadow-sm border border-indigo-100 dark:border-indigo-900/30">
+           <ClipboardList size={28} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Stock Adjustment</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Correct physical stock discrepancies (Damage, Theft, etc.)</p>
+          <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Stock Adjustment</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Correct physical stock discrepancies (Damage, Theft, etc.)</p>
         </div>
       </div>
 

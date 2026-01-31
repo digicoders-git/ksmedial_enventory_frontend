@@ -487,52 +487,61 @@ const SupplierList = () => {
     <>
       <div className="space-y-6 animate-fade-in-up pb-10">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-              <Truck className="text-primary" /> Supplier Master
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage your medicine distributors and vendors.</p>
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+          <div className="flex items-center gap-4 w-full xl:w-auto">
+            <div className="p-4 bg-primary/10 text-primary rounded-2xl shadow-sm border border-primary/20 dark:border-primary/10">
+              <Truck size={28} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none flex items-center gap-2">
+                Supplier Master
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Manage your medicine distributors and vendors.</p>
+            </div>
           </div>
           <button 
             onClick={() => { setSelectedSupplier(null); setShowAddModal(true); }}
-            className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-secondary shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all text-sm"
+            className="w-full xl:w-auto flex items-center justify-center gap-2 bg-primary text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest hover:bg-secondary shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 text-[11px]"
           >
-            <Plus size={18} />
+            <Plus size={18} strokeWidth={3} />
             <span>Add Supplier</span>
           </button>
         </div>
 
         {/* Filters & Toggle */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full sm:w-96">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col xl:flex-row gap-4 justify-between items-center px-5 py-5">
+            <div className="relative w-full xl:w-96">
+               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
                <input 
                  type="text" 
                  placeholder="Search name, contact, city..." 
                  value={searchTerm}
                  onChange={(e) => handleSearchChange(e.target.value)}
-                 className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                 className="w-full pl-11 pr-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 font-medium"
                />
             </div>
             
-            <div className="flex gap-2">
-                <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <button 
-                        onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        title="Grid View"
-                    >
-                        <LayoutGrid size={18} />
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        title="List View"
-                    >
-                        <ListIcon size={18} />
-                    </button>
-                </div>
+            <div className="flex items-center gap-1.5 bg-gray-100/50 dark:bg-gray-900/50 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 w-full xl:w-auto">
+                <button 
+                    onClick={() => setViewMode('grid')}
+                    className={`flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
+                        ${viewMode === 'grid' 
+                            ? 'bg-white dark:bg-gray-600 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10' 
+                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700'}`}
+                >
+                    <LayoutGrid size={16} strokeWidth={2.5} />
+                    <span>Grid</span>
+                </button>
+                <button 
+                    onClick={() => setViewMode('list')}
+                    className={`flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
+                        ${viewMode === 'list' 
+                            ? 'bg-white dark:bg-gray-600 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10' 
+                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700'}`}
+                >
+                    <ListIcon size={16} strokeWidth={2.5} />
+                    <span>List</span>
+                </button>
             </div>
         </div>
 
@@ -650,61 +659,69 @@ const SupplierList = () => {
 
         {/* Pagination Controls */}
         {paginationInfo.totalItems > 0 && (
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mt-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              {/* Items Info */}
-              <div className="flex items-center gap-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Showing <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.startIndex}</span> to{' '}
-                  <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.endIndex}</span> of{' '}
-                  <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.totalItems}</span> suppliers
+          <div className="bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 px-6 py-6 transition-all">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              
+              {/* Info & Limit Selector */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-medium order-2 sm:order-1">
+                  Showing <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.startIndex}</span> to{' '}
+                  <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.endIndex}</span> of{' '}
+                  <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.totalItems}</span> suppliers
                 </p>
                 
-                {/* Items per page selector */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+                <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm order-1 sm:order-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Show:</label>
                   <select
                     value={itemsPerPage}
                     onChange={(e) => handleItemsPerPageChange(e.target.value)}
-                    className="px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                    className="bg-transparent border-none text-sm font-black text-primary outline-none cursor-pointer focus:ring-0 p-0"
                   >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
+                    {[5, 10, 20, 50].map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
               </div>
 
               {/* Page Navigation */}
               {totalPages > 1 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                   >
-                    <ChevronLeft size={18} />
+                    <ChevronLeft size={18} strokeWidth={2.5} />
                   </button>
 
-                  <div className="flex items-center gap-1">
-                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                            key={page}
-                            onClick={() => goToPage(page)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === page ? 'bg-primary text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                        >
-                            {page}
-                        </button>
-                     ))}
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                     {[...Array(totalPages)].map((_, i) => {
+                        const pg = i + 1;
+                        if (totalPages <= 7 || (pg === 1 || pg === totalPages || (pg >= currentPage - 1 && pg <= currentPage + 1))) {
+                            return (
+                                <button
+                                    key={pg}
+                                    onClick={() => goToPage(pg)}
+                                    className={`min-w-[36px] sm:min-w-[40px] h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center shadow-sm active:scale-95
+                                        ${currentPage === pg 
+                                            ? 'bg-primary text-white shadow-primary/20 scale-105' 
+                                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:border-primary/50 border border-gray-200 dark:border-gray-600'}`}
+                                >
+                                    {pg}
+                                </button>
+                            );
+                        } else if (pg === currentPage - 2 || pg === currentPage + 2) {
+                            return <span key={pg} className="px-1 text-gray-400 font-black">...</span>;
+                        }
+                        return null;
+                     })}
                   </div>
 
                   <button
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                   >
-                    <ChevronRight size={18} />
+                    <ChevronRight size={18} strokeWidth={2.5} />
                   </button>
                 </div>
               )}

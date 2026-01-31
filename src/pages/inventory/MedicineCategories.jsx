@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Tag, Edit3, Trash2, Activity, ChevronRight, X, Grid, List, FileText, Calendar, Box, UploadCloud, RefreshCw, Check } from 'lucide-react';
+import { Plus, Search, Tag, Edit3, Trash2, Activity, ChevronRight, X, Grid, List, FileText, Calendar, Box, UploadCloud, RefreshCw, Check, Layers } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
 import Papa from 'papaparse';
@@ -245,13 +245,19 @@ const MedicineCategories = () => {
       <div className="space-y-6 animate-fade-in-up pb-10">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Therapeutic Categories</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Classify medicines by their therapeutic use.</p>
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+          <div className="flex items-center gap-4 w-full xl:w-auto">
+             <div className="p-4 bg-primary/10 dark:bg-primary/20 rounded-2xl text-primary shadow-sm border border-primary/10">
+                <Layers size={28} strokeWidth={2.5} />
+             </div>
+             <div>
+                <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">Therapeutic Categories</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Classify medicines by their therapeutic use.</p>
+             </div>
           </div>
-          <div className="flex gap-3">
-             <div className="relative">
+          
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+             <div className="relative w-full sm:w-auto">
                 <input 
                     type="file" 
                     accept=".csv" 
@@ -263,56 +269,59 @@ const MedicineCategories = () => {
                 {!isBulkMode ? (
                   <label 
                       htmlFor="csv-upload"
-                      className="px-5 py-2.5 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-bold hover:bg-primary/5 cursor-pointer transition-all text-sm flex items-center gap-2"
+                      className="w-full sm:w-auto px-6 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-black hover:bg-primary/5 cursor-pointer transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap"
                   >
-                      {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                      {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} strokeWidth={3} />}
                       <span>Bulk Upload</span>
                   </label>
                 ) : (
                   <button 
                     onClick={handleBulkSave}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-200 active:scale-95 transition-all text-sm flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-200 active:scale-95 transition-all text-[11px] uppercase tracking-widest flex items-center justify-center gap-2"
                   >
-                    <Check size={18} />
-                    <span>Save {bulkData.length} Categories</span>
+                    <Check size={18} strokeWidth={3} />
+                    <span>Save {bulkData.length} Items</span>
                   </button>
                 )}
               </div>
             <button 
               onClick={() => handleOpenModal()}
-              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-secondary shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all text-sm"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-primary/20 hover:bg-secondary active:scale-95 transition-all text-[11px] uppercase tracking-widest"
             >
-              <Plus size={18} />
+              <Plus size={18} strokeWidth={3} />
               <span>Add Category</span>
             </button>
           </div>
         </div>
 
         {/* Filters & View Toggle */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full sm:w-80">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div className="relative w-full md:w-96">
+               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                <input 
                  type="text" 
-                 placeholder="Search categories..." 
+                 placeholder="Search categories by name..." 
                  value={searchTerm}
                  onChange={(e) => setSearchTerm(e.target.value)}
-                 className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                 className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 font-medium"
                />
             </div>
             
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 p-1 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1.5 rounded-xl border border-gray-100 dark:border-gray-600 w-full md:w-auto justify-center">
                 <button 
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 >
-                   <Grid size={18} />
+                   <Grid size={16} strokeWidth={2.5} />
+                   <span className="md:hidden lg:inline">Grid View</span>
                 </button>
+                <div className="w-px h-4 bg-gray-200 dark:bg-gray-600 md:block hidden"></div>
                 <button 
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 text-primary shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 >
-                   <List size={18} />
+                   <List size={16} strokeWidth={2.5} />
+                   <span className="md:hidden lg:inline">List View</span>
                 </button>
             </div>
         </div>

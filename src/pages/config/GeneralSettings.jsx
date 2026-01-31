@@ -132,19 +132,24 @@ const GeneralSettings = () => {
     return (
         <div className="animate-fade-in-up max-w-5xl mx-auto space-y-6 pb-10">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Store className="text-primary" /> General Store Settings
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage your store profile, contact info, and business details.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
+                        <Store className="text-primary" size={28} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">
+                            General Store Settings
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Manage profile, contact info, and business details.</p>
+                    </div>
                 </div>
                 {!isEditing && (
                     <button 
                         onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2"
+                        className="w-full sm:w-auto px-6 py-3 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-black uppercase tracking-widest text-[11px] rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                     >
-                        <Edit2 size={16} /> Edit Settings
+                        <Edit2 size={16} strokeWidth={3} /> Edit Settings
                     </button>
                 )}
             </div>
@@ -277,38 +282,38 @@ const GeneralSettings = () => {
                             </div>
                          </div>
 
-                         <div className="grid grid-cols-3 gap-4">
+                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                              <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">City</label>
+                                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">City</label>
                                 <input 
                                     type="text" 
                                     name="city" 
                                     value={storeData.city} 
                                     onChange={handleChange} 
                                     disabled={!isEditing}
-                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-800 dark:text-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                                 />
                              </div>
                              <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">State</label>
+                                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">State</label>
                                 <input 
                                     type="text" 
                                     name="state" 
                                     value={storeData.state} 
                                     onChange={handleChange} 
                                     disabled={!isEditing}
-                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-800 dark:text-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                                 />
                              </div>
                              <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Pincode</label>
+                                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pincode</label>
                                 <input 
                                     type="text" 
                                     name="pincode" 
                                     value={storeData.pincode} 
                                     onChange={handleChange} 
                                     disabled={!isEditing}
-                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+                                    className="w-full mt-1 px-4 py-2.5 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-800 dark:text-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                                 />
                              </div>
                          </div>

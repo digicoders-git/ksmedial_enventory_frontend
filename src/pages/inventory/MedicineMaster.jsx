@@ -322,25 +322,24 @@ const MedicineMaster = () => {
     <div className="animate-fade-in-up max-w-[1600px] mx-auto pb-10">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-             <div className="p-2.5 bg-primary/10 dark:bg-primary/20 rounded-lg text-primary dark:text-primary-400">
-                <Package size={24} />
-             </div>
-             <div>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {isViewMode ? 'View Medicine Details' : (isEditMode ? 'Edit Medicine' : 'Add New Medicine')}
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
-                  {isViewMode ? 'View medicine details' : (isEditMode ? 'Update existing medicine record' : 'Create a master record for a new inventory item')}.
-                </p>
-             </div>
-          </div>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-10">
+        <div className="flex items-center gap-4 w-full xl:w-auto">
+           <div className="p-4 bg-primary/10 dark:bg-primary/20 rounded-2xl text-primary shadow-sm border border-primary/10">
+              <Package size={28} strokeWidth={2.5} />
+           </div>
+           <div>
+              <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">
+                {isViewMode ? 'View Medicine' : (isEditMode ? 'Edit Medicine' : 'Add New Medicine')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">
+                {isViewMode ? 'Reference record details' : (isEditMode ? 'Modify master product data' : 'Create a master record for a new item')}
+              </p>
+           </div>
         </div>
-        <div className="flex gap-3">
+        
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {!isEditMode && !isViewMode && (
-                <div className="relative">
+                <div className="relative flex-1 sm:flex-none">
                     <input 
                         type="file" 
                         accept=".csv" 
@@ -351,27 +350,29 @@ const MedicineMaster = () => {
                     />
                     <label 
                         htmlFor="csv-upload"
-                        className="px-5 py-2.5 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-bold hover:bg-primary/5 cursor-pointer transition-all text-sm flex items-center gap-2"
+                        className="w-full sm:w-auto px-5 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-black hover:bg-primary/5 cursor-pointer transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap"
                     >
-                        {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                        {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} strokeWidth={3} />}
                         <span>Bulk Upload (CSV)</span>
                     </label>
                 </div>
             )}
+            
             <button 
               onClick={() => navigate('/medicines/list')}
-              className="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all text-sm"
+              className="flex-1 sm:flex-none px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-xs uppercase tracking-widest active:scale-95"
             >
               {isViewMode ? 'Back' : 'Cancel'}
             </button>
+
             {!isViewMode && (
-            <button 
-               onClick={handleSubmit} 
-               className={`px-6 py-2.5 rounded-xl text-white font-bold shadow-lg active:scale-95 transition-all flex items-center gap-2 ${isBulkMode ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-primary hover:bg-secondary shadow-primary/20'}`}
-            >
-              {isBulkMode ? <Check size={18} /> : <Save size={18} />}
-              <span>{isBulkMode ? `Save ${bulkData.length} Items` : (isEditMode ? 'Update Record' : 'Save Record')}</span>
-            </button>
+              <button 
+                 onClick={handleSubmit} 
+                 className={`flex-1 sm:flex-none px-8 py-3 rounded-xl text-white font-black shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest ${isBulkMode ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-primary hover:bg-secondary'}`}
+              >
+                {isBulkMode ? <Check size={18} strokeWidth={3} /> : <Save size={18} strokeWidth={3} />}
+                <span>{isBulkMode ? `Save ${bulkData.length}` : (isEditMode ? 'Update' : 'Save Record')}</span>
+              </button>
             )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Banknote, BriefcaseMedical, AlertTriangle, ChevronRight, Download } from 'lucide-react';
+import { ShieldCheck, Banknote, BriefcaseMedical, AlertTriangle, ChevronRight, Download, LayoutDashboard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import Highcharts from 'highcharts';
@@ -105,85 +105,91 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">A quick data overview of the inventory.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-800/50">
+            <LayoutDashboard size={28} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">
+              Main Dashboard
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">A quick data overview of the inventory.</p>
+          </div>
         </div>
-        <button className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-primary active:scale-95 transition-all shadow-sm">
-          <span>Download Report</span>
-          <Download size={16} />
+        <button className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+          <Download size={18} strokeWidth={3} /> Download Report
         </button>
       </div>
 
       {/* Top Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         
         {/* Card 1: Inventory Status */}
         <div 
           onClick={() => navigate('/inventory/stats-history', { state: { type: 'products', title: 'Inventory Status History' } })}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
         >
           <div className="p-6 flex flex-col items-center text-center">
-            <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${stats.inventoryStatus === 'Good' ? 'border-accent text-accent' : 'border-danger text-danger'}`}>
-              <ShieldCheck size={24} />
+            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${stats.inventoryStatus === 'Good' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50 text-emerald-600' : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/50 text-rose-600'}`}>
+              <ShieldCheck size={28} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">{stats.inventoryStatus}</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Inventory Status</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white">{stats.inventoryStatus}</h3>
+            <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Inventory Status</p>
           </div>
-          <div className="bg-accent/10 py-2 px-4 flex items-center justify-center gap-1 text-accent text-sm font-medium hover:bg-accent/20 transition-colors">
-            View Detailed Report <ChevronRight size={14} />
+          <div className="bg-gray-50 dark:bg-gray-900/50 py-3 px-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 border-t border-gray-100 dark:border-gray-700">
+            View Analysis <ChevronRight size={14} strokeWidth={3} />
           </div>
         </div>
 
         {/* Card 2: Revenue */}
         <div 
           onClick={() => navigate('/inventory/stats-history', { state: { type: 'value', title: 'Revenue History' } })}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
         >
           <div className="p-6 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full border-2 border-highlight flex items-center justify-center text-highlight mb-3 group-hover:scale-110 transition-transform">
-              <Banknote size={24} />
+            <div className="w-14 h-14 rounded-2xl border border-amber-100 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 mb-4 group-hover:scale-110 transition-transform">
+              <Banknote size={28} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">Rs. {stats.totalRevenue.toLocaleString()}</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Revenue : This Month</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white">₹{stats.totalRevenue.toLocaleString()}</h3>
+            <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Monthly Revenue</p>
           </div>
-          <div className="bg-highlight/10 py-2 px-4 flex items-center justify-center gap-1 text-highlight text-sm font-medium hover:bg-highlight/20 transition-colors">
-            View Detailed Report <ChevronRight size={14} />
+          <div className="bg-gray-50 dark:bg-gray-900/50 py-3 px-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 border-t border-gray-100 dark:border-gray-700">
+            View Analytics <ChevronRight size={14} strokeWidth={3} />
           </div>
         </div>
 
         {/* Card 3: Medicines Available */}
         <div 
           onClick={() => navigate('/medicines/list')}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
         >
           <div className="p-6 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full border-2 border-info flex items-center justify-center text-info mb-3 group-hover:scale-110 transition-transform">
-              <BriefcaseMedical size={24} />
+            <div className="w-14 h-14 rounded-2xl border border-blue-100 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform">
+              <BriefcaseMedical size={28} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">{stats.totalMedicines}</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Medicines Available</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white">{stats.totalMedicines}</h3>
+            <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Medicines In Stock</p>
           </div>
-          <div className="bg-info/10 py-2 px-4 flex items-center justify-center gap-1 text-info text-sm font-medium hover:bg-info/20 transition-colors">
-            Visit Inventory <ChevronRight size={14} />
+          <div className="bg-gray-50 dark:bg-gray-900/50 py-3 px-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 border-t border-gray-100 dark:border-gray-700">
+            View Inventory <ChevronRight size={14} strokeWidth={3} />
           </div>
         </div>
 
         {/* Card 4: Shortage */}
         <div 
           onClick={() => navigate('/inventory/low-stock')}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
         >
           <div className="p-6 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full border-2 border-danger flex items-center justify-center text-danger mb-3 group-hover:scale-110 transition-transform">
-              <AlertTriangle size={24} />
+            <div className="w-14 h-14 rounded-2xl border border-rose-100 dark:border-rose-800/50 bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 mb-4 group-hover:scale-110 transition-transform">
+              <AlertTriangle size={28} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">{stats.shortageCount.toString().padStart(2, '0')}</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Medicine Shortage</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white">{stats.shortageCount.toString().padStart(2, '0')}</h3>
+            <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Low Stock Alerts</p>
           </div>
-          <div className="bg-danger/10 py-2 px-4 flex items-center justify-center gap-1 text-danger text-sm font-medium hover:bg-danger/20 transition-colors">
-            Resolve Now <ChevronRight size={14} />
+          <div className="bg-gray-50 dark:bg-gray-900/50 py-3 px-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 border-t border-gray-100 dark:border-gray-700">
+            Resolve Now <ChevronRight size={14} strokeWidth={3} />
           </div>
         </div>
       </div>
@@ -192,112 +198,112 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
         
         {/* Inventory Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">Inventory</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
+            <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest">Inventory Glance</h3>
             <button 
                 onClick={() => navigate('/config/inventory')}
-                className="text-xs text-gray-400 hover:text-accent flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:opacity-70 flex items-center gap-1 transition-all"
             >
-                Go to Configuration <ChevronRight size={12} />
+                Config <ChevronRight size={12} strokeWidth={3} />
             </button>
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div 
                 onClick={() => navigate('/medicines/list')}
-                className="flex-1 border-r border-gray-100 dark:border-gray-700 pr-4 cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 sm:border-r border-gray-100 dark:border-gray-700 pr-0 sm:pr-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalMedicines}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Total no of Medicines</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.totalMedicines}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Total SKU Count</p>
             </div>
             <div 
                 onClick={() => navigate('/medicines/groups')}
-                className="flex-1 pl-4 text-right cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 pl-0 sm:pl-4 text-left sm:text-right cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalGroups}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Medicine Groups</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.totalGroups}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Medicine Categories</p>
             </div>
           </div>
         </div>
 
         {/* Quick Report Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">Quick Report</h3>
-            <span className="text-xs font-semibold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">This Month</span>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
+            <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest">Monthly Sales</h3>
+            <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg uppercase tracking-widest border border-amber-100 dark:border-amber-800/50">Trends</span>
           </div>
-           <div className="flex justify-between items-center">
+           <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div 
                 onClick={() => navigate('/reports/sales')}
-                className="flex-1 border-r border-gray-100 dark:border-gray-700 pr-4 cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 sm:border-r border-gray-100 dark:border-gray-700 pr-0 sm:pr-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.itemsSold}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Qty of Medicines Sold</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.itemsSold}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Units Dispatched</p>
             </div>
             <div 
                 onClick={() => navigate('/sales/invoices')}
-                className="flex-1 pl-4 text-right cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 pl-0 sm:pl-4 text-left sm:text-right cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.monthlyInvoices}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Invoices Generated</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.monthlyInvoices}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Sales Records</p>
             </div>
           </div>
         </div>
 
         {/* My Pharmacy Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">My Pharmacy</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
+            <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest">Team & Partners</h3>
             <button 
                 onClick={() => navigate('/config/roles')}
-                className="text-xs text-gray-400 hover:text-accent flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest hover:opacity-70 flex items-center gap-1 transition-all"
             >
-                Go to User Management <ChevronRight size={12} />
+                Users <ChevronRight size={12} strokeWidth={3} />
             </button>
           </div>
-           <div className="flex justify-between items-center">
+           <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div 
                 onClick={() => navigate('/purchase/suppliers')}
-                className="flex-1 border-r border-gray-100 dark:border-gray-700 pr-4 cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 sm:border-r border-gray-100 dark:border-gray-700 pr-0 sm:pr-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalSuppliers.toString().padStart(2, '0')}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Total no of Suppliers</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.totalSuppliers.toString().padStart(2, '0')}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Active Suppliers</p>
             </div>
             <div 
                 onClick={() => navigate('/config/roles')}
-                className="flex-1 pl-4 text-right cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 pl-0 sm:pl-4 text-left sm:text-right cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">01</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Total no of Users</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">01</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Registered Staff</p>
             </div>
           </div>
         </div>
 
         {/* Customers Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">Customers</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
+            <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest">Base & Products</h3>
              <button 
                 onClick={() => navigate('/people/customers')}
-                className="text-xs text-gray-400 hover:text-accent flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:opacity-70 flex items-center gap-1 transition-all"
              >
-                Go to Customers Page <ChevronRight size={12} />
+                Clients <ChevronRight size={12} strokeWidth={3} />
              </button>
           </div>
-           <div className="flex justify-between items-center">
+           <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div 
                 onClick={() => navigate('/people/customers')}
-                className="flex-1 border-r border-gray-100 dark:border-gray-700 pr-4 cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 sm:border-r border-gray-100 dark:border-gray-700 pr-0 sm:pr-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalCustomers}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Total no of Customers</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none">{stats.totalCustomers}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Active Customers</p>
             </div>
             <div 
                 onClick={() => navigate('/reports/sales')}
-                className="flex-1 pl-4 text-right cursor-pointer hover:opacity-80 transition-opacity"
+                className="w-full flex-1 pl-0 sm:pl-4 text-left sm:text-right cursor-pointer hover:opacity-80 transition-opacity"
             >
-               <h4 className="text-2xl font-bold text-gray-800 dark:text-white truncate">{stats.featuredProduct}</h4>
-               <p className="text-sm text-gray-500 dark:text-gray-400">Frequently bought Item</p>
+               <h4 className="text-3xl font-black text-gray-800 dark:text-white leading-none truncate">{stats.featuredProduct}</h4>
+               <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2">Top Performer</p>
             </div>
           </div>
         </div>

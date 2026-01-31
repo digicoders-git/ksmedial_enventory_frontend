@@ -236,46 +236,46 @@ const PurchaseInvoices = () => {
                 {/* Filters & Actions Toolbox */}
                 <div className="space-y-4">
                     {/* Top Row: Search & Actions */}
-                    <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-                        <div className="relative w-full lg:w-1/2">
+                    <div className="flex flex-col xl:flex-row gap-4 xl:items-center justify-between">
+                        <div className="relative w-full xl:w-1/2">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                             <input 
                                 type="text" 
                                 placeholder="Search by invoice no, supplier, or batch..." 
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                                className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm font-medium text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                className="w-full pl-12 pr-4 py-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-sm font-medium text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                             />
                         </div>
-                        <div className="flex items-center gap-3 w-full lg:w-auto">
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
                             <button 
                                 onClick={handleExport}
-                                className="flex-1 lg:flex-none px-6 py-3.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                className="w-full sm:w-auto px-6 py-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                             >
-                                <Download size={18} /> Export List
+                                <Download size={18} strokeWidth={2.5} /> Export List
                             </button>
                             <button 
                                 onClick={() => navigate('/inventory/stock-in')} 
-                                className="flex-1 lg:flex-none px-6 py-3.5 bg-primary text-white rounded-2xl text-sm font-black uppercase tracking-wide hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
-                                <Plus size={18} /> New Purchase
+                                <Plus size={18} strokeWidth={3} /> New Purchase
                             </button>
                         </div>
                     </div>
 
                     {/* Bottom Row: Filters Hub */}
-                    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col xl:flex-row items-center justify-between gap-6">
                         {/* Status Hub */}
-                        <div className="flex items-center gap-2 w-full md:w-auto">
-                            <div className="flex items-center bg-gray-50/80 dark:bg-gray-750 p-1 rounded-xl border border-gray-100 dark:border-gray-700 w-full md:w-auto overflow-x-auto no-scrollbar">
+                        <div className="flex items-center gap-2 w-full xl:w-auto">
+                            <div className="flex items-center bg-gray-50/80 dark:bg-gray-900/50 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-700 w-full xl:w-auto overflow-x-auto no-scrollbar">
                                 {['All', 'Received', 'Pending', 'Cancelled'].map((status) => (
                                     <button
                                         key={status}
                                         onClick={() => { setStatusFilter(status); setCurrentPage(1); }}
-                                        className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-xs font-black uppercase tracking-[0.1em] transition-all whitespace-nowrap
+                                        className={`flex-1 xl:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all whitespace-nowrap
                                             ${statusFilter === status 
-                                                ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900 shadow-md transform scale-105' 
-                                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                                ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900 shadow-lg shadow-gray-200 dark:shadow-none scale-105' 
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white dark:hover:bg-gray-700'}`}
                                     >
                                         {status}
                                     </button>
@@ -284,37 +284,40 @@ const PurchaseInvoices = () => {
                         </div>
 
                         {/* Date Range Hub */}
-                        <div className="flex items-center gap-4 w-full md:w-auto">
-                            <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
-                            <div className="flex items-center gap-2 flex-1 md:flex-none">
-                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mr-1">Range:</span>
-                                <div className="flex items-center gap-1.5 bg-gray-50/80 dark:bg-gray-750 p-1 rounded-xl border border-gray-100 dark:border-gray-700 shadow-inner">
-                                    <div className="relative group">
-                                        <Calendar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-focus-within:text-primary transition-colors" />
-                                        <input 
-                                            type="date" 
-                                            value={startDate}
-                                            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
-                                            className="w-32 sm:w-36 pl-8 pr-2 py-2 bg-transparent text-xs font-bold text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
-                                        />
-                                    </div>
-                                    <span className="text-gray-300 dark:text-gray-600 font-bold">-</span>
-                                    <div className="relative group">
-                                        <Calendar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-focus-within:text-primary transition-colors" />
-                                        <input 
-                                            type="date" 
-                                            value={endDate}
-                                            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
-                                            className="w-32 sm:w-36 pl-8 pr-2 py-2 bg-transparent text-xs font-bold text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
-                                        />
+                        <div className="flex flex-col lg:flex-row items-center gap-4 w-full xl:w-auto">
+                            <div className="hidden xl:block h-10 w-px bg-gray-100 dark:bg-gray-700 mx-2"></div>
+                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap lg:mr-2">Date Range:</span>
+                                <div className="flex flex-col sm:flex-row items-center gap-2 bg-gray-50/80 dark:bg-gray-900/50 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 w-full lg:w-auto">
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <div className="relative flex-1 sm:flex-none">
+                                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                                            <input 
+                                                type="date" 
+                                                value={startDate}
+                                                onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                                                className="w-full sm:w-40 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                            />
+                                        </div>
+                                        <span className="text-gray-400 dark:text-gray-600 font-black text-[10px] hidden sm:block">TO</span>
+                                        <div className="relative flex-1 sm:flex-none">
+                                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                                            <input 
+                                                type="date" 
+                                                value={endDate}
+                                                onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                                                className="w-full sm:w-40 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                            />
+                                        </div>
                                     </div>
                                     {(startDate || endDate) && (
                                         <button 
                                             onClick={() => { setStartDate(''); setEndDate(''); setCurrentPage(1); }}
-                                            className="p-1.5 bg-white dark:bg-gray-700 text-red-500 hover:text-red-600 rounded-lg shadow-sm transition-all active:scale-90"
+                                            className="w-full sm:w-auto p-2.5 bg-white dark:bg-gray-800 text-red-500 hover:text-red-600 rounded-xl shadow-sm transition-all active:scale-95 border border-red-100 dark:border-red-900/30 flex items-center justify-center"
                                             title="Reset Filter"
                                         >
-                                            <X size={14} />
+                                            <X size={16} strokeWidth={3} />
+                                            <span className="sm:hidden text-[10px] font-black uppercase tracking-widest ml-2">Clear Filter</span>
                                         </button>
                                     )}
                                 </div>
@@ -419,40 +422,49 @@ const PurchaseInvoices = () => {
                     </div>
 
                     {/* Pagination */}
-                    <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
-                         <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                            Showing <span className="text-gray-800 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-gray-800 dark:text-white">{Math.min(currentPage * itemsPerPage, totalEntries)}</span> of <span className="text-gray-800 dark:text-white">{totalEntries}</span> entries
+                    <div className="px-6 py-6 border-t border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row items-center justify-between gap-6 bg-gray-50/50 dark:bg-gray-800/50">
+                         <div className="text-sm text-gray-500 dark:text-gray-400 font-medium order-2 lg:order-1">
+                            Showing <span className="font-black text-gray-800 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black text-gray-800 dark:text-white">{Math.min(currentPage * itemsPerPage, totalEntries)}</span> of <span className="font-black text-gray-800 dark:text-white">{totalEntries}</span> entries
                          </div>
                          
-                         <div className="flex items-center gap-2">
+                         <div className="flex items-center gap-2 order-1 lg:order-2">
                              <button 
                                 onClick={() => paginate(currentPage - 1)}
                                 disabled={currentPage === 1}
-                                className="p-2 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="p-2.5 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                             >
-                                <ChevronLeft size={16} />
+                                <ChevronLeft size={18} strokeWidth={2.5} />
                              </button>
                              
-                             {Array.from({ length: totalPages }, (_, i) => (
-                                <button
-                                    key={i + 1}
-                                    onClick={() => paginate(i + 1)}
-                                    className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors
-                                        ${currentPage === i + 1
-                                            ? 'bg-primary text-white shadow-md shadow-primary/20'
-                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                                        }`}
-                                >
-                                    {i + 1}
-                                </button>
-                             ))}
-
+                             <div className="flex items-center gap-1.5">
+                                 {Array.from({ length: totalPages }, (_, i) => {
+                                     const pg = i + 1;
+                                     if (totalPages <= 7 || (pg === 1 || pg === totalPages || (pg >= currentPage - 1 && pg <= currentPage + 1))) {
+                                         return (
+                                            <button
+                                                key={pg}
+                                                onClick={() => paginate(pg)}
+                                                className={`min-w-[40px] h-10 rounded-xl text-sm font-black transition-all flex items-center justify-center shadow-sm active:scale-95
+                                                    ${currentPage === pg
+                                                        ? 'bg-primary text-white shadow-primary/20 scale-110'
+                                                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary/50 border border-gray-100 dark:border-gray-700'
+                                                    }`}
+                                            >
+                                                {pg}
+                                            </button>
+                                         );
+                                     } else if (pg === currentPage - 2 || pg === currentPage + 2) {
+                                         return <span key={pg} className="px-1 text-gray-400 font-black">...</span>;
+                                     }
+                                     return null;
+                                 })}
+                             </div>
                              <button 
                                 onClick={() => paginate(currentPage + 1)}
                                 disabled={currentPage === totalPages}
-                                className="p-2 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="p-2.5 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                             >
-                                <ChevronRight size={16} />
+                                <ChevronRight size={18} strokeWidth={2.5} />
                              </button>
                          </div>
                     </div>

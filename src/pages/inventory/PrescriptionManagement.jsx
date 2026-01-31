@@ -389,16 +389,21 @@ const PrescriptionManagement = () => {
     <>
     <div className="space-y-6 animate-fade-in-up pb-10">
       
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Prescription Verification</h1>
-           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Review and approve customer prescriptions before dispensing.</p>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+        <div className="flex items-center gap-4 w-full xl:w-auto">
+           <div className="p-4 bg-primary/10 dark:bg-primary/20 rounded-2xl text-primary shadow-sm border border-primary/10">
+              <FileText size={28} strokeWidth={2.5} />
+           </div>
+           <div>
+              <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">Prescription Verification</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Review and approve data before dispensing.</p>
+           </div>
         </div>
         <button 
             onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-secondary shadow-md active:scale-95 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-primary/20 hover:bg-secondary active:scale-95 transition-all text-[11px] uppercase tracking-widest"
         >
-            <Upload size={18} /> Upload New Rx
+            <Upload size={18} strokeWidth={3} /> Upload New Rx
         </button>
       </div>
 
@@ -451,14 +456,14 @@ const PrescriptionManagement = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex flex-col sm:flex-row justify-between items-center px-6 py-4">
+          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex flex-col md:flex-row justify-between items-center gap-4 px-6 py-5">
                {/* Tabs */}
-              <div className="flex bg-gray-100/80 dark:bg-gray-900/50 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-900/50 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 w-full md:w-auto">
                   {['pending', 'verified', 'rejected'].map(tab => (
                       <button 
                         key={tab}
                         onClick={() => handleTabChange(tab)}
-                        className={`px-5 py-2 rounded-lg text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700'}`}
+                        className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white dark:bg-gray-600 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700'}`}
                       >
                           {tab}
                       </button>
@@ -466,13 +471,13 @@ const PrescriptionManagement = () => {
               </div>
               
               {/* Search */}
-              <div className="relative w-full sm:w-72 mt-3 sm:mt-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+              <div className="relative w-full md:w-80">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
                   <input 
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     placeholder="Search Patient, Doctor or ID..." 
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" 
+                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm" 
                   />
               </div>
           </div>
@@ -552,22 +557,23 @@ const PrescriptionManagement = () => {
           {/* Pagination Controls */}
           {paginationInfo.totalItems > 0 && (
             <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Items Info */}
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Showing <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.startIndex}</span> to{' '}
-                    <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.endIndex}</span> of{' '}
-                    <span className="font-bold text-gray-800 dark:text-gray-200">{paginationInfo.totalItems}</span> items
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                
+                {/* Items Info & Selector */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 font-medium order-2 sm:order-1">
+                    Showing <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.startIndex}</span> to{' '}
+                    <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.endIndex}</span> of{' '}
+                    <span className="font-black text-gray-800 dark:text-gray-200">{paginationInfo.totalItems}</span> items
                   </p>
                   
                   {/* Items per page selector */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+                  <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm order-1 sm:order-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Show:</label>
                     <select
                       value={itemsPerPage}
                       onChange={(e) => handleItemsPerPageChange(e.target.value)}
-                      className="px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                      className="bg-transparent border-none text-sm font-black text-primary outline-none cursor-pointer focus:ring-0 p-0"
                     >
                       <option value="5">5</option>
                       <option value="10">10</option>
@@ -579,85 +585,53 @@ const PrescriptionManagement = () => {
 
                 {/* Page Navigation */}
                 {totalPages > 1 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Previous Button */}
                     <button
                       onClick={() => goToPage(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                       title="Previous Page"
                     >
-                      <ChevronLeft size={18} />
+                      <ChevronLeft size={18} strokeWidth={2.5} />
                     </button>
 
                     {/* Page Numbers */}
-                    <div className="flex items-center gap-1">
-                      {/* First Page */}
-                      {currentPage > 2 && (
-                        <>
-                          <button
-                            onClick={() => goToPage(1)}
-                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                          >
-                            1
-                          </button>
-                          {currentPage > 3 && (
-                            <span className="px-2 text-gray-400">...</span>
-                          )}
-                        </>
-                      )}
-
-                      {/* Previous Page */}
-                      {currentPage > 1 && (
-                        <button
-                          onClick={() => goToPage(currentPage - 1)}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                        >
-                          {currentPage - 1}
-                        </button>
-                      )}
-
-                      {/* Current Page */}
-                      <button
-                        className="px-3 py-1.5 rounded-lg text-sm font-bold bg-primary text-white shadow-sm"
-                      >
-                        {currentPage}
-                      </button>
-
-                      {/* Next Page */}
-                      {currentPage < totalPages && (
-                        <button
-                          onClick={() => goToPage(currentPage + 1)}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                        >
-                          {currentPage + 1}
-                        </button>
-                      )}
-
-                      {/* Last Page */}
-                      {currentPage < totalPages - 1 && (
-                        <>
-                          {currentPage < totalPages - 2 && (
-                            <span className="px-2 text-gray-400">...</span>
-                          )}
-                          <button
-                            onClick={() => goToPage(totalPages)}
-                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                          >
-                            {totalPages}
-                          </button>
-                        </>
-                      )}
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                      {/* Sequential Page Logic for Premium Feel */}
+                      {[...Array(totalPages)].map((_, idx) => {
+                          const pg = idx + 1;
+                          // Show first, last, current, and pages around current
+                          if (pg === 1 || pg === totalPages || (pg >= currentPage - 1 && pg <= currentPage + 1)) {
+                              return (
+                                <button
+                                  key={pg}
+                                  onClick={() => goToPage(pg)}
+                                  className={`min-w-[36px] sm:min-w-[40px] h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center shadow-sm active:scale-95
+                                    ${currentPage === pg 
+                                      ? 'bg-primary text-white shadow-primary/20 scale-105' 
+                                      : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:border-primary/50 border border-gray-200 dark:border-gray-600'}`}
+                                >
+                                  {pg}
+                                </button>
+                              );
+                          }
+                          // Dots for gaps
+                          if (pg === currentPage - 2 || pg === currentPage + 2) {
+                              return <span key={pg} className="px-1 text-gray-400 font-black">...</span>;
+                          }
+                          return null;
+                      })}
                     </div>
 
                     {/* Next Button */}
                     <button
                       onClick={() => goToPage(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="p-2 sm:p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                       title="Next Page"
                     >
-                      <ChevronRight size={18} />
+                      <ChevronRight size={18} strokeWidth={2.5} />
                     </button>
                   </div>
                 )}

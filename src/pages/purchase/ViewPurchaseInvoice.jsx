@@ -294,26 +294,33 @@ Verified System Document
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 animate-fade-in print:p-0 print:bg-white">
       
       {/* Action Header - Hidden on Print */}
-      <div className="max-w-4xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+      <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 print:hidden">
         <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/purchase/invoices');
+              }
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 dark:text-gray-300 hover:text-primary transition-colors bg-white dark:bg-gray-800 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md font-bold active:scale-95"
         >
-            <ArrowLeft size={18} /> Back
+            <ArrowLeft size={18} strokeWidth={2.5} /> 
+            <span className="uppercase text-xs tracking-widest">Back to List</span>
         </button>
         
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
             <button 
                 onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 shadow-sm transition-all"
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 shadow-sm transition-all active:scale-95 text-sm font-black uppercase tracking-wider"
             >
-                <Download size={18} /> Download PDF
+                <Download size={18} strokeWidth={2.5} /> PDF
             </button>
             <button 
                 onClick={() => window.print()} 
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-md hover:shadow-lg hover:bg-secondary transition-all"
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:bg-secondary transition-all active:scale-95 text-sm font-black uppercase tracking-wider"
             >
-                <Printer size={18} /> Print Invoice
+                <Printer size={18} strokeWidth={2.5} /> Print Invoice
             </button>
         </div>
       </div>
@@ -322,38 +329,42 @@ Verified System Document
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden print:shadow-none print:border-none print:rounded-none print:max-w-none print:w-full">
         
         {/* Top Branding Section */}
-        <div className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 p-8 md:p-12">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                <div className="flex flex-col gap-4">
-                    <img src="/KS2-Logo.png" alt="Logo" className="h-20 w-auto object-contain" />
-                    <div className="space-y-1.5 text-sm text-gray-500">
-                        <h2 className="text-xl font-bold text-gray-900">KS Pharma Net</h2>
-                        <div className="flex items-center gap-2"><MapPin size={14} className="text-primary"/> 123, Health Avenue, Medical District</div>
-                        <div className="flex items-center gap-2"><Phone size={14} className="text-primary"/> +91 98765 43210</div>
-                        <div className="flex items-center gap-2"><Mail size={14} className="text-primary"/> support@kspharma.com</div>
+        <div className="bg-gradient-to-br from-gray-50 to-white border-b border-gray-100 p-6 sm:p-8 md:p-12">
+            <div className="flex flex-col lg:flex-row justify-between items-start gap-10">
+                <div className="flex flex-col gap-6 w-full lg:w-auto">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
+                            <img src="/KS2-Logo.png" alt="Logo" className="h-16 w-auto object-contain" />
+                        </div>
+                        <div>
+                           <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">KS Pharma Net</h2>
+                           <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Medical Excellence</p>
+                        </div>
+                    </div>
+                    <div className="space-y-2.5 text-sm text-gray-500 font-medium">
+                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><MapPin size={16}/></div> 123, Health Avenue, Medical District</div>
+                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><Phone size={16}/></div> +91 98765 43210</div>
+                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><Mail size={16}/></div> support@kspharma.com</div>
                     </div>
                 </div>
 
-                <div className="text-right w-full md:w-auto">
-                    <h1 className="text-5xl font-black text-gray-900/10 uppercase tracking-tight leading-none mb-2">Purchase</h1>
-                    <div className="text-2xl font-bold text-gray-800">#{invoice.id}</div>
+                <div className="text-left lg:text-right w-full lg:w-auto flex flex-col lg:items-end">
+                    <h1 className="text-5xl sm:text-7xl font-black text-gray-900/5 uppercase tracking-tighter leading-none mb-1 select-none">Purchase</h1>
+                    <div className="text-3xl font-black text-gray-800 tracking-tight">#{invoice.id}</div>
                     
-                    <div className="mt-6 flex flex-col items-end gap-3">
-                        <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Verify Purchase</span>
-                                <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
-                                    <img src={qrCodeUrl} alt="Purchase QR" className="w-16 h-16" />
-                                </div>
-                            </div>
-                            <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border inline-block
-                                 ${invoice.status === 'Received' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-orange-50 text-orange-700 border-orange-100'}
+                    <div className="mt-8 flex flex-col items-start lg:items-end gap-5">
+                        <div className="flex items-center gap-4">
+                            <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm
+                                 ${invoice.status === 'Received' ? 'bg-green-50 text-green-700 border-green-200/50' : 'bg-orange-50 text-orange-700 border-orange-200/50'}
                             `}>
                                  {invoice.status}
                             </div>
+                            <div className="h-10 w-10 bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm group hover:scale-110 transition-transform">
+                                <img src={qrCodeUrl} alt="Purchase QR" className="w-full h-full" />
+                            </div>
                         </div>
-                        <div className="text-sm text-gray-500 font-medium">
-                            Date: <span className="text-gray-900 font-bold">{invoice.date}</span>
+                        <div className="text-xs text-gray-500 font-black uppercase tracking-widest bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200/50">
+                            Date: <span className="text-gray-900 ml-1">{invoice.date}</span>
                         </div>
                     </div>
                 </div>
@@ -361,83 +372,108 @@ Verified System Document
         </div>
 
         {/* Billing Details */}
-        <div className="p-8 md:p-12 grid md:grid-cols-2 gap-12">
-            <div>
-                <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4 flex items-center gap-2">
-                    <Truck size={14} /> Supplier
+        <div className="p-6 sm:p-8 md:p-12 grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="bg-gray-50/50 dark:bg-gray-900/10 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <Truck size={14} strokeWidth={3} className="text-primary" /> Supplier
                 </h3>
-                <div className="text-lg font-bold text-gray-900 mb-2">{invoice.supplier}</div>
-                <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{invoice.address}</div>
-                <div className="mt-3 text-sm font-medium text-gray-700">Tel: {invoice.contact}</div>
-                <div className="text-sm font-medium text-gray-700">GST: {invoice.gst}</div>
+                <div className="text-xl font-black text-gray-900 mb-3 tracking-tight">{invoice.supplier}</div>
+                <div className="text-sm text-gray-500 leading-relaxed font-medium mb-4">{invoice.address}</div>
+                <div className="flex flex-col gap-2">
+                    <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div> Tel: <span className="text-gray-700 ml-auto">{invoice.contact}</span></div>
+                    <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div> GST: <span className="text-gray-700 ml-auto">{invoice.gst}</span></div>
+                </div>
             </div>
             
-            <div className="md:text-right">
-                 <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Payment Info</h3>
-                 <div className="space-y-2 text-sm">
-                    <div className="flex md:justify-end justify-between gap-8">
-                        <span className="text-gray-500">Status</span>
-                        <span className={`font-bold ${invoice.payment === 'Paid' ? 'text-green-600' : 'text-red-500'}`}>{invoice.payment}</span>
+            <div className="md:text-right flex flex-col justify-center">
+                 <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">Payment Info</h3>
+                 <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10">
+                    <div className="flex md:justify-end justify-between items-center gap-8">
+                        <span className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Payment Status</span>
+                        <span className={`px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm
+                            ${invoice.payment === 'Paid' ? 'bg-white text-green-600 border-green-100' : 'bg-white text-red-500 border-red-100'}`}>
+                            {invoice.payment}
+                        </span>
                     </div>
                  </div>
             </div>
         </div>
 
         {/* Items Table */}
-        <div className="px-8 md:px-12 pb-8">
-            <div className="border rounded-xl overflow-hidden border-gray-200">
-                <table className="w-full text-left text-sm">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-900 font-bold uppercase text-xs tracking-wider">
-                            <th className="py-4 px-6 w-16 text-center">#</th>
-                            <th className="py-4 px-6 w-1/3">Item Name</th>
-                            <th className="py-4 px-6 text-center">Qty</th>
-                            <th className="py-4 px-6 text-right">Rate</th>
-                            <th className="py-4 px-6 text-right">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {invoice.items.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="py-4 px-6 text-center text-gray-500 font-medium">{index + 1}</td>
-                                <td className="py-4 px-6 font-semibold text-gray-800">{item.name}</td>
-                                <td className="py-4 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
-                                <td className="py-4 px-6 text-right text-gray-600">₹{item.rate.toFixed(2)}</td>
-                                <td className="py-4 px-6 text-right font-bold text-gray-900">₹{item.amount.toFixed(2)}</td>
+        <div className="px-6 sm:px-8 md:px-12 pb-8">
+            <div className="relative group">
+                <div className="md:hidden flex items-center justify-center gap-2 text-[10px] font-black text-primary/40 uppercase tracking-widest mb-3 animate-pulse">
+                   Swipe to see details <Share2 size={12} className="rotate-90" />
+                </div>
+                <div className="border rounded-2xl overflow-x-auto border-gray-100 shadow-inner scrollbar-hide">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead>
+                            <tr className="bg-gray-900 text-white font-black uppercase text-[10px] tracking-[0.2em]">
+                                <th className="py-5 px-6 w-16 text-center">#</th>
+                                <th className="py-5 px-6">Item Name</th>
+                                <th className="py-5 px-6 text-center">Qty</th>
+                                <th className="py-5 px-6 text-right">Rate</th>
+                                <th className="py-5 px-6 text-right rounded-tr-2xl">Total</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {invoice.items.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50 transition-colors group">
+                                    <td className="py-5 px-6 text-center text-gray-400 font-black text-[11px]">{index + 1}</td>
+                                    <td className="py-5 px-6 font-black text-gray-800 uppercase tracking-tight">{item.name}</td>
+                                    <td className="py-5 px-6 text-center text-gray-600 font-bold bg-gray-50/50">{item.qty}</td>
+                                    <td className="py-5 px-6 text-right text-gray-500 font-medium whitespace-nowrap">₹{item.rate.toFixed(2)}</td>
+                                    <td className="py-5 px-6 text-right font-black text-gray-900 whitespace-nowrap group-hover:text-primary transition-colors">₹{item.amount.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         {/* Footer Summary */}
-        <div className="bg-gray-50 p-8 md:p-12 flex flex-col md:flex-row justify-end items-start gap-12 print:break-inside-avoid">
-             <div className="flex-1 text-xs text-gray-500 space-y-2 max-w-sm">
-                <p className="font-bold text-gray-900 text-sm">Note:</p>
-                <p>Goods once sold will not be taken back or exchanged.</p>
+        <div className="bg-gray-900 text-white p-6 sm:p-8 md:p-12 flex flex-col lg:flex-row justify-between items-start gap-12 print:break-inside-avoid">
+             <div className="flex-1 space-y-4 max-w-sm">
+                <div>
+                   <p className="font-black text-primary uppercase text-[10px] tracking-[0.2em] mb-2">Note & Declaration:</p>
+                   <p className="text-xs text-gray-400 leading-relaxed font-medium">Goods once sold will not be taken back or exchanged. This is a computer generated invoice and does not require a physical signature.</p>
+                </div>
+                <div className="flex items-center gap-4 py-4 border-y border-white/5">
+                    <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">System Document</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Calendar size={16} className="text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.date}</span>
+                    </div>
+                </div>
              </div>
 
-             <div className="w-full md:w-80 space-y-4">
-                <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Subtotal</span>
-                    <span>₹{invoice.subtotal.toFixed(2)}</span>
+             <div className="w-full lg:w-96 space-y-4 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
+                <div className="flex justify-between items-center text-sm">
+                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Subtotal</span>
+                    <span className="font-bold">₹{invoice.subtotal.toFixed(2)}</span>
                 </div>
-                 <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Discount</span>
-                    <span className="text-red-500">-₹{invoice.discountAmount.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-sm">
+                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Discount</span>
+                    <span className="font-bold text-red-500">-₹{invoice.discountAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Tax</span>
-                    <span>₹{invoice.taxAmount.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-sm">
+                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Tax reversable</span>
+                    <span className="font-bold whitespace-nowrap">₹{invoice.taxAmount.toFixed(2)}</span>
                 </div>
                 
-                <div className="flex justify-between border-t border-gray-200 pt-4 mt-2">
-                    <div className="flex flex-col">
-                        <span className="font-black text-gray-900 text-lg">Grand Total</span>
-                        <span className="text-xs text-gray-500 font-normal">Inclusive of all taxes</span>
+                <div className="flex justify-between items-center border-t border-white/10 pt-6 mt-2 relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-primary/5 -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
+                    <div className="flex flex-col relative z-10">
+                        <span className="font-black text-primary uppercase text-[10px] tracking-[0.2em] mb-1">Grand Total</span>
+                        <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Digital Verified Amount</span>
                     </div>
-                    <span className="font-black text-primary text-2xl">₹{invoice.grandTotal.toFixed(2)}</span>
+                    <span className="font-black text-white text-3xl sm:text-4xl tracking-tighter relative z-10">
+                       ₹{invoice.grandTotal.toFixed(2)}
+                    </span>
                 </div>
              </div>
         </div>

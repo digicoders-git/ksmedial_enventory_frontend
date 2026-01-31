@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Ticket, Trash2, Printer, Grid, List, Filter, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
@@ -11,6 +11,8 @@ const SalesEntry = () => {
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
   const { id } = useParams();
   const isEditing = !!id;
 
@@ -285,23 +287,37 @@ const SalesEntry = () => {
     });
   };
 
-  const filteredInventory = inventory.filter(item => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      const matchesSearch = !searchLower || (
-        item.name.toLowerCase().includes(searchLower) ||
-        item.sku?.toLowerCase().includes(searchLower) ||
-        item.batch?.toLowerCase().includes(searchLower)
-      );
+  const { filteredInventory, paginatedInventory, totalPages } = useMemo(() => {
+    const filtered = inventory.filter(item => {
+        const searchLower = searchTerm.toLowerCase().trim();
+        const matchesSearch = !searchLower || (
+          item.name.toLowerCase().includes(searchLower) ||
+          item.sku?.toLowerCase().includes(searchLower) ||
+          item.batch?.toLowerCase().includes(searchLower)
+        );
+          
+        const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
         
-      const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
-      
-      return matchesSearch && matchesCategory;
-  });
+        return matchesSearch && matchesCategory;
+    });
+
+    const totalPgs = Math.ceil(filtered.length / itemsPerPage);
+    const start = (currentPage - 1) * itemsPerPage;
+    const paged = filtered.slice(start, start + itemsPerPage);
+
+    return { filteredInventory: filtered, paginatedInventory: paged, totalPages: totalPgs };
+  }, [inventory, searchTerm, activeCategory, currentPage, itemsPerPage]);
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     c.phone?.includes(customerSearch)
   );
+
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-2 lg:p-4 bg-gray-50/50 dark:bg-gray-900 min-h-[calc(100vh-5rem)] text-gray-800 dark:text-gray-100 font-sans">
@@ -318,7 +334,10 @@ const SalesEntry = () => {
                     type="text" 
                     placeholder="Search medicines, SKU or scan QR..." 
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                    }}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border-none rounded-xl focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-primary/10 focus:shadow-sm outline-none transition-all font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm"
                 />
            </div>
@@ -332,7 +351,10 @@ const SalesEntry = () => {
                   {categories.map(cat => (
                       <button 
                         key={cat}
-                        onClick={() => setActiveCategory(cat)}
+                        onClick={() => {
+                            setActiveCategory(cat);
+                            setCurrentPage(1);
+                        }}
                         className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-200 border border-transparent ${
                             activeCategory === cat 
                             ? 'bg-primary text-white shadow-md shadow-primary/20' 
@@ -353,53 +375,109 @@ const SalesEntry = () => {
                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
                    <p className="font-medium animate-pulse">Loading Medicines...</p>
                </div>
-           ) : (
-               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                   {filteredInventory.map((item) => (
-                       <div 
-                            key={item.id} 
-                            onClick={() => item.stock > 0 && addToCart(item)}
-                            className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-primary/20 dark:hover:border-primary/20 transition-all duration-300 group flex flex-col justify-between relative overflow-hidden h-full ${item.stock === 0 ? 'opacity-60 grayscale cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' : 'cursor-pointer hover:-translate-y-1'}`}
-                       >
-                           {/* Stock Badge */}
-                           <div className="flex justify-between items-start mb-3">
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
-                                    item.stock > 10 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
-                                    item.stock > 0 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800'
-                                }`}>
-                                    {item.stock > 0 ? `${item.stock} left` : 'No Stock'}
-                                </span>
-                                {item.stock > 0 && (
-                                    <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                        <Plus size={16} strokeWidth={3} />
-                                    </div>
-                                )}
-                           </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                  {paginatedInventory.map((item) => (
+                    <div 
+                      key={item.id} 
+                      onClick={() => item.stock > 0 && addToCart(item)}
+                      className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-primary/20 dark:hover:border-primary/20 transition-all duration-300 group flex flex-col justify-between relative overflow-hidden h-full ${item.stock === 0 ? 'opacity-60 grayscale cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' : 'cursor-pointer hover:-translate-y-1'}`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
+                          item.stock > 10 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
+                          item.stock > 0 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800'
+                        }`}>
+                          {item.stock > 0 ? `${item.stock} left` : 'No Stock'}
+                        </span>
+                        {item.stock > 0 && (
+                          <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                            <Plus size={16} strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
 
-                           <div className="flex-1 flex flex-col items-center text-center">
-                               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform duration-300">
-                                   <Package size={32} />
-                               </div>
-                               <h3 className="font-bold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-primary transition-colors line-clamp-2 w-full text-base">{item.name}</h3>
-                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.sku || 'SKU'}</p>
-                           </div>
-                           
-                           <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 w-full text-center">
-                               <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">Rs. {item.rate}</p>
-                           </div>
-                       </div>
-                   ))}
-                   {filteredInventory.length === 0 && (
-                       <div className="col-span-full h-64 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
-                           <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                                <Search size={32} className="opacity-40" />
-                           </div>
-                           <p className="font-medium text-lg text-gray-500 dark:text-gray-400">No medicines found</p>
-                           <p className="text-sm">Try adjusting your search or filters</p>
-                       </div>
-                   )}
-               </div>
-           )}
+                      <div className="flex-1 flex flex-col items-center text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform duration-300">
+                          <Package size={32} />
+                        </div>
+                        <h3 className="font-bold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-primary transition-colors line-clamp-2 w-full text-base">{item.name}</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.sku || 'SKU'}</p>
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 w-full text-center">
+                        <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">Rs. {item.rate}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredInventory.length === 0 && (
+                    <div className="col-span-full h-64 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
+                      <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                        <Search size={32} className="opacity-40" />
+                      </div>
+                      <p className="font-medium text-lg text-gray-500 dark:text-gray-400">No medicines found</p>
+                      <p className="text-sm">Try adjusting your search or filters</p>
+                    </div>
+                  )}
+                </div>
+
+                {filteredInventory.length > itemsPerPage && (
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                      {`Showing `}
+                      <span className="text-gray-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span>
+                      {` - `}
+                      <span className="text-gray-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredInventory.length)}</span>
+                      {` of `}
+                      <span className="text-gray-900 dark:text-white">{filteredInventory.length}</span>
+                      {` items`}
+                    </p>
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full pb-2 sm:pb-0">
+                      <button 
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-gray-600 transition-all shadow-sm active:scale-95"
+                      >
+                        Prev
+                      </button>
+                      
+                      <div className="flex items-center gap-1.5 px-2">
+                        {[...Array(totalPages)].map((_, i) => {
+                          const pageNum = i + 1;
+                          if (totalPages > 5 && Math.abs(pageNum - currentPage) > 1 && pageNum !== 1 && pageNum !== totalPages) {
+                            if (pageNum === 2 || pageNum === totalPages - 1) return <span key={pageNum} className="text-gray-300 dark:text-gray-600">...</span>;
+                            return null;
+                          }
+                          
+                          return (
+                            <button 
+                              key={pageNum}
+                              onClick={() => goToPage(pageNum)}
+                              className={`w-9 h-9 rounded-xl text-xs font-black transition-all shadow-sm active:scale-95 ${
+                                currentPage === pageNum 
+                                ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-110' 
+                                : 'bg-gray-50 dark:bg-gray-700 text-gray-400 hover:text-primary'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button 
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-gray-600 transition-all shadow-sm active:scale-95"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
       </div>
 

@@ -193,15 +193,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     });
   };
 
+  const handleNavClick = () => {
+    if (window.innerWidth < 1024) {
+      toggleSidebar();
+    }
+  };
+
   return (
     <>
       <div className={`fixed inset-0 z-20 bg-black/50 transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={toggleSidebar} />
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-900 text-gray-300 transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:h-screen shadow-xl border-r border-gray-800`}>
         {/* Brand */}
         <div className="flex items-center justify-between p-4 h-16 border-b border-gray-800 bg-gray-900">
-          <div className="flex items-center gap-2 text-white font-bold text-xl">
+          <div className="flex items-center gap-2 text-white font-bold text-xl cursor-pointer" onClick={() => { navigate('/'); handleNavClick(); }}>
             <img src="/KS2-Logo.png" alt="Pharma One Logo" className="w-160 h-12 object-contain" />
-             
           </div>
           <button onClick={toggleSidebar} className="lg:hidden text-gray-400 hover:text-white"><X size={24} /></button>
         </div>
@@ -228,21 +233,21 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">My Account</p>
                 </div>
                 <div className="p-1">
-                  <button onClick={() => { setShowUserMenu(false); navigate('/account/profile'); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
+                  <button onClick={() => { setShowUserMenu(false); navigate('/account/profile'); handleNavClick(); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
                     <User size={16} className="text-blue-400" /> My Profile
                   </button>
-                  <button onClick={() => { setShowUserMenu(false); navigate('/account/security'); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
+                  <button onClick={() => { setShowUserMenu(false); navigate('/account/security'); handleNavClick(); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
                     <Shield size={16} className="text-green-400" /> Security & 2FA
                   </button>
-                    <button onClick={() => { setShowUserMenu(false); navigate('/account/billing'); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
+                    <button onClick={() => { setShowUserMenu(false); navigate('/account/billing'); handleNavClick(); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
                     <CreditCard size={16} className="text-purple-400" /> Plan & Billing
                   </button>
-                   <button onClick={() => { setShowUserMenu(false); navigate('/account/activity'); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
+                   <button onClick={() => { setShowUserMenu(false); navigate('/account/activity'); handleNavClick(); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
                     <Activity size={16} className="text-orange-400" /> Activity Log
                   </button>
                 </div>
                 <div className="border-t border-gray-700 p-1">
-                   <button onClick={() => { setShowUserMenu(false); navigate('/account/support'); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
+                   <button onClick={() => { setShowUserMenu(false); navigate('/account/support'); handleNavClick(); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg flex items-center gap-2 transition-colors">
                     <HelpCircle size={16} className="text-teal-400" /> Help & Support
                   </button>
                   <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-lg flex items-center gap-2 transition-colors">
@@ -276,6 +281,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         <NavLink 
                           key={subIndex} 
                           to={sub.path}
+                          onClick={handleNavClick}
                           className={({ isActive }) => `block px-3 py-2 text-sm rounded-md transition-colors ${isActive ? 'text-accent bg-gray-800/50' : 'text-gray-400 hover:text-white hover:bg-gray-800/30'}`}
                         >
                           {sub.label}
@@ -287,6 +293,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
               ) : (
                 <NavLink 
                   to={item.path}
+                  onClick={handleNavClick}
                   className={({ isActive }) => `flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'hover:bg-gray-800 hover:text-white'}`}
                 >
                   <div className="flex items-center gap-3">

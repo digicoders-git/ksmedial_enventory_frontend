@@ -86,19 +86,24 @@ const InventorySettings = () => {
     return (
         <div className="animate-fade-in-up max-w-4xl mx-auto space-y-6 pb-10">
              {/* Header */}
-             <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Package className="text-primary" /> Inventory Settings
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Configure stock alerts, defaults, and operational rules.</p>
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
+                        <Package className="text-primary" size={28} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">
+                            Inventory Settings
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Configure stock alerts, defaults, and operational rules.</p>
+                    </div>
                 </div>
                  {!isEditing && (
                     <button 
                         onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2"
+                        className="w-full sm:w-auto px-6 py-3 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-black uppercase tracking-widest text-[11px] rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
                     >
-                        <Edit2 size={16} /> Edit Settings
+                        <Edit2 size={16} strokeWidth={3} /> Edit Settings
                     </button>
                 )}
             </div>
@@ -111,9 +116,9 @@ const InventorySettings = () => {
                         <h3 className="font-bold text-gray-800 dark:text-white text-lg mb-4 flex items-center gap-2">
                             <Bell className="text-orange-500" size={20} /> Alerts & Notifications
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Default Low Stock Threshold</label>
+                                <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Low Stock Threshold</label>
                                 <div className="relative">
                                     <input 
                                         type="number" 
@@ -121,15 +126,15 @@ const InventorySettings = () => {
                                         value={settings.lowStockThreshold}
                                         onChange={handleChange}
                                         disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary text-gray-800 dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed" 
+                                        className="w-full px-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold text-gray-800 dark:text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">UNITS</span>
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400 uppercase tracking-widest">UNITS</span>
                                 </div>
-                                <p className="text-xs text-gray-400">Products falling below this quantity will trigger an alert.</p>
+                                <p className="text-[10px] text-gray-400 font-medium">Products falling below this quantity will trigger an alert.</p>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Expiry Warning (Days)</label>
+                                <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Expiry Warning (Days)</label>
                                 <div className="relative">
                                     <input 
                                         type="number" 
@@ -137,11 +142,11 @@ const InventorySettings = () => {
                                         value={settings.expiryAlertDays}
                                         onChange={handleChange}
                                         disabled={!isEditing}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary text-gray-800 dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed" 
+                                        className="w-full px-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold text-gray-800 dark:text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">DAYS</span>
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400 uppercase tracking-widest">DAYS</span>
                                 </div>
-                                <p className="text-xs text-gray-400">Warning period before a batch expires.</p>
+                                <p className="text-[10px] text-gray-400 font-medium">Warning period before a batch expires.</p>
                             </div>
                         </div>
                     </div>
@@ -198,18 +203,18 @@ const InventorySettings = () => {
                 </div>
 
                 {isEditing && (
-                    <div className="bg-gray-50 dark:bg-gray-750 p-6 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="bg-gray-50 dark:bg-gray-750/50 p-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
                         <button 
                             onClick={handleCancel}
-                            className="px-6 py-2.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-white font-bold rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center gap-2"
+                            className="w-full sm:w-auto px-6 py-3.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-white font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-2"
                         >
-                            <X size={18} /> Cancel
+                            <X size={18} strokeWidth={3} /> Cancel
                         </button>
                         <button 
                             onClick={handleSave}
-                            className="px-8 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-secondary shadow-lg active:scale-95 transition-all flex items-center gap-2"
+                            className="w-full sm:w-auto px-8 py-3.5 bg-primary text-white font-black uppercase tracking-widest text-[11px] rounded-xl hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                            <Save size={18} /> Save Settings
+                            <Save size={18} strokeWidth={3} /> Save Settings
                         </button>
                     </div>
                 )}

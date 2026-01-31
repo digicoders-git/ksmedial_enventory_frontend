@@ -270,26 +270,35 @@ KS Pharma Net - Authorized Document
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 animate-fade-in print:p-0 print:bg-white">
       
       {/* Action Header - Hidden on Print */}
-      <div className="max-w-4xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+      <div className="max-w-4xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden">
         <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/sales/return');
+              }
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 dark:text-gray-300 hover:text-red-500 transition-colors bg-white dark:bg-gray-800 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md font-bold active:scale-95"
         >
-            <ArrowLeft size={18} /> Back to List
+            <ArrowLeft size={18} strokeWidth={2.5} />
+            <span className="uppercase text-xs tracking-widest">Back to List</span>
         </button>
         
-        <div className="flex gap-2">
+        <div className="flex gap-3 w-full sm:w-auto">
             <button 
                 onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 shadow-sm transition-all"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition-all font-bold active:scale-95"
             >
-                <Download size={18} /> Download PDF
+                <Download size={18} strokeWidth={2.5} />
+                <span className="uppercase text-xs tracking-widest">PDF</span>
             </button>
             <button 
                 onClick={() => window.print()} 
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg shadow-md hover:shadow-lg hover:bg-red-700 transition-all"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl shadow-lg shadow-red-200 hover:shadow-red-300 hover:bg-red-700 transition-all font-black active:scale-95"
             >
-                <Printer size={18} /> Print Credit Note
+                <Printer size={18} strokeWidth={3} />
+                <span className="uppercase text-xs tracking-widest">Print Note</span>
             </button>
         </div>
       </div>
@@ -298,37 +307,51 @@ KS Pharma Net - Authorized Document
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden print:shadow-none print:border-none print:rounded-none print:max-w-none print:w-full">
         
         {/* Top Branding Section */}
-        <div className="bg-gradient-to-r from-red-50 to-white border-b border-gray-100 p-8 md:p-12">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                <div className="flex flex-col gap-4">
-                    <img src="/KS2-Logo.png" alt="Logo" className="h-20 w-auto object-contain" />
-                    <div className="space-y-1.5 text-sm text-gray-500">
-                    <h2 className="text-xl font-bold text-gray-900">{returnNote.shop?.shopName || 'KS Pharma Net'}</h2>
-                    <div className="flex items-center gap-2"><MapPin size={14} className="text-red-500"/> {returnNote.shop?.address || '123, Health Avenue, Medical District'}</div>
-                    <div className="flex items-center gap-2"><Phone size={14} className="text-red-500"/> {returnNote.shop?.contactNumber || '+91 98765 43210'}</div>
-                    <div className="flex items-center gap-2"><Mail size={14} className="text-red-500"/> {returnNote.shop?.email || 'support@kspharma.com'}</div>
+        <div className="bg-gradient-to-br from-red-50 to-white dark:from-gray-800 dark:to-gray-900 border-b border-gray-100 dark:border-gray-700 p-6 md:p-12">
+            <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
+                <div className="flex flex-col gap-6 w-full lg:w-1/2">
+                    <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm w-fit">
+                        <img src="/KS2-Logo.png" alt="Logo" className="h-16 md:h-20 w-auto object-contain" />
+                    </div>
+                    <div className="space-y-3 text-sm text-gray-500 dark:text-gray-400">
+                        <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{returnNote.shop?.shopName || 'KS Pharma Net'}</h2>
+                        <div className="flex items-start gap-3">
+                            <MapPin size={16} className="text-red-500 shrink-0 mt-0.5"/>
+                            <span className="font-medium text-gray-600 dark:text-gray-300">{returnNote.shop?.address || '123, Health Avenue, Medical District'}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Phone size={16} className="text-red-500 shrink-0"/>
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{returnNote.shop?.contactNumber || '+91 98765 43210'}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Mail size={16} className="text-red-500 shrink-0"/>
+                            <span className="font-medium">{returnNote.shop?.email || 'support@kspharma.com'}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="text-right w-full md:w-auto">
-                    <h1 className="text-4xl font-black text-red-500 uppercase tracking-tight leading-none mb-2">Credit Note</h1>
-                    <div className="text-xl font-bold text-gray-800">#{returnNote.id}</div>
-                    <div className="text-sm text-gray-500 mt-1">Ref Invoice: <span className="font-bold text-gray-900">{returnNote.originalInvoiceId}</span></div>
+                <div className="text-left lg:text-right w-full lg:w-auto lg:pt-0 pt-8 border-t lg:border-t-0 border-gray-100 dark:border-gray-700">
+                    <h1 className="text-6xl md:text-8xl font-black text-red-500/5 dark:text-red-400/5 uppercase tracking-tighter leading-none mb-1 -mt-2 lg:block hidden">Return</h1>
+                    <div className="flex flex-col lg:items-end">
+                        <span className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-2">Credit Note No.</span>
+                        <div className="text-3xl font-black text-gray-800 dark:text-white leading-none">#{returnNote.id}</div>
+                        <div className="text-xs font-bold text-gray-400 mt-2 uppercase tracking-widest">Ref: {returnNote.originalInvoiceId}</div>
+                    </div>
                     
-                    <div className="mt-6 flex flex-col items-end gap-3">
-                        <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Verify Return</span>
-                                <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
-                                    <img src={qrCodeUrl} alt="Return QR" className="w-16 h-16" />
-                                </div>
-                            </div>
-                            <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-red-100 inline-block">
-                                 {returnNote.status}
+                    <div className="mt-8 flex flex-col lg:items-end gap-6">
+                        <div className="flex flex-col lg:items-end">
+                            <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Scan & Verify</span>
+                            <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg ring-4 ring-red-500/5">
+                                <img src={qrCodeUrl} alt="Return QR" className="w-20 h-20 md:w-24 md:h-24 mix-blend-multiply dark:mix-blend-normal rounded-lg" />
                             </div>
                         </div>
-                        <div className="text-sm text-gray-500 font-medium">
-                            Date: <span className="text-gray-900 font-bold">{returnNote.date}</span>
+                        <div className="flex flex-col lg:items-end gap-2">
+                            <div className="px-4 py-1.5 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100 dark:border-red-900/30 shadow-sm">
+                                 {returnNote.status}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">
+                                ISSUED: <span className="text-gray-900 dark:text-white">{returnNote.date}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -336,87 +359,104 @@ KS Pharma Net - Authorized Document
         </div>
 
         {/* Details Section */}
-        <div className="p-8 md:p-12 grid md:grid-cols-2 gap-12">
+        <div className="p-6 md:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
             <div>
-                <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Customer Details</h3>
-                <div className="text-lg font-bold text-gray-900 mb-2">{returnNote.customer}</div>
-                <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{returnNote.address}</div>
-                <div className="mt-3 text-sm font-medium text-gray-700">Tel: {returnNote.contact}</div>
+                <h3 className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-[0.2em] mb-4">Customer Details</h3>
+                <div className="text-2xl font-black text-gray-900 dark:text-white mb-2">{returnNote.customer}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                    {returnNote.address}
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200">
+                    <Phone size={16} className="text-red-500" />
+                    <span>{returnNote.contact}</span>
+                </div>
             </div>
             
-            <div className="md:text-right">
-                 <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Return Reason</h3>
-                 <div className="text-sm font-medium text-gray-800 bg-gray-50 p-3 rounded-lg inline-block border border-gray-200">
-                    "{returnNote.reason}"
+            <div className="lg:text-right pt-8 lg:pt-0 border-t lg:border-t-0 border-gray-100 dark:border-gray-700">
+                 <h3 className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-[0.2em] mb-4">Return Reason</h3>
+                 <div className="p-4 bg-red-50/50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 inline-block max-w-md">
+                    <p className="text-sm font-black text-red-800 dark:text-red-400 italic leading-relaxed">
+                        "{returnNote.reason}"
+                    </p>
                  </div>
             </div>
         </div>
 
         {/* Items Table */}
-        <div className="px-8 md:px-12 pb-8">
-            <div className="border rounded-xl overflow-hidden border-gray-200">
-                <table className="w-full text-left text-sm">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px] tracking-widest">
-                            <th className="py-4 px-6 w-16 text-center">#</th>
-                            <th className="py-4 px-6 w-1/3 text-left">Item Name</th>
-                            <th className="py-4 px-6 text-center">Returned Qty</th>
-                            <th className="py-4 px-6 text-center">Rate</th>
-                            <th className="py-4 px-6 text-right">Tax</th>
-                            <th className="py-4 px-6 text-right">Total Refund</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {returnNote.items.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50">
-                                <td className="py-6 px-6 text-center text-gray-400 font-medium">{index + 1}</td>
-                                <td className="py-6 px-6 font-bold text-gray-800">{item.name}</td>
-                                <td className="py-6 px-6 text-center text-gray-600 font-medium">{item.qty}</td>
-                                <td className="py-6 px-6 text-center text-gray-500 font-medium">
-                                    <div className="flex flex-col items-center">
-                                         <span className="text-[10px] text-gray-400 uppercase">Rs.</span>
-                                         <span>{item.rate.toFixed(2)}</span>
-                                    </div>
-                                </td>
-                                <td className="py-6 px-6 text-right text-gray-500 flex flex-col items-end gap-1">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[10px] text-gray-400 uppercase font-bold">{item.tax}% GST</span>
-                                        <span className="text-[11px] text-gray-400">Rs. {((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
-                                    </div>
-                                </td>
-                                <td className="py-6 px-6 text-right">
-                                    <span className="font-bold text-red-600 text-base">- Rs. {(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</span>
-                                </td>
+        <div className="px-6 md:px-12 pb-8 pt-8">
+            <div className="border rounded-2xl overflow-hidden border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[700px] lg:min-w-0">
+                        <thead>
+                            <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-200 font-black uppercase text-[10px] tracking-widest">
+                                <th className="py-5 px-6 w-16 text-center">#</th>
+                                <th className="py-5 px-6">Item Name</th>
+                                <th className="py-5 px-6 text-center">Qty</th>
+                                <th className="py-5 px-6 text-right">Rate</th>
+                                <th className="py-5 px-6 text-right">Tax (GST)</th>
+                                <th className="py-5 px-6 text-right">Total Refund</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                            {returnNote.items.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
+                                    <td className="py-5 px-6 text-center text-gray-400 font-black italic">{index + 1}</td>
+                                    <td className="py-5 px-6">
+                                        <div className="font-bold text-gray-900 dark:text-white text-base">{item.name}</div>
+                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mt-0.5">HSN: 3004 / Returned Item</div>
+                                    </td>
+                                    <td className="py-5 px-6 text-center">
+                                        <span className="bg-red-50 dark:bg-red-900/30 px-3 py-1 rounded-lg text-xs font-black text-red-700 dark:text-red-400">
+                                            {item.qty < 10 ? `0${item.qty}` : item.qty}
+                                        </span>
+                                    </td>
+                                    <td className="py-5 px-6 text-right font-bold text-gray-700 dark:text-gray-300">₹{item.rate.toFixed(2)}</td>
+                                    <td className="py-5 px-6 text-right">
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{item.tax}% GST</span>
+                                            <span className="font-bold text-gray-500 text-xs">₹{((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
+                                        </div>
+                                    </td>
+                                    <td className="py-5 px-6 text-right">
+                                        <span className="font-black text-red-600 dark:text-red-400 text-base">- ₹{(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+            {/* Mobile Helper Text */}
+            <p className="lg:hidden text-center text-[10px] text-gray-400 font-black uppercase tracking-widest mt-4 animate-pulse">
+                ← Swipe to see full details →
+            </p>
         </div>
 
         {/* Footer Summary */}
-        <div className="bg-gray-50 p-8 md:p-12 flex flex-col md:flex-row justify-end items-start gap-12 print:break-inside-avoid">
-             <div className="flex-1 text-xs text-gray-500 space-y-2 max-w-sm">
-                <p className="font-bold text-gray-900 text-sm">Declaration:</p>
-                <p>We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct.</p>
+        <div className="bg-gray-50 dark:bg-gray-850 p-6 md:p-12 flex flex-col md:flex-row justify-end items-start gap-12 print:break-inside-avoid">
+             <div className="flex-1 text-[10px] text-gray-400 dark:text-gray-500 space-y-3 max-w-sm uppercase tracking-widest leading-loose">
+                <p className="font-black text-gray-900 dark:text-white text-xs">Declaration:</p>
+                <p>We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct. This is a computer generated document.</p>
              </div>
 
-             <div className="w-full md:w-80 space-y-4">
-                <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Subtotal (Refund)</span>
-                    <span>Rs. {returnNote.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                    <span className="font-medium">Reversed Tax</span>
-                    <span>Rs. {returnNote.taxAmount.toFixed(2)}</span>
+             <div className="w-full md:w-80 space-y-6">
+                <div className="space-y-3">
+                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400">
+                        <span>Subtotal (Refund)</span>
+                        <span className="text-gray-700 dark:text-gray-300">₹{returnNote.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400">
+                        <span>Reversed Tax</span>
+                        <span className="text-gray-700 dark:text-gray-300">₹{returnNote.taxAmount.toFixed(2)}</span>
+                    </div>
                 </div>
                 
-                <div className="flex justify-between border-t border-gray-200 pt-4 mt-2">
+                <div className="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-6 mt-4">
                     <div className="flex flex-col">
-                        <span className="font-black text-gray-900 text-lg">Total Refund</span>
-                        <span className="text-xs text-gray-500 font-normal">Credited to customer account</span>
+                        <span className="font-black text-gray-900 dark:text-white text-base uppercase tracking-tighter">Total Refund</span>
+                        <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest">Credited to Account</span>
                     </div>
-                    <span className="font-black text-red-600 text-2xl">- Rs. {returnNote.refundAmount.toFixed(2)}</span>
+                    <span className="font-black text-red-600 dark:text-red-500 text-3xl tracking-tighter">- ₹{returnNote.refundAmount.toFixed(2)}</span>
                 </div>
              </div>
         </div>

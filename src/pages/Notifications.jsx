@@ -104,52 +104,57 @@ const Notifications = () => {
     return (
         <div className="animate-fade-in-up max-w-4xl mx-auto space-y-6 pb-10">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Bell className="text-primary" /> Notifications
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-primary/10 rounded-2xl shadow-sm border border-primary/20 relative">
+                        <Bell className="text-primary" size={28} strokeWidth={2.5} />
                         {unreadCount > 0 && (
-                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
-                                {unreadCount} New
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-gray-900 animate-pulse">
+                                {unreadCount}
                             </span>
                         )}
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Stay updated with important system alerts.</p>
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none flex items-center gap-3">
+                            Notifications
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Stay updated with important system alerts.</p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex items-center gap-3 w-full xl:w-auto">
                     <button 
                         onClick={handleMarkAllRead}
                         disabled={unreadCount === 0}
-                        className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 dark:hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 xl:flex-none px-5 py-3 text-[11px] font-black uppercase tracking-widest text-primary bg-primary/5 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm active:scale-95"
                     >
-                        <Check size={16} /> Mark all read
+                        <Check size={18} strokeWidth={3} /> Mark Read
                     </button>
                     <button 
                         onClick={handleClearAll}
                         disabled={notifications.length === 0}
-                        className="px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 xl:flex-none px-5 py-3 text-[11px] font-black uppercase tracking-widest text-red-500 bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm active:scale-95"
                     >
-                        <Trash2 size={16} /> Clear all
+                        <Trash2 size={18} strokeWidth={3} /> Clear All
                     </button>
                 </div>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex overflow-x-auto pb-2 gap-2 border-b border-gray-100 dark:border-gray-700">
+            <div className="bg-gray-50/50 dark:bg-gray-800/10 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800 flex overflow-x-auto no-scrollbar gap-2">
                 {[
                     { id: 'all', label: 'All' },
                     { id: 'unread', label: 'Unread' },
-                    { id: 'critical', label: 'Critical Alerts' },
-                    { id: 'system', label: 'System Info' },
+                    { id: 'critical', label: 'Critical' },
+                    { id: 'system', label: 'System' },
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${
-                            activeTab === tab.id 
-                                ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900 shadow-md' 
-                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
+                        className={`flex-1 min-w-[100px] xl:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
+                        ${activeTab === tab.id 
+                            ? 'bg-gray-800 dark:bg-primary text-white shadow-lg shadow-black/10 scale-105' 
+                            : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100'}`}
                     >
                         {tab.label}
                     </button>
@@ -162,34 +167,43 @@ const Notifications = () => {
                     filteredNotifications.map((notif) => (
                         <div 
                             key={notif._id} 
-                            className={`p-4 rounded-xl border flex items-start gap-4 transition-all hover:scale-[1.01] cursor-pointer group relative ${getBg(notif.type, notif.read)}`}
+                            className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start gap-4 transition-all hover:shadow-md cursor-pointer group relative ${getBg(notif.type, notif.read)}`}
                             onClick={() => !notif.read && markAsRead(notif._id)}
                         >
-                            <div className="mt-1 p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm">
+                            <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-black/5">
                                 {getIcon(notif.type)}
                             </div>
-                            <div className="flex-1">
-                                <div className="flex justify-between items-start">
-                                    <h3 className={`font-bold ${notif.read ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>{notif.title}</h3>
+                            <div className="flex-1 w-full">
+                                <div className="flex justify-between items-start gap-4">
+                                    <h3 className={`font-bold leading-snug ${notif.read ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                                        {notif.title}
+                                    </h3>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {!notif.read && (
+                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-lg shadow-red-500/50 animate-pulse"></span>
+                                        )}
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); deleteNotification(notif._id); }}
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all xl:opacity-0 xl:group-hover:opacity-100"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className={`text-sm mt-1.5 leading-relaxed ${notif.read ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'}`}>
+                                    {notif.message}
+                                </p>
+                                <div className="flex items-center justify-between mt-4">
+                                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5">
+                                        <Clock size={12} strokeWidth={3} /> {formatTime(notif.createdAt)}
+                                    </p>
                                     {!notif.read && (
-                                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                                            <Check size={12} strokeWidth={3} /> Tap to read
+                                        </span>
                                     )}
                                 </div>
-                                <p className={`text-sm mt-1 ${notif.read ? 'text-gray-500 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>{notif.message}</p>
-                                <p className="text-xs text-gray-400 mt-2 font-medium flex items-center gap-1">
-                                    <Clock size={12} /> {formatTime(notif.createdAt)}
-                                </p>
-                            </div>
-                            
-                            {/* Action Buttons */}
-                            <div className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 flex bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg p-1 shadow-sm transition-opacity">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); deleteNotification(notif._id); }}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
                             </div>
                         </div>
                     ))

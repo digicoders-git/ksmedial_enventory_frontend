@@ -244,24 +244,24 @@ const QRCodeModal = ({ isOpen, onClose, medicine, medicines = [] }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex justify-between items-center">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            <p className="font-medium">📱 Scan QR code to view complete medicine details</p>
-            <p className="text-xs mt-1">Each QR contains: ID, Name, Generic, Company, MRP, Batch & Expiry</p>
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex flex-col sm:flex-row gap-4 justify-between items-center">
+          <div className="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left">
+            <p className="font-bold text-gray-700 dark:text-gray-200">📱 Scan QR code to view details</p>
+            <p className="text-[10px] mt-0.5 opacity-80 leading-tight">ID, Name, Generic, Company, MRP, Batch & Expiry included</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              className="flex-1 sm:flex-none px-6 py-2.5 text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95"
             >
               Close
             </button>
             <button
               onClick={handlePrint}
-              className="px-5 py-2.5 bg-accent text-white font-bold rounded-xl shadow-lg hover:bg-teal-700 hover:shadow-xl transition-all flex items-center gap-2"
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-accent text-white font-black rounded-xl shadow-lg shadow-accent/20 hover:bg-teal-700 hover:shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95"
             >
-              <Printer size={18} />
-              Print {isBatchMode ? 'All' : 'QR Code'}
+              <Printer size={18} strokeWidth={3} />
+              <span className="uppercase tracking-tight">Print {isBatchMode ? 'All' : 'QR'}</span>
             </button>
           </div>
         </div>

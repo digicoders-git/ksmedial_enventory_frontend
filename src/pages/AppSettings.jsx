@@ -157,17 +157,22 @@ const AppSettings = () => {
     return (
         <div className="animate-fade-in-up max-w-6xl mx-auto space-y-6 pb-20">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Cpu className="text-primary" /> Application Settings
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Configure app behavior, appearance, and connectivity.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
+                        <Cpu className="text-primary" size={28} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">
+                            Application Settings
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Configure app behavior, appearance, and connectivity.</p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
                      <button 
                         onClick={handleReset}
-                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                        className="w-full sm:w-auto px-6 py-3 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm active:scale-95"
                     >
                         Reset Defaults
                     </button>
@@ -179,22 +184,20 @@ const AppSettings = () => {
                 
                 {/* Sidebar Navigation */}
                 <div className="w-full lg:w-64 flex-shrink-0">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden sticky top-6">
-                        <div className="p-2 space-y-1">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all
-                                        ${activeTab === tab.id 
-                                            ? 'bg-primary text-white shadow-md shadow-primary/20' 
-                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-primary dark:hover:text-primary'}`}
-                                >
-                                    {tab.icon}
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-1.5 flex lg:flex-col overflow-x-auto no-scrollbar gap-1 lg:sticky lg:top-6">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex-1 lg:flex-none min-w-[120px] lg:min-w-0 flex items-center gap-3 px-5 py-3.5 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap
+                                    ${activeTab === tab.id 
+                                        ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' 
+                                        : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 hover:text-primary dark:hover:text-primary'}`}
+                            >
+                                {tab.icon}
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -431,15 +434,15 @@ const AppSettings = () => {
                     )}
 
                     {/* Action Footer */}
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-end pt-6">
                          <button 
                             onClick={handleSave}
                             disabled={loading}
-                            className={`px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2
+                            className={`w-full sm:w-auto px-10 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-xl shadow-xl shadow-primary/20 transition-all flex items-center justify-center gap-3
                                 ${loading ? 'opacity-70 cursor-wait' : 'hover:bg-secondary active:scale-95'}`}
                         >
-                            {loading ? <RotateCw size={18} className="animate-spin" /> : <Save size={18} />}
-                            {loading ? 'Saving...' : 'Save Changes'}
+                            {loading ? <RotateCw size={20} className="animate-spin" /> : <Save size={20} strokeWidth={3} />}
+                            {loading ? 'Saving...' : 'Save Settings'}
                         </button>
                     </div>
 

@@ -8,7 +8,19 @@ import { useInventory } from '../../context/InventoryContext';
 
 const InventoryDashboard = () => {
   const navigate = useNavigate();
-  const {  stats: contextStats, inventory, transactions, loading } = useInventory();
+  const {  stats: contextStats, inventory, transactions, loading, fetchInventory, fetchTransactions } = useInventory();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([fetchInventory(), fetchTransactions()]);
+    } catch (error) {
+      console.error("Refresh failed:", error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500); // Small delay for visual feedback
+    }
+  };
 
   // Compute additional dashboard-specific stats dynamically from Context data
   const dashboardStats = useMemo(() => {
@@ -158,8 +170,12 @@ const InventoryDashboard = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Real-time stock analytics and control center</p>
         </div>
         <div className="flex gap-2">
-            <button className="p-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-500 hover:text-primary transition-all shadow-sm">
-                <RefreshCcw size={18} />
+            <button 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={`p-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-500 hover:text-primary transition-all shadow-sm ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <RefreshCcw size={18} className={`${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
         </div>
       </div>
@@ -343,12 +359,12 @@ const InventoryDashboard = () => {
 
       {/* Movement List (Refined) */}
        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 overflow-hidden relative">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tight">Live Stock Transactions</h3>
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Real-time ledger updates</p>
                 </div>
-                <button onClick={() => navigate('/inventory/stats-history')} className="text-[10px] font-black uppercase text-blue-600 hover:underline">View All Activities</button>
+                <button onClick={() => navigate('/inventory/stats-history')} className="text-[10px] font-black uppercase text-blue-600 hover:underline self-start sm:self-auto">View All Activities</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
              {dashboardStats.recentTransactions.length > 0 ? dashboardStats.recentTransactions.slice(0, 6).map(tx => (

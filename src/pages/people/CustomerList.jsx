@@ -323,35 +323,47 @@ const CustomerList = () => {
         <>
             <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10 px-4">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <User className="text-emerald-600" /> Customer Management
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage customer profiles, history, and credit records.</p>
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+                <div className="flex items-center gap-4 w-full xl:w-auto">
+                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-800/50">
+                        <User size={28} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none flex items-center gap-2">
+                            Customer Management
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Manage profiles, history, and credit records.</p>
+                    </div>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl flex gap-1 border border-gray-200 dark:border-gray-700 mr-2">
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                    <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-auto">
                         <button 
                             disabled={isBulkMode}
                             onClick={() => setViewMode('card')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'} disabled:opacity-50`}
-                            title="Card View"
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
+                                ${viewMode === 'card' 
+                                    ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm ring-1 ring-black/5' 
+                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} disabled:opacity-50`}
                         >
-                            <LayoutGrid size={18} />
+                            <LayoutGrid size={16} strokeWidth={2.5} />
+                            <span className="xl:hidden">Grid View</span>
                         </button>
                         <button 
                             disabled={isBulkMode}
                             onClick={() => setViewMode('table')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'} disabled:opacity-50`}
-                            title="Table View"
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
+                                ${viewMode === 'table' 
+                                    ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm ring-1 ring-black/5' 
+                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} disabled:opacity-50`}
                         >
-                            <List size={18} />
+                            <List size={16} strokeWidth={2.5} />
+                            <span className="xl:hidden">List View</span>
                         </button>
                     </div>
 
                     {!isBulkMode && (
-                        <div className="relative">
+                        <div className="w-full sm:w-auto relative">
                             <input 
                                 type="file" 
                                 accept=".csv" 
@@ -362,20 +374,20 @@ const CustomerList = () => {
                             />
                             <label 
                                 htmlFor="csv-upload"
-                                className={`px-4 py-2 rounded-xl border-2 border-dashed border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/10 cursor-pointer transition-all text-sm flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full sm:w-auto px-6 py-3.5 rounded-xl border-2 border-dashed border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/10 cursor-pointer transition-all text-[11px] flex items-center justify-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                {uploading ? <Loader className="animate-spin" size={18} /> : <UploadCloud size={18} />}
-                                <span className="hidden sm:inline">Bulk Upload</span>
+                                {uploading ? <Loader className="animate-spin" size={16} /> : <UploadCloud size={16} strokeWidth={3} />}
+                                <span>Bulk Upload</span>
                             </label>
                         </div>
                     )}
 
                     <button 
                         onClick={isBulkMode ? handleBulkSave : handleAddCustomer}
-                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
+                        className={`w-full sm:w-auto px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-900/20' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'}`}
                     >
-                        {isBulkMode ? <CheckCircle size={18} /> : <Plus size={18} />}
-                        {isBulkMode ? `Save ${bulkData.length} Customers` : 'Add Customer'}
+                        {isBulkMode ? <CheckCircle size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />}
+                        <span>{isBulkMode ? `Save ${bulkData.length}` : 'Add Customer'}</span>
                     </button>
                 </div>
             </div>
@@ -433,29 +445,29 @@ const CustomerList = () => {
                 </div>
             </div>
 
-             {/* Filters & Search */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full sm:w-96">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+             {/* Filters & Search Row */}
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col xl:flex-row gap-5 justify-between items-center">
+                <div className="relative w-full xl:w-96">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                    <input 
                      type="text" 
                      placeholder="Search name, mobile number..." 
                      value={searchTerm}
                      onChange={(e) => handleSearchChange(e.target.value)}
-                     className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900 focus:border-emerald-500 outline-none transition-all text-sm text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                     className="w-full pl-12 pr-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-sm font-medium text-gray-800 dark:text-white placeholder:text-gray-400"
                    />
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full xl:w-auto bg-gray-50/50 dark:bg-gray-900/50 p-1.5 rounded-xl border border-gray-100 dark:border-gray-800">
                     {['All', 'Pending', 'Top'].map((type) => (
                         <button
                             key={type}
                             disabled={isBulkMode}
                             onClick={() => handleFilterChange(type)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50
+                            className={`flex-1 xl:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50
                                 ${filterType === type 
-                                    ? 'bg-gray-800 dark:bg-emerald-600 text-white shadow-md' 
-                                    : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+                                    ? 'bg-gray-800 dark:bg-emerald-600 text-white shadow-lg shadow-black/10' 
+                                    : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
                         >
                             {type}
                         </button>
@@ -670,25 +682,25 @@ const CustomerList = () => {
 
             {/* Pagination Controls */}
             {totalEntries > 0 && !isBulkMode && (
-                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm p-4 mt-6">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                <div className="bg-gray-50/50 dark:bg-gray-800/20 border-t border-gray-100 dark:border-gray-700 px-6 py-6 transition-all mt-6 rounded-2xl">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium order-2 sm:order-1">
                                 Showing <span className="font-black text-gray-800 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                                 <span className="font-black text-gray-800 dark:text-white">{Math.min(currentPage * itemsPerPage, totalEntries)}</span> of{' '}
                                 <span className="font-black text-gray-800 dark:text-white">{totalEntries}</span> records
                             </p>
                             
-                            <select
-                                value={itemsPerPage}
-                                onChange={(e) => handleItemsPerPageChange(e.target.value)}
-                                className="px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-black text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                <option value="6">6 Per Page</option>
-                                <option value="12">12 Per Page</option>
-                                <option value="24">24 Per Page</option>
-                                <option value="50">50 Per Page</option>
-                            </select>
+                            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-600 shadow-sm order-1 sm:order-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Show:</label>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => handleItemsPerPageChange(e.target.value)}
+                                    className="bg-transparent border-none text-xs font-black text-emerald-600 outline-none cursor-pointer focus:ring-0 p-0"
+                                >
+                                    {[6, 12, 24, 50].map(v => <option key={v} value={v}>{v} / Page</option>)}
+                                </select>
+                            </div>
                         </div>
 
                         {totalPages > 1 && (
@@ -696,21 +708,41 @@ const CustomerList = () => {
                                 <button
                                     onClick={() => goToPage(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="p-2 rounded-xl border-2 border-gray-50 dark:border-gray-700 text-gray-400 hover:text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-emerald-600 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                                 >
-                                    <ChevronLeft size={20} />
+                                    <ChevronLeft size={18} strokeWidth={2.5} />
                                 </button>
                                 
-                                <span className="px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 text-xs font-black">
-                                    Page {currentPage} of {totalPages}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                   {[...Array(totalPages)].map((_, i) => {
+                                      const pg = i + 1;
+                                      // Show first, last, current, and one around current
+                                      if (totalPages <= 5 || (pg === 1 || pg === totalPages || (pg >= currentPage - 1 && pg <= currentPage + 1))) {
+                                          return (
+                                              <button
+                                                  key={pg}
+                                                  onClick={() => goToPage(pg)}
+                                                  className={`min-w-[36px] h-9 rounded-xl text-[11px] font-black transition-all flex items-center justify-center shadow-sm active:scale-95
+                                                      ${currentPage === pg 
+                                                          ? 'bg-emerald-600 text-white shadow-emerald-200 scale-105' 
+                                                          : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:border-emerald-500/50 border border-gray-100 dark:border-gray-600'}`}
+                                              >
+                                                  {pg}
+                                              </button>
+                                          );
+                                      } else if (pg === currentPage - 2 || pg === currentPage + 2) {
+                                          return <span key={pg} className="px-1 text-gray-300 font-black">...</span>;
+                                      }
+                                      return null;
+                                   })}
+                                </div>
 
                                 <button
                                     onClick={() => goToPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="p-2 rounded-xl border-2 border-gray-50 dark:border-gray-700 text-gray-400 hover:text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-emerald-600 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-90"
                                 >
-                                    <ChevronRight size={20} />
+                                    <ChevronRight size={18} strokeWidth={2.5} />
                                 </button>
                             </div>
                         )}
