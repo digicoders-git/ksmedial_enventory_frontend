@@ -33,11 +33,15 @@ import InvoiceList from './pages/sales/InvoiceList';
 import ViewInvoice from './pages/sales/ViewInvoice';
 import ViewSalesReturn from './pages/sales/ViewSalesReturn';
 import SalesReturn from './pages/sales/SalesReturn';
+import OnlineOrders from './pages/sales/OnlineOrders';
 import SupplierList from './pages/purchase/SupplierList';
 import PurchaseInvoices from './pages/purchase/PurchaseInvoices';
 import ViewPurchaseInvoice from './pages/purchase/ViewPurchaseInvoice';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 import ViewPurchaseReturn from './pages/purchase/ViewPurchaseReturn';
+import GRNList from './pages/purchase/GRNList';
+import AddGRN from './pages/purchase/AddGRN';
+import ViewGRN from './pages/purchase/ViewGRN';
 import CustomerList from './pages/people/CustomerList';
 import DoctorList from './pages/people/DoctorList';
 import DoctorForm from './pages/people/DoctorForm';
@@ -117,6 +121,7 @@ function App() {
           <Route path="sales/pos" element={<SalesEntry />} />
           <Route path="sales/pos/edit/:id" element={<SalesEntry />} />
           <Route path="sales/invoices" element={<InvoiceList />} />
+          <Route path="sales/online-orders" element={<OnlineOrders />} />
           <Route path="sales/return" element={<SalesReturn />} />
 
 
@@ -127,6 +132,9 @@ function App() {
           <Route path="purchase/invoices" element={<PurchaseInvoices />} />
           <Route path="purchase/return" element={<PurchaseReturn />} />
           <Route path="purchase/return/view/:id" element={<ViewPurchaseReturn />} />
+          <Route path="purchase/grn" element={<GRNList />} />
+          <Route path="purchase/grn/add" element={<AddGRN />} />
+          <Route path="purchase/grn/view/:id" element={<ViewGRN />} />
 
           {/* =======================
               6. CUSTOMERS ROUTES 

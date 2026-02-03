@@ -156,7 +156,7 @@ const PurchaseReturn = () => {
                 batchNumber: item.batchNumber, 
                 purchasePrice: item.purchasePrice,
                 returnQuantity: 1,
-                maxQty: item.quantity 
+                maxQty: item.receivedQty || item.quantity || 0
             }]); 
         }
     };
@@ -623,7 +623,7 @@ const PurchaseReturn = () => {
                                                             <div className="flex items-center gap-3 mt-1">
                                                                 <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Batch: {item.batchNumber}</span>
                                                                 <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Rate: ₹{item.purchasePrice}</span>
-                                                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Input Stock: {item.quantity}</span>
+                                                                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">Input Stock: {item.receivedQty || item.quantity || 0}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -631,9 +631,9 @@ const PurchaseReturn = () => {
                                                     {isSelected && (
                                                         <div className="flex items-center gap-6 animate-fade-in pl-6 border-l border-primary/20">
                                                             <div className="flex items-center bg-white dark:bg-gray-800 border border-primary/20 p-1 rounded-xl h-11">
-                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity - 1, item.quantity)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">-</button>
+                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity - 1, item.receivedQty || item.quantity || 0)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">-</button>
                                                                 <span className="w-10 text-center text-sm font-black text-gray-900 dark:text-white leading-none">{isSelected.returnQuantity}</span>
-                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity + 1, item.quantity)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">+</button>
+                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity + 1, item.receivedQty || item.quantity || 0)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">+</button>
                                                             </div>
                                                             <div className="text-right w-28 shrink-0">
                                                                 <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase leading-none mb-1.5">Debit Amount</p>

@@ -76,11 +76,11 @@ Verified System Document
                     payment: p.paymentStatus,
                     status: p.status || 'Received',
                     items: p.items.map(i => ({
-                         name: i.productId?.name || i.name, 
-                         qty: i.quantity,
-                         rate: i.purchasePrice,
-                         tax: i.tax || 0, // Assuming tax might be there or not
-                         amount: i.amount
+                         name: i.productName || i.productId?.name || i.name, 
+                         qty: i.receivedQty || i.quantity || 0,
+                         rate: i.purchasePrice || i.baseRate || 0,
+                         tax: i.cgst + i.sgst + i.igst || 0,
+                         amount: i.amount || 0
                     })),
                     subtotal: p.subTotal,
                     taxAmount: p.taxAmount,

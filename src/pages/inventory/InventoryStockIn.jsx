@@ -171,26 +171,71 @@ const InventoryStockIn = () => {
       }
 
       try {
+          // Calculate totals
+          let taxableAmount = 0;
+          let mrpValue = 0;
+          
+          const items = cart.map(item => {
+              const receivedQty = parseInt(item.quantity) || 0;
+              const freeQty = parseInt(item.freeQty) || 0;
+              const purchasePrice = parseFloat(item.purchaseRate) || 0;
+              const mrp = parseFloat(item.mrp) || 0;
+              const amount = receivedQty * purchasePrice;
+              
+              taxableAmount += amount;
+              mrpValue += mrp * receivedQty;
+              
+              return {
+                  productId: item.medicineId,
+                  productName: item.name,
+                  batchNumber: item.batchNo,
+                  expiryDate: item.expiryDate || null,
+                  receivedQty: receivedQty, // Required field
+                  physicalFreeQty: freeQty,
+                  schemeFreeQty: 0,
+                  purchasePrice: purchasePrice,
+                  sellingPrice: mrp,
+                  mrp: mrp,
+                  baseRate: purchasePrice,
+                  amount: amount,
+                  hsnCode: item.hsnCode || '',
+                  cgst: parseFloat(item.tax) / 2 || 0,
+                  sgst: parseFloat(item.tax) / 2 || 0,
+                  igst: 0
+              };
+          });
+          
+          const amountAfterGst = taxableAmount; // No tax calculation in this simple version
+          const invoiceAmount = Math.round(amountAfterGst);
+          
           const payload = {
               supplierId: invoiceDetails.supplierId,
               invoiceNumber: invoiceDetails.invoiceNo,
-              purchaseDate: invoiceDetails.invoiceDate, // Backend expects purchaseDate or dates? Check model. Model has purchaseDate.
-              items: cart.map(item => ({
-                  productId: item.medicineId,
-                  name: item.name,
-                  batchNumber: item.batchNo,
-                  expiryDate: item.expiryDate || null, // Handle empty date
-                  quantity: parseInt(item.quantity) + parseInt(item.freeQty || 0), // Total qty
-                  purchasePrice: parseFloat(item.purchaseRate),
-                  amount: item.total
-              })),
-              subTotal: invoiceTotal,
-              taxAmount: 0, // Not calculated in frontend currently
+              invoiceDate: invoiceDetails.invoiceDate,
+              items: items,
+              invoiceSummary: {
+                  taxableAmount: parseFloat(taxableAmount.toFixed(2)),
+                  tcsAmount: 0,
+                  mrpValue: parseFloat(mrpValue.toFixed(2)),
+                  netAmount: parseFloat(taxableAmount.toFixed(2)),
+                  amountAfterGst: parseFloat(amountAfterGst.toFixed(2)),
+                  roundAmount: invoiceAmount - amountAfterGst,
+                  invoiceAmount: invoiceAmount
+              },
+              taxBreakup: {
+                  gst5: { taxable: 0, tax: 0 },
+                  gst12: { taxable: 0, tax: 0 },
+                  gst18: { taxable: 0, tax: 0 },
+                  gst28: { taxable: 0, tax: 0 }
+              },
+              subTotal: taxableAmount,
+              taxAmount: 0,
               discount: 0,
-              grandTotal: invoiceTotal,
-              paymentStatus: 'Pending', // Match backend enum (Paid, Pending, Partial)
-              paymentMethod: 'Cash', // Default
-              notes: 'Created from Stock In'
+              grandTotal: invoiceAmount,
+              paymentStatus: 'Pending',
+              paymentMethod: 'Cash',
+              notes: 'Created from Stock In',
+              status: 'Received'
           };
 
           const { data } = await api.post('/purchases', payload);
@@ -202,7 +247,7 @@ const InventoryStockIn = () => {
                   text: `Invoice ${invoiceDetails.invoiceNo} saved and stock updated.`,
                   confirmButtonColor: '#007242'
               }).then(() => {
-                  navigate('/purchase/invoices'); // Redirect to invoices list instead of stock list
+                  navigate('/purchase/invoices');
               });
           } else {
               Swal.fire('Error', data.message || 'Failed to save purchase', 'error');

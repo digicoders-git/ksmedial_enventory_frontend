@@ -103,6 +103,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       subItems: [
         { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
         { label: 'Invoices', path: '/sales/invoices' },
+        { label: 'Online Orders', path: '/sales/online-orders' },
         { label: 'Sales Return', path: '/sales/return' }
       ]
     },
@@ -114,6 +115,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/purchase',
       subItems: [
         { label: 'Supplier List', path: '/purchase/suppliers' },
+        { label: 'Add GRN (Receive)', path: '/purchase/grn/add' },
+        { label: 'GRN History', path: '/purchase/grn' },
         { label: 'Purchase Invoices', path: '/purchase/invoices' },
         { label: 'Purchase Return', path: '/purchase/return' }
       ]
