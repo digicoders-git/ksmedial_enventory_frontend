@@ -22,21 +22,20 @@ const ViewPurchaseInvoice = () => {
     }
   }, [loading, invoice, searchParams]);
 
-  // Generate QR Data for scanning
-  const qrData = invoice ? encodeURIComponent(`
-PURCHASE INVOICE - KS Pharma Net
--------------------------------
-Invoice No: ${invoice.id}
-Date: ${invoice.date}
-Supplier: ${invoice.supplier}
-Total Amount: Rs. ${invoice.grandTotal.toFixed(2)}
-Payment: ${invoice.payment}
-Status: ${invoice.status}
--------------------------------
-Verified System Document
-  `.trim()) : '';
+  // Generate QR Data for scanning - using JSON format for better scannability
+  const qrData = invoice ? JSON.stringify({
+    type: 'PURCHASE_INVOICE',
+    company: 'KS Pharma Net',
+    invoiceNo: invoice.id,
+    date: invoice.date,
+    supplier: invoice.supplier,
+    amount: invoice.grandTotal,
+    payment: invoice.payment,
+    status: invoice.status,
+    verified: true
+  }) : '';
 
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -126,9 +125,6 @@ Verified System Document
             
             // QR Code in Top Right corner of PDF
             doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
-            doc.setFontSize(7);
-            doc.setTextColor(150);
-            doc.text('SCAN TO VERIFY', pageWidth - 29, 78, { align: 'center' });
 
         // Company Info
         doc.setFontSize(11);
@@ -153,19 +149,19 @@ Verified System Document
         doc.setTextColor(0);
         doc.text(`#${invoice.id}`, pageWidth - 14, 38, { align: 'right' });
         
-        // Status Badge
-        const statusX = pageWidth - 30;
-        const statusY = 48;
+        // Status Badge - moved to left side to avoid QR overlap
+        const statusX = 14;
+        const statusY = 62;
         doc.setDrawColor(220, 252, 231);
         doc.setFillColor(240, 253, 244);
-        doc.roundedRect(statusX, statusY, 16, 6, 1, 1, 'FD');
+        doc.roundedRect(statusX, statusY, 20, 6, 1, 1, 'FD');
         doc.setTextColor(22, 101, 52);
         doc.setFontSize(8);
-        doc.text(invoice.status.toUpperCase(), statusX + 8, statusY + 4.2, { align: 'center' });
+        doc.text(invoice.status.toUpperCase(), statusX + 10, statusY + 4.2, { align: 'center' });
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Date: ${invoice.date}`, pageWidth - 14, 62, { align: 'right' });
+        doc.text(`Date: ${invoice.date}`, 14, 72);
 
         doc.setDrawColor(245);
         doc.line(14, 75, pageWidth - 14, 75);
