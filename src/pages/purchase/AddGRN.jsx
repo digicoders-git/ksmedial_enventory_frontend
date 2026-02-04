@@ -602,7 +602,6 @@ const AddGRN = () => {
                         </table>
                     </div>
                 </div>
-
                 {/* Submit Button */}
                 <div className="flex justify-end gap-4">
                     <button
