@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
     Save, X, Plus, Trash2, Calendar, 
@@ -622,9 +623,9 @@ const AddGRN = () => {
                 </div>
             </form>
 
-            {/* Add SKU Modal */}
-            {showAddSkuModal && (
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in" style={{ zIndex: 99999 }}>
+            {/* Add SKU Modal - Using Portal to render outside component tree */}
+            {showAddSkuModal && ReactDOM.createPortal(
+                <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in" style={{ zIndex: 999999, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
                     <div className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-2xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 flex flex-col max-h-[85vh]">
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/20 rounded-t-2xl">
                             <div>
@@ -702,7 +703,8 @@ const AddGRN = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
