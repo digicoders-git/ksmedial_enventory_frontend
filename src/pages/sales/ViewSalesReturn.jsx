@@ -12,21 +12,20 @@ const ViewSalesReturn = () => {
   const navigate = useNavigate();
   const [returnNote, setReturnNote] = useState(null);
 
-  // QR Code Logic
-  const qrData = returnNote ? encodeURIComponent(`
-SALES RETURN (CREDIT NOTE)
--------------------------------
-Return No: ${returnNote.id}
-Ref Invoice: ${returnNote.originalInvoiceId}
-Date: ${returnNote.date}
-Customer: ${returnNote.customer}
-Refund Amount: Rs. ${returnNote.refundAmount.toFixed(2)}
-Status: ${returnNote.status}
--------------------------------
-KS Pharma Net - Authorized Document
-  `.trim()) : '';
+  // QR Code Logic - JSON format for better scannability
+  const qrData = returnNote ? JSON.stringify({
+    type: "SALES_RETURN",
+    company: "KS Pharma Net",
+    returnNo: returnNote.id,
+    refInvoice: returnNote.originalInvoiceId,
+    date: returnNote.date,
+    customer: returnNote.customer,
+    refundAmount: returnNote.refundAmount.toFixed(2),
+    status: returnNote.status,
+    verified: true
+  }) : '';
 
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
   const handleDownloadPDF = () => {
     if (!returnNote) return;
@@ -48,11 +47,8 @@ KS Pharma Net - Authorized Document
         qrImg.src = qrCodeUrl;
 
         qrImg.onload = () => {
-            // QR in top right
+            // QR in top right - Clean without any text overlay
             doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
-            doc.setFontSize(7);
-            doc.setTextColor(150);
-            doc.text('VERIFY RETURN', pageWidth - 29, 78, { align: 'center' });
 
             // Company Info
             doc.setFontSize(11);
@@ -79,14 +75,14 @@ KS Pharma Net - Authorized Document
 
             doc.setFontSize(10);
             doc.setTextColor(100);
-            doc.text('Ref Invoice: ', pageWidth - 45, 45, { align: 'right' });
+            doc.text('Ref Invoice: ', pageWidth - 45, 82, { align: 'right' });
             doc.setTextColor(0);
             doc.setFont('helvetica', 'bold');
-            doc.text(returnNote.originalInvoiceId, pageWidth - 14, 45, { align: 'right' });
+            doc.text(returnNote.originalInvoiceId, pageWidth - 14, 82, { align: 'right' });
             
-            // Status Badge
+            // Status Badge - Moved below QR code to avoid overlap
             const statusX = pageWidth - 35;
-            const statusY = 52;
+            const statusY = 88;
             doc.setDrawColor(254, 242, 242);
             doc.setFillColor(254, 242, 242);
             doc.roundedRect(statusX, statusY, 21, 6, 1, 1, 'FD');
@@ -97,7 +93,7 @@ KS Pharma Net - Authorized Document
             doc.setFontSize(9);
             doc.setTextColor(100);
             doc.setFont('helvetica', 'normal');
-            doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 65, { align: 'right' });
+            doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 100, { align: 'right' });
 
             doc.setDrawColor(245);
             doc.line(14, 75, pageWidth - 14, 75);
