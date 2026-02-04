@@ -13,6 +13,7 @@ const AddGRN = () => {
     const [loading, setLoading] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [selectedSupplierDetails, setSelectedSupplierDetails] = useState(null);
     
     // Form State
     const [formData, setFormData] = useState({
@@ -296,7 +297,13 @@ const AddGRN = () => {
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supplier *</label>
                                 <select
                                     value={formData.supplierId}
-                                    onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                                    onChange={(e) => {
+                                        const supplierId = e.target.value;
+                                        setFormData({ ...formData, supplierId });
+                                        // Auto-fill supplier details
+                                        const supplier = suppliers.find(s => s._id === supplierId);
+                                        setSelectedSupplierDetails(supplier || null);
+                                    }}
                                     className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                                     required
                                 >
@@ -336,6 +343,49 @@ const AddGRN = () => {
                                 />
                             </div>
                         </div>
+                        
+                        {/* Supplier Details Display */}
+                        {selectedSupplierDetails && (
+                            <div className="mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+                                <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-3">Supplier Information</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">Contact Person:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white">{selectedSupplierDetails.contactPerson || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">Phone:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white">{selectedSupplierDetails.phone || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">Email:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white">{selectedSupplierDetails.email || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">City:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white">{selectedSupplierDetails.city || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">GST Number:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white font-mono">{selectedSupplierDetails.gstNumber || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500 text-xs font-bold">Drug License:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white font-mono">{selectedSupplierDetails.drugLicenseNumber || 'N/A'}</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <span className="text-gray-500 text-xs font-bold">Address:</span>
+                                        <p className="font-bold text-gray-800 dark:text-white">{selectedSupplierDetails.address || 'N/A'}</p>
+                                    </div>
+                                    {selectedSupplierDetails.supplierCode && (
+                                        <div>
+                                            <span className="text-gray-500 text-xs font-bold">Supplier Code:</span>
+                                            <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">{selectedSupplierDetails.supplierCode}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Right: Summary & Tax Breakup */}

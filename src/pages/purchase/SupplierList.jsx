@@ -29,6 +29,7 @@ const SupplierList = () => {
         setSuppliers(data.suppliers.map(s => ({
           ...s,
           id: s._id,
+          supplierCode: s.supplierCode,
           contact: s.contactPerson,
           gst: s.gstNumber,
           license: s.drugLicenseNumber
@@ -562,6 +563,7 @@ const SupplierList = () => {
                                     <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">{supplier.name}</h3>
                                     {supplier.status === 'Active' && <CheckCircle size={14} className="text-green-500 fill-green-50 dark:fill-green-900/20" />}
                                 </div>
+                                <p className="text-[10px] font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded inline-block mb-1">{supplier.supplierCode || 'N/A'}</p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 font-medium flex items-center gap-1.5"><Briefcase size={12} /> {supplier.contact}</p>
                             </div>
                             <div className="w-10 h-10 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:text-primary group-hover:bg-primary/5 transition-colors">
@@ -612,6 +614,7 @@ const SupplierList = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-gray-50 dark:bg-gray-750 border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 uppercase font-semibold">
                             <tr>
+                                <th className="px-6 py-4">Supplier Code</th>
                                 <th className="px-6 py-4">Supplier Name</th>
                                 <th className="px-6 py-4">City</th>
                                 <th className="px-6 py-4">Contact Person</th>
@@ -624,6 +627,7 @@ const SupplierList = () => {
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {paginatedSuppliers.map((s) => (
                                 <tr key={s.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td className="px-6 py-4 font-mono text-xs text-primary font-bold">{s.supplierCode || 'N/A'}</td>
                                     <td className="px-6 py-4 font-bold text-gray-800 dark:text-white">{s.name}</td>
                                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{s.city}</td>
                                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{s.contact}</td>
@@ -646,7 +650,7 @@ const SupplierList = () => {
                             ))}
                             {paginatedSuppliers.length === 0 && (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+                                    <td colSpan="8" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
                                         No suppliers found matching your search.
                                     </td>
                                 </tr>
