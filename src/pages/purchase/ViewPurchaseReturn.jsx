@@ -22,20 +22,19 @@ const ViewPurchaseReturn = () => {
     }
   }, [loading, returnNote, searchParams]);
 
-  // Generate QR Data for scanning
-  const qrData = returnNote ? encodeURIComponent(`
-DEBIT NOTE (PURCHASE RETURN)
--------------------------------
-Return No: ${returnNote.id}
-Ref Invoice: ${returnNote.invoiceRef}
-Date: ${returnNote.date}
-Supplier: ${returnNote.supplier}
-Refund Amount: Rs. ${returnNote.totalAmount.toFixed(2)}
--------------------------------
-Verified System Document
-  `.trim()) : '';
+  // Generate QR Data for scanning - JSON format for better scannability
+  const qrData = returnNote ? JSON.stringify({
+    type: "PURCHASE_RETURN",
+    company: "KS Pharma Net",
+    returnNo: returnNote.id,
+    refInvoice: returnNote.invoiceRef,
+    date: returnNote.date,
+    supplier: returnNote.supplier,
+    refundAmount: returnNote.totalAmount.toFixed(2),
+    verified: true
+  }) : '';
 
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
   useEffect(() => {
     const fetchReturn = async () => {
@@ -96,11 +95,8 @@ Verified System Document
         qrImg.onload = () => {
             doc.addImage(img, 'PNG', 14, 10, 45, 20);
 
-            // QR Code in Top Right corner of PDF
+            // QR Code in Top Right corner of PDF - Clean without any text overlay
             doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
-            doc.setFontSize(7);
-            doc.setTextColor(150);
-            doc.text('SCAN TO VERIFY', pageWidth - 29, 78, { align: 'center' });
 
         // Company Details
         doc.setFontSize(11);
@@ -125,11 +121,11 @@ Verified System Document
         doc.setTextColor(239, 68, 68); // Red for Debit Note emphasis
         doc.text(`#${returnNote.id}`, pageWidth - 14, 38, { align: 'right' });
         
-        // Ref Invoice
+        // Ref Invoice - Moved below QR code to avoid overlap
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Ref Invoice: ${returnNote.invoiceRef}`, pageWidth - 14, 48, { align: 'right' });
-        doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 54, { align: 'right' });
+        doc.text(`Ref Invoice: ${returnNote.invoiceRef}`, pageWidth - 14, 82, { align: 'right' });
+        doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 88, { align: 'right' });
 
         doc.setDrawColor(245);
         doc.line(14, 65, pageWidth - 14, 65);
