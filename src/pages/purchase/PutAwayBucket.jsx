@@ -239,84 +239,85 @@ const PutAwayBucket = () => {
             {!selectedPurchase ? (
                 <>
                 {/* Filter Section */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-                    <div className="flex items-center gap-4">
-                         <span className="text-sm font-bold text-gray-500 whitespace-nowrap w-24">Filter results:</span>
+                <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+                    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                         <span className="text-sm font-bold text-gray-500 whitespace-nowrap lg:w-24 lg:pt-2">Filter results:</span>
                          
-                         {/* Row 1 */}
-                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                             <input name="skuName" value={filters.skuName} onChange={handleFilterChange} placeholder="SKU Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <input name="batchName" value={filters.batchName} onChange={handleFilterChange} placeholder="Batch Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <input name="priority" value={filters.priority} onChange={handleFilterChange} placeholder="Priority" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <select name="actionType" value={filters.actionType} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
-                                 <option value="">Action Type</option>
-                                 <option value="Standard">Standard</option>
-                             </select>
-                         </div>
-                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                             <input type="date" name="createdFrom" value={filters.createdFrom} onChange={handleFilterChange} placeholder="Created From" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500" />
-                             <input type="date" name="createdTo" value={filters.createdTo} onChange={handleFilterChange} placeholder="Created To" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500" />
-                             <input name="supplierName" value={filters.supplierName} onChange={handleFilterChange} placeholder="Supplier Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <input name="pickingAisle" value={filters.pickingAisle} onChange={handleFilterChange} placeholder="Picking Aisle" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pl-[8rem]"> {/* Indent to align with inputs above */}
-                         {/* Row 2 */}
-                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                             <input name="grnNos" value={filters.grnNos} onChange={handleFilterChange} placeholder="GRN Nos. (Comma Separated)" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <select name="putAwayType" value={filters.putAwayType} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-medium">
-                                 <option value="Purchase Receipt Item">Purchase Receipt Item</option>
-                                 <option value="Sales Return Receiving">Sales Return Receiving</option>
-                                 <option value="Pr Item Return">Pr Item Return</option>
-                                 <option value="Inventory">Inventory</option>
-                                 <option value="Phlebo Inventory">Phlebo Inventory</option>
-                             </select>
-                             <input name="invoiceNos" value={filters.invoiceNos} onChange={handleFilterChange} placeholder="Invoice Nos. (Comma Separated)" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <select name="locationPresent" value={filters.locationPresent} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
-                                 <option value="">Location Present</option>
-                                 <option value="Yes">Yes</option>
-                                 <option value="No">No</option>
-                             </select>
-                         </div>
-                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3">
-                             <input name="putterName" value={filters.putterName} onChange={handleFilterChange} placeholder="Putter Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                             <select name="assignStatus" value={filters.assignStatus} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
-                                 <option value="">Assign Status</option>
-                                 <option value="Assigned">Assigned</option>
-                                 <option value="Unassigned">Unassigned</option>
-                             </select>
-                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pl-[8rem]">
-                        {/* Row 3 */}
-                        <div className="flex-1 flex items-center gap-3 max-w-2xl">
-                             <select name="reason" value={filters.reason} onChange={handleFilterChange} className="w-1/3 px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
-                                 <option value="">Reason</option>
-                                 <option value="Damaged">Damaged</option>
-                                 <option value="Expiry">Expiry</option>
-                             </select>
-                             <input name="tags" value={filters.tags} onChange={handleFilterChange} placeholder="Tags" className="w-1/3 px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                         <div className="flex-1 w-full space-y-4">
+                             {/* Row 1 */}
+                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                 <input name="skuName" value={filters.skuName} onChange={handleFilterChange} placeholder="SKU Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <input name="batchName" value={filters.batchName} onChange={handleFilterChange} placeholder="Batch Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <input name="priority" value={filters.priority} onChange={handleFilterChange} placeholder="Priority" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <select name="actionType" value={filters.actionType} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
+                                     <option value="">Action Type</option>
+                                     <option value="Standard">Standard</option>
+                                 </select>
+                             </div>
                              
-                             <button 
-                                onClick={handleFetchRecord}
-                                className="px-6 py-2 bg-cyan-500 text-white font-bold rounded-md text-sm hover:bg-cyan-600 shadow-md transition-colors"
-                             >
-                                 Fetch Record
-                             </button>
-                        </div>
+                             {/* Row 1.5 - Date & Supplier */}
+                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                 <input type="date" name="createdFrom" value={filters.createdFrom} onChange={handleFilterChange} placeholder="Created From" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500" />
+                                 <input type="date" name="createdTo" value={filters.createdTo} onChange={handleFilterChange} placeholder="Created To" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500" />
+                                 <input name="supplierName" value={filters.supplierName} onChange={handleFilterChange} placeholder="Supplier Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <input name="pickingAisle" value={filters.pickingAisle} onChange={handleFilterChange} placeholder="Picking Aisle" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                             </div>
+
+                             {/* Row 2 */}
+                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                 <input name="grnNos" value={filters.grnNos} onChange={handleFilterChange} placeholder="GRN Nos." className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <select name="putAwayType" value={filters.putAwayType} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-medium">
+                                     <option value="Purchase Receipt Item">Purchase Receipt Item</option>
+                                     <option value="Sales Return Receiving">Sales Return Receiving</option>
+                                     <option value="Pr Item Return">Pr Item Return</option>
+                                     <option value="Inventory">Inventory</option>
+                                     <option value="Phlebo Inventory">Phlebo Inventory</option>
+                                 </select>
+                                 <input name="invoiceNos" value={filters.invoiceNos} onChange={handleFilterChange} placeholder="Invoice Nos." className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <select name="locationPresent" value={filters.locationPresent} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
+                                     <option value="">Location Present</option>
+                                     <option value="Yes">Yes</option>
+                                     <option value="No">No</option>
+                                 </select>
+                             </div>
+
+                             {/* Row 3 - Misc */}
+                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                 <input name="putterName" value={filters.putterName} onChange={handleFilterChange} placeholder="Putter Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <select name="assignStatus" value={filters.assignStatus} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
+                                     <option value="">Assign Status</option>
+                                     <option value="Assigned">Assigned</option>
+                                     <option value="Unassigned">Unassigned</option>
+                                 </select>
+                                 <select name="reason" value={filters.reason} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white text-gray-500">
+                                     <option value="">Reason</option>
+                                     <option value="Damaged">Damaged</option>
+                                     <option value="Expiry">Expiry</option>
+                                 </select>
+                                 <input name="tags" value={filters.tags} onChange={handleFilterChange} placeholder="Tags" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                             </div>
+                             
+                             {/* Fetch Action */}
+                             <div className="flex justify-end pt-2">
+                                <button 
+                                    onClick={handleFetchRecord}
+                                    className="w-full sm:w-auto px-8 py-2.5 bg-cyan-500 text-white font-bold rounded-xl text-sm hover:bg-cyan-600 shadow-md transition-colors"
+                                >
+                                    Fetch Record
+                                </button>
+                             </div>
+                         </div>
                     </div>
                 </div>
 
                  {/* Results & Actions Bar */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-2">
-                    <div className="text-gray-500 text-sm">
+                <div className="flex flex-col xl:flex-row justify-between items-center gap-4 pt-2">
+                    <div className="text-gray-500 text-sm font-medium order-2 xl:order-1">
                         Showing {(page - 1) * pageSize} - {Math.min(page * pageSize, totalRecords)} of {totalRecords} results
                     </div>
-                    <div className="flex items-center gap-3">
-                         <div className="flex items-center gap-2">
-                             <span className="text-sm font-bold text-gray-500">Records per page</span>
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto order-1 xl:order-2">
+                         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                             <span className="text-sm font-bold text-gray-500">Rows:</span>
                              <select 
                                 value={pageSize} 
                                 onChange={(e) => setPageSize(Number(e.target.value))}
@@ -328,37 +329,40 @@ const PutAwayBucket = () => {
                                  <option value={100}>100</option>
                              </select>
                          </div>
-                         <button className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded text-sm hover:bg-gray-300 cursor-not-allowed">
-                             Assign Putter
-                         </button>
                          
-                         {/* Bulk Upload trigger */}
-                         <div className="relative">
-                            <input 
-                                type="file" 
-                                accept=".csv" 
-                                onChange={handleBulkPutAwayUpload}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            />
-                            <button className="px-4 py-2 bg-cyan-500 text-white font-bold rounded text-sm hover:bg-cyan-600 shadow-md flex items-center gap-1">
-                                Upload Put Away <Upload size={14} />
+                         <div className="flex gap-2 w-full sm:w-auto">
+                            <button className="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-lg text-sm hover:bg-gray-300 cursor-not-allowed whitespace-nowrap">
+                                Assign Putter
                             </button>
-                         </div>
+                            
+                            {/* Bulk Upload trigger */}
+                            <div className="relative flex-1 sm:flex-none">
+                                <input 
+                                    type="file" 
+                                    accept=".csv" 
+                                    onChange={handleBulkPutAwayUpload}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <button className="w-full px-4 py-2 bg-cyan-500 text-white font-bold rounded-lg text-sm hover:bg-cyan-600 shadow-md flex items-center justify-center gap-1 whitespace-nowrap">
+                                    Upload <Upload size={14} />
+                                </button>
+                            </div>
 
-                         <button 
-                            onClick={handleDownloadCSV}
-                            className="p-2 border border-cyan-500 text-cyan-500 rounded-full hover:bg-cyan-50 transition-colors"
-                            title="Download CSV"
-                         >
-                             <Download size={16} />
-                         </button>
+                             <button 
+                                onClick={handleDownloadCSV}
+                                className="px-3 py-2 border border-cyan-500 text-cyan-500 rounded-lg hover:bg-cyan-50 transition-colors"
+                                title="Download CSV"
+                             >
+                                 <Download size={16} />
+                             </button>
+                         </div>
                     </div>
                 </div>
 
                 {/* List View */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left hidden md:table">
                             <thead className="bg-gray-100 dark:bg-gray-700/50 text-xs uppercase text-gray-500 font-bold border-b dark:border-gray-700">
                                 <tr>
                                     <th className="p-4">Invoice No</th>
@@ -395,6 +399,40 @@ const PutAwayBucket = () => {
                                 )}
                             </tbody>
                         </table>
+                        
+                        {/* Mobile Card View */}
+                        <div className="md:hidden space-y-4 p-4">
+                            {loading ? (
+                                <p className="text-center text-gray-500 text-sm">Loading...</p>
+                            ) : purchases.length === 0 ? (
+                                <p className="text-center text-gray-500 text-sm">No items pending for Put Away</p>
+                            ) : (
+                                purchases.map(purchase => (
+                                    <div key={purchase._id} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col gap-3">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tight text-lg">{purchase.invoiceNumber}</h3>
+                                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{purchase.supplierId?.name || 'Unknown'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="block font-black text-gray-800 dark:text-white text-base">₹{purchase.grandTotal.toLocaleString()}</span>
+                                                <span className="text-[10px] text-gray-400 font-medium">{new Date(purchase.invoiceDate).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700 mt-1">
+                                            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold">{purchase.items.length} items</span>
+                                            <button 
+                                                onClick={() => handleSelectPurchase(purchase)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md flex items-center gap-2 transition-transform active:scale-95"
+                                            >
+                                                Put Away <ArrowRight size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -422,16 +460,16 @@ const PutAwayBucket = () => {
             ) : (
                 // Detail/Action View
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col h-[calc(100vh-140px)] animate-fade-in-up">
-                     <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800">
+                     <div className="p-4 md:p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 dark:bg-gray-800 gap-4">
                          <div>
                              <button onClick={() => setSelectedPurchase(null)} className="text-sm text-gray-500 hover:underline mb-1 flex items-center gap-1">← Back to List</button>
-                             <h2 className="text-xl font-black flex items-center gap-2 text-gray-800 dark:text-white">
+                             <h2 className="text-xl font-black flex flex-wrap items-center gap-2 text-gray-800 dark:text-white">
                                  Invoice: {selectedPurchase.invoiceNumber}
-                                 <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full border border-yellow-200">Waitlist</span>
+                                 <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full border border-yellow-200 whitespace-nowrap">Waitlist</span>
                              </h2>
                              <p className="text-sm text-gray-500">Verify items and location before making live</p>
                          </div>
-                         <div className="flex gap-3">
+                         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                              {/* CSV Upload */}
                              <div className="relative">
                                  <input 
@@ -440,14 +478,14 @@ const PutAwayBucket = () => {
                                     onChange={handleCSVUpload}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                  />
-                                 <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                 <button className="w-full md:w-auto px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                      <Upload size={16} /> Upload CSV
                                  </button>
                              </div>
                              
                              <button 
                                 onClick={handleCompletePutAway}
-                                className="px-6 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-md flex items-center gap-2 transition-transform active:scale-95"
+                                className="w-full md:w-auto px-6 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
                              >
                                  <CheckCircle size={18} /> Complete & Make Live
                              </button>

@@ -181,7 +181,7 @@ const GRNWaitlist = () => {
              <div className="flex flex-col xl:flex-row items-center justify-center gap-6">
                  
                  {/* Auto GRN Toggle */}
-                 <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-3 self-center xl:self-auto">
                      <span className="font-bold text-gray-600 dark:text-gray-300 text-sm uppercase">Auto GRN:</span>
                      <button onClick={handleAutoGrnToggle} className={`transition-transform active:scale-95 ${autoGrn ? 'text-emerald-500' : 'text-gray-400'}`}>
                          {autoGrn ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
@@ -194,20 +194,20 @@ const GRNWaitlist = () => {
                     value={physicalReceivingIdInput}
                     onChange={(e) => setPhysicalReceivingIdInput(e.target.value)}
                     placeholder="Physical Receiving ID" 
-                    className="flex-1 max-w-md p-3 border-2 border-blue-100 dark:border-gray-600 rounded-xl outline-none focus:border-cyan-400 font-bold text-gray-700 dark:text-white transition-colors shadow-sm"
+                    className="w-full xl:flex-1 p-3 border-2 border-blue-100 dark:border-gray-600 rounded-xl outline-none focus:border-cyan-400 font-bold text-gray-700 dark:text-white transition-colors shadow-sm"
                  />
   
                  {/* Actions */}
-                 <div className="flex gap-3">
+                 <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
                      <button 
                           onClick={handleSubmitPhysicalId}
-                          className="px-8 py-3 bg-cyan-500 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all active:scale-95"
+                          className="flex-1 xl:flex-none px-8 py-3 bg-cyan-500 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all active:scale-95 text-center"
                      >
                          Submit
                      </button>
                      <button 
                           onClick={handleReset}
-                          className="px-8 py-3 bg-amber-400 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-amber-300 hover:shadow-lg hover:shadow-amber-500/30 transition-all active:scale-95"
+                          className="flex-1 xl:flex-none px-8 py-3 bg-amber-400 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-amber-300 hover:shadow-lg hover:shadow-amber-500/30 transition-all active:scale-95 text-center"
                      >
                          Reset
                      </button>
@@ -220,7 +220,7 @@ const GRNWaitlist = () => {
                      />
                      <button 
                           onClick={handleBulkUploadClick}
-                          className="px-8 py-3 bg-cyan-500 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all active:scale-95 flex items-center gap-2"
+                          className="flex-1 xl:flex-none px-8 py-3 bg-cyan-500 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all active:scale-95 flex items-center justify-center gap-2 text-center whitespace-nowrap"
                      >
                          Upload Bulk GRN <Upload size={18} />
                      </button>

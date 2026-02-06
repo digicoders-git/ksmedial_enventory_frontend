@@ -113,8 +113,8 @@ const PackingMaterialManager = () => {
         <>
         <div className="animate-fade-in-up pb-10">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-                <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                <div className="w-full sm:w-auto">
                     <h1 className="text-2xl font-black text-gray-800 dark:text-white flex items-center gap-2">
                         <Archive className="text-orange-500" /> Packing Materials
                     </h1>
@@ -122,27 +122,29 @@ const PackingMaterialManager = () => {
                 </div>
                 <button 
                     onClick={() => setShowModal(true)}
-                    className="px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:shadow-lg transition-all active:scale-95 flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                     <Plus size={18} /> Add New Material
                 </button>
             </div>
 
             {/* Quick Filter & Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-                <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                     <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Low Stock Items</p>
-                     <h3 className="text-2xl font-black text-red-500 mt-1">{materials.filter(m => m.quantity <= m.minStockLevel).length}</h3>
-                </div>
-                 <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center">
-                    <Search className="text-gray-400 ml-3" size={20} />
-                    <input 
-                        type="text" 
-                        placeholder="Search materials by name or type..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full p-3 bg-transparent outline-none text-gray-800 dark:text-white placeholder:text-gray-400 font-medium"
-                    />
+            <div className="flex flex-col gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="md:col-span-1 bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                         <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Low Stock Items</p>
+                         <h3 className="text-2xl font-black text-red-500 mt-1">{materials.filter(m => m.quantity <= m.minStockLevel).length}</h3>
+                    </div>
+                     <div className="md:col-span-3 bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center">
+                        <Search className="text-gray-400 ml-3 min-w-[20px]" size={20} />
+                        <input 
+                            type="text" 
+                            placeholder="Search materials by name or type..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full p-3 bg-transparent outline-none text-gray-800 dark:text-white placeholder:text-gray-400 font-medium text-sm sm:text-base"
+                        />
+                    </div>
                 </div>
             </div>
 

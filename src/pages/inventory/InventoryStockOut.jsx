@@ -158,12 +158,10 @@ const InventoryStockOut = () => {
 
     return (
     <div className="animate-fade-in-up pb-10 space-y-8">
-      <div className="h-[calc(100vh-100px)] flex flex-col xl:flex-row gap-6">
-      
-      {/* ... (Keep existing layout code) ... */}
+      <div className="flex flex-col xl:flex-row gap-6 h-auto xl:h-[calc(100vh-100px)]">
       
       {/* LEFT: Product Catalog */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-[500px] xl:h-auto">
          {/* ... (Keep existing catalog code search/table header) ... */}
          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1 relative w-full">
@@ -177,11 +175,10 @@ const InventoryStockOut = () => {
                  autoFocus
                />
             </div>
-            {/* ... */}
          </div>
 
          {/* Product List Table Header */}
-         <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 dark:bg-gray-700/80 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+         <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 dark:bg-gray-700/80 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 hidden sm:grid">
             <div className="col-span-4">Medicine Info</div>
             <div className="col-span-2">Batch / Exp</div>
             <div className="col-span-2 text-center">Stock</div>
@@ -194,33 +191,55 @@ const InventoryStockOut = () => {
              {filteredInventory.length > 0 ? (
                 <div className="divide-y divide-gray-50 dark:divide-gray-700">
                    {filteredInventory.map((item) => (
-                      <div key={item.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
-                         {/* ... (Keep row content) ... */}
-                        <div className="col-span-4">
+                      <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 px-4 sm:px-6 py-4 items-start sm:items-center hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
+                         {/* Mobile View Item */}
+                         <div className="sm:hidden flex justify-between w-full items-start">
+                             <div>
+                                 <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm">{item.name}</h4>
+                                 <p className="text-xs text-gray-400 mt-0.5">{item.company} • {item.batch}</p>
+                                 <div className="mt-1 flex gap-2">
+                                     <span className={`text-[10px] font-bold ${item.stock === 0 ? 'text-red-500' : 'text-green-600'}`}>Stock: {item.stock}</span>
+                                     <span className="text-[10px] font-bold text-gray-500">Exp: {item.exp}</span>
+                                 </div>
+                             </div>
+                             <div className="flex flex-col items-end gap-2">
+                                 <span className="font-bold text-gray-800 dark:text-gray-200 text-sm">₹{item.rate.toFixed(2)}</span>
+                                 <button 
+                                     onClick={() => addToCart(item)}
+                                     disabled={item.stock === 0}
+                                     className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
+                                 >
+                                     <Plus size={16} strokeWidth={3} />
+                                 </button>
+                             </div>
+                         </div>
+
+                        {/* Desktop View Cols */}
+                        <div className="hidden sm:block col-span-4">
                            <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm">{item.name}</h4>
                            <p className="text-xs text-gray-400 mt-0.5">{item.company || 'Generic'} • {item.category}</p>
                            {item.sku && <span className="text-[10px] text-blue-500 font-mono">{item.sku}</span>}
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="hidden sm:block col-span-2">
                            <span className="block text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit mb-1">{item.batch}</span>
                            <span className={`text-[10px] font-bold ${item.exp?.includes('23') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
-                              Exp: {item.exp}
+                               Exp: {item.exp}
                            </span>
                         </div>
 
-                        <div className="col-span-2 text-center">
+                        <div className="hidden sm:block col-span-2 text-center">
                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.stock === 0 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : item.stock < 50 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'}`}>
-                              {item.stock}
+                               {item.stock}
                            </span>
                         </div>
 
-                        <div className="col-span-2 text-right">
+                        <div className="hidden sm:block col-span-2 text-right">
                            <span className="font-bold text-gray-800 dark:text-gray-200 text-sm">₹{item.rate.toFixed(2)}</span>
                            <p className="text-[10px] text-gray-400">/ unit</p>
                         </div>
 
-                        <div className="col-span-2 flex justify-center">
+                        <div className="hidden sm:block col-span-2 flex justify-center">
                            <button 
                              onClick={() => addToCart(item)}
                              disabled={item.stock === 0}
@@ -242,7 +261,7 @@ const InventoryStockOut = () => {
       </div>
 
       {/* RIGHT: Transaction Cart (Keep as is) */}
-      <div className="w-full xl:w-[400px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col border border-gray-100 dark:border-gray-700 h-full">
+      <div className="w-full xl:w-[400px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col border border-gray-100 dark:border-gray-700 h-auto xl:h-full">
          {/* Cart Header & Type */}
          <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50">
             <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-base mb-3">
