@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Ticket, Trash2, Printer, Grid, List, Filter, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package } from 'lucide-react';
+import { Search, ShoppingCart, User, Trash2, Printer, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
+
+const getPackSize = (packingStr) => {
+    if (!packingStr) return 1;
+    const match = packingStr.toString().match(/(\d+)$/);
+    return match ? parseInt(match[0]) : 1;
+};
 
 const SalesEntry = () => {
   const navigate = useNavigate();
@@ -72,13 +78,14 @@ const SalesEntry = () => {
                 // Sync cart with inventory to ensure stock/price details are fresh
                 const populatedCart = sale.items.map(item => {
                     const invItem = inventory.find(p => p.id === item.productId?._id || p.id === item.productId);
+                    const packSize = invItem ? getPackSize(invItem.packing) : 1;
                     return {
                         id: item.productId?._id || item.productId,
                         name: item.name,
                         qty: item.quantity,
                         rate: item.price,
                         amount: item.subtotal,
-                        stock: invItem ? invItem.stock + item.quantity : item.quantity // Add back current qty to stock limit
+                        stock: invItem ? invItem.stock + (item.quantity * packSize) : item.quantity 
                     };
                 });
                 setCart(populatedCart);
@@ -93,15 +100,26 @@ const SalesEntry = () => {
     fetchInvoice();
   }, [isEditing, id, inventory]);
 
+  const [patientDetails, setPatientDetails] = useState({ name: '', age: '', gender: 'Male', mobile: '', address: '', doctorName: '', doctorAddress: '' });
+  const [shippingDetails, setShippingDetails] = useState({ packingType: 'Box', boxCount: 0, polyCount: 0, isColdStorage: false });
+  const [showExtraDetails, setShowExtraDetails] = useState(false);
+
+
+
+  // ... (existing effects)
+
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
     const currentQty = existingItem ? existingItem.qty : 0;
+    
+    const packSize = getPackSize(product.packing);
+    const neededUnits = (currentQty + 1) * packSize;
 
-    if (currentQty + 1 > product.stock) {
+    if (neededUnits > product.stock) {
       Swal.fire({
           icon: 'warning',
           title: 'Stock Limit Reached',
-          text: `Only ${product.stock} units available!`,
+          text: `Only ${Math.floor(product.stock / packSize)} Strips (${product.stock} Units) available!`,
           timer: 1500,
           showConfirmButton: false
       });
@@ -127,11 +145,14 @@ const SalesEntry = () => {
         if (newQty <= 0) return item; 
 
         const product = inventory.find(p => p.id === id);
-        if (newQty > product.stock) {
+        const packSize = getPackSize(product.packing);
+        const neededUnits = newQty * packSize;
+
+        if (neededUnits > product.stock) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Insufficient Stock',
-                text: `Max available: ${product.stock}`,
+                text: `Max available: ${Math.floor(product.stock / packSize)} Strips`,
                 toast: true,
                 position: 'top-end',
                 timer: 2000,
@@ -144,6 +165,63 @@ const SalesEntry = () => {
       return item;
     }));
   };
+
+  const printShippingLabel = (sale, details) => {
+      const w = window.open('', '_blank');
+      w.document.write(`
+          <html>
+          <head>
+              <title>Shipping Label</title>
+              <style>
+                  body { font-family: sans-serif; padding: 20px; border: 2px solid #000; max-width: 400px; margin: 20px auto; }
+                  h1 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                  .row { margin: 10px 0; display: flex; justify-content: space-between; }
+                  .label { font-weight: bold; }
+                  .box { border: 1px solid #333; padding: 10px; margin-top: 20px; text-align: center; font-weight: bold; font-size: 1.2em; }
+                  .cold { background: #e0f7fa; color: #006064; padding: 5px; text-align: center; font-weight: bold; margin-bottom: 10px; border: 1px dashed #0097a7; }
+              </style>
+          </head>
+          <body>
+              ${details.shipping.isColdStorage ? '<div class="cold">❄️ COLD STORAGE ITEM ❄️</div>' : ''}
+              <h1>SHIPPING LABEL</h1>
+              
+              <div style="margin-bottom: 20px;">
+                  <div class="label">TO:</div>
+                  <div>${details.patient.name || sale.customerName}</div>
+                  <div>${details.patient.address || (sale.customer && sale.customer.address) || ''}</div>
+                  <div>Ph: ${details.patient.mobile || (sale.customer && sale.customer.phone) || ''}</div>
+              </div>
+
+              <div style="margin-bottom: 20px; text-align: right;">
+                  <div class="label">FROM:</div>
+                  <div>KS4PharmaNet</div>
+                  <div>Main Market, City Center</div>
+                  <div>New Delhi - 110001</div>
+              </div>
+
+              <div class="row">
+                  <span>Packet Type: ${details.shipping.packingType}</span>
+                  <span>Inv #: ${sale.invoiceNumber}</span>
+              </div>
+              
+              <div class="box">
+                  Contents: ${details.shipping.boxCount} BOX / ${details.shipping.polyCount} POLY
+              </div>
+              
+              ${details.patient.doctorName ? `
+              <div style="margin-top: 20px; font-size: 0.9em; border-top: 1px dotted #ccc; pt: 10px;">
+                  <strong>Doctor:</strong> ${details.patient.doctorName}<br>
+                  ${details.patient.doctorAddress || ''}
+              </div>` : ''}
+
+              <script>window.print();</script>
+          </body>
+          </html>
+      `);
+      w.document.close();
+  };
+
+  // ... (rest of imports)
 
   const removeFromCart = (id) => {
     setCart(cart.filter(item => item.id !== id));
@@ -231,7 +309,7 @@ const SalesEntry = () => {
             <div class="text-left py-2">
                 <div class="flex justify-between mb-1">
                     <span class="text-gray-500">Customer:</span>
-                    <span class="font-bold">${selectedCustomer ? selectedCustomer.name : 'Walk-in'}</span>
+                    <span class="font-bold">${selectedCustomer ? selectedCustomer.name : (patientDetails.name || 'Walk-in')}</span>
                 </div>
                 <div class="flex justify-between mb-1">
                     <span class="text-gray-500">Items:</span>
@@ -241,10 +319,7 @@ const SalesEntry = () => {
                     <span class="text-gray-800 font-bold">Total Amount:</span>
                     <span class="text-primary font-black text-lg">Rs. ${grandTotal.toFixed(2)}</span>
                 </div>
-                <div class="flex justify-between mt-2">
-                    <span class="text-gray-500">Payment Via:</span>
-                    <span class="badge bg-primary/10 text-primary border-none px-2 rounded font-bold">${paymentMode}</span>
-                </div>
+                ${patientDetails.name ? `<div class="mt-2 text-xs text-gray-500">Patient: ${patientDetails.name} | Doc: ${patientDetails.doctorName || 'N/A'}</div>` : ''}
             </div>
         `,
         icon: 'success',
@@ -254,14 +329,16 @@ const SalesEntry = () => {
         cancelButtonColor: '#d33'
     }).then(async (result) => {
         if (result.isConfirmed) {
-            const saleData = cart.map(item => ({ id: item.id, qty: item.qty }));
+            const saleData = cart.map(item => ({ id: item.id, qty: item.qty })); // qty is Strips
             const metadata = { 
                 customer: selectedCustomer || (customerSearch ? { name: customerSearch } : 'Walk-in'), 
                 paymentMode,
                 totalAmount: grandTotal,
                 subTotal: subTotal,
                 tax: totalTax,
-                discount: discountAmount
+                discount: discountAmount,
+                patientDetails,
+                shippingDetails
             };
             
             const response = await sellItems(saleData, metadata, isEditing ? id : null);
@@ -270,13 +347,24 @@ const SalesEntry = () => {
                 setCart([]);
                 setSelectedCustomer(null);
                 setCustomerSearch('');
+                setPatientDetails({ name: '', age: '', gender: 'Male', mobile: '', address: '', doctorName: '', doctorAddress: '' }); // Reset
+                setShippingDetails({ packingType: 'Box', boxCount: 0, polyCount: 0, isColdStorage: false });
+
                 Swal.fire({
                     icon: 'success',
-                    title: isEditing ? 'Invoice Updated!' : 'Sale Successful!',
-                    text: response.message,
-                    timer: 2000,
+                    title: 'Sale Successful!',
+                    text: 'Generating Label...',
+                    timer: 1000,
                     showConfirmButton: false
                 });
+
+                // Auto Print Label
+                setTimeout(() => {
+                    if (response.sale || response.data) {
+                        printShippingLabel(response.sale || response.data, { patient: patientDetails, shipping: shippingDetails });
+                    }
+                }, 1000);
+
                 if (isEditing) {
                     setTimeout(() => navigate('/sales/invoices'), 2000);
                 }
@@ -286,6 +374,12 @@ const SalesEntry = () => {
         }
     });
   };
+
+  // ... (useMemo, filteredCustomers...)
+
+  // Insert UI below customer input
+  // LOC: around line 552
+
 
   const { filteredInventory, paginatedInventory, totalPages } = useMemo(() => {
     const filtered = inventory.filter(item => {
@@ -403,7 +497,7 @@ const SalesEntry = () => {
                           <Package size={32} />
                         </div>
                         <h3 className="font-bold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-primary transition-colors line-clamp-2 w-full text-base">{item.name}</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.sku || 'SKU'}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.brand || 'Generic'} • {item.sku || 'SKU'} {item.packing ? `• ${item.packing}` : ''}</p>
                       </div>
                       
                       <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 w-full text-center">
@@ -549,6 +643,81 @@ const SalesEntry = () => {
                        </div>
                    )}
                </div>
+
+           {/* Detailed Billing Info Toggle */}
+           <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-3">
+               <button 
+                  onClick={() => setShowExtraDetails(!showExtraDetails)} 
+                  className="w-full text-xs font-bold text-gray-500 dark:text-gray-400 flex items-center justify-between hover:text-primary transition-colors bg-gray-50 dark:bg-gray-750 p-2 rounded-lg"
+               >
+                  <span>{showExtraDetails ? 'Hide Details' : '+ Add Patient & Shipping Info'}</span>
+                  <span>{showExtraDetails ? '▲' : '▼'}</span>
+               </button>
+               
+               {showExtraDetails && (
+                   <div className="mt-2 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-inner text-xs space-y-3">
+                       <div className="grid grid-cols-2 gap-2">
+                           <div>
+                               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Patient Name</label>
+                               <input value={patientDetails.name} onChange={e => setPatientDetails({...patientDetails, name: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                           </div>
+                           <div>
+                               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Mobile</label>
+                               <input value={patientDetails.mobile} onChange={e => setPatientDetails({...patientDetails, mobile: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                           </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-2">
+                           <div>
+                                <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Age</label>
+                                <input value={patientDetails.age} onChange={e => setPatientDetails({...patientDetails, age: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                           </div>
+                           <div>
+                                <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Gender</label>
+                                <select value={patientDetails.gender} onChange={e => setPatientDetails({...patientDetails, gender: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary">
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                           </div>
+                       </div>
+                       
+                       <div>
+                           <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Address</label>
+                           <input value={patientDetails.address} onChange={e => setPatientDetails({...patientDetails, address: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                       </div>
+
+                       <div className="grid grid-cols-2 gap-2">
+                           <div>
+                               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Doctor Name</label>
+                               <input value={patientDetails.doctorName} onChange={e => setPatientDetails({...patientDetails, doctorName: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                           </div>
+                           <div>
+                               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Doctor Address</label>
+                               <input value={patientDetails.doctorAddress} onChange={e => setPatientDetails({...patientDetails, doctorAddress: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                           </div>
+                       </div>
+
+                       <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-3">
+                           <p className="font-bold mb-2 text-primary flex items-center gap-2"><Package size={14} /> Shipping & Packing</p>
+                           <div className="flex gap-4 mb-3">
+                               <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" className="text-primary focus:ring-primary" checked={shippingDetails.packingType === 'Box'} onChange={() => setShippingDetails({...shippingDetails, packingType: 'Box'})} /> Box</label>
+                               <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" className="text-primary focus:ring-primary" checked={shippingDetails.packingType === 'Poly'} onChange={() => setShippingDetails({...shippingDetails, packingType: 'Poly'})} /> Poly</label>
+                               <label className="flex items-center gap-1.5 cursor-pointer ml-auto"><input type="checkbox" className="text-primary focus:ring-primary rounded" checked={shippingDetails.isColdStorage} onChange={e => setShippingDetails({...shippingDetails, isColdStorage: e.target.checked})} /> <span className="text-blue-500 font-bold">Cold Storage ❄️</span></label>
+                           </div>
+                           <div className="grid grid-cols-2 gap-2">
+                               <div>
+                                   <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Box Count</label>
+                                   <input type="number" value={shippingDetails.boxCount} onChange={e => setShippingDetails({...shippingDetails, boxCount: Number(e.target.value)})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                               </div>
+                               <div>
+                                   <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Poly Count</label>
+                                   <input type="number" value={shippingDetails.polyCount} onChange={e => setShippingDetails({...shippingDetails, polyCount: Number(e.target.value)})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-750 outline-none focus:border-primary" />
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               )}
+           </div>
           </div>
 
           {/* Cart Items List */}
@@ -576,9 +745,9 @@ const SalesEntry = () => {
                                 </button>
                            </div>
                            
-                           <div className="flex-1 min-w-0">
+                   <div className="flex-1 min-w-0">
                                <h4 className="font-bold text-gray-800 dark:text-white text-sm truncate">{item.name}</h4>
-                               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">₹{item.rate} / unit</p>
+                               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">₹{item.rate} / {item.packing ? `strip (${item.packing})` : 'unit'}</p>
                            </div>
 
                            <div className="flex flex-col items-end gap-1">

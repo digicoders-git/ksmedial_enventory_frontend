@@ -41,6 +41,7 @@ const Dashboard = () => {
     }
   });
   const [loading, setLoading] = useState(true);
+  const [grnPage, setGrnPage] = useState(1);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -728,7 +729,7 @@ const Dashboard = () => {
                     </button>
                 </div>
                 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto min-h-[300px]">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50/50 dark:bg-gray-700/50 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest border-b border-gray-100 dark:border-gray-700">
                             <tr>
@@ -746,7 +747,9 @@ const Dashboard = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                stats.pendingGrnStats?.invoiceQueue.map((inv) => (
+                                stats.pendingGrnStats?.invoiceQueue
+                                  .slice((grnPage - 1) * 5, grnPage * 5)
+                                  .map((inv) => (
                                     <tr key={inv.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/40 transition-colors group">
                                         <td className="py-4 px-4">
                                             <p className="font-black text-gray-800 dark:text-gray-200 text-xs tracking-tight">{inv.invoiceNumber}</p>
@@ -785,6 +788,31 @@ const Dashboard = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Optional Pagination Footer inside the card */}
+                {stats.pendingGrnStats?.invoiceQueue.length > 5 && (
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-50 dark:border-gray-700">
+                        <span className="text-[10px] breadcrumb text-gray-400 font-bold uppercase tracking-wider">
+                            Page {grnPage} of {Math.ceil(stats.pendingGrnStats.invoiceQueue.length / 5)}
+                        </span>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setGrnPage(prev => Math.max(prev - 1, 1))}
+                                disabled={grnPage === 1}
+                                className="px-2 py-1 text-xs font-bold text-gray-500 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                            >
+                                Prev
+                            </button>
+                            <button 
+                                onClick={() => setGrnPage(prev => Math.min(prev + 1, Math.ceil(stats.pendingGrnStats.invoiceQueue.length / 5)))}
+                                disabled={grnPage >= Math.ceil(stats.pendingGrnStats.invoiceQueue.length / 5)}
+                                className="px-2 py-1 text-xs font-bold text-gray-500 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
       </div>

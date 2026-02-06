@@ -72,11 +72,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       subItems: [
         { label: 'Inventory Dashboard', path: '/inventory/dashboard' },
         { label: 'Stock List', path: '/inventory/stock' },
+        { label: 'Physical Validation', path: '/inventory/physical-validation' },
         { label: 'Stock IN (Purchase)', path: '/inventory/stock-in' },
         { label: 'Stock OUT', path: '/inventory/stock-out' },
         { label: 'Expiry Management', path: '/inventory/expiry' },
         { label: 'Low Stock Alerts', path: '/inventory/low-stock' },
         { label: 'Units Management', path: '/inventory/units' },
+        { label: 'Packing Materials', path: '/inventory/packing-materials' },
         { label: 'Stock Adjustment', path: '/inventory/adjustment' }
       ]
     },
@@ -115,6 +117,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/purchase',
       subItems: [
         { label: 'Supplier List', path: '/purchase/suppliers' },
+        { label: 'GRN Waitlist', path: '/purchase/grn/waitlist', badge: 'New' },
+        { label: 'Put Away Bucket', path: '/purchase/putaway' },
         { label: 'Add GRN (Receive)', path: '/purchase/grn/add' },
         { label: 'GRN History', path: '/purchase/grn' },
         { label: 'Purchase Invoices', path: '/purchase/invoices' },
@@ -299,11 +303,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   onClick={handleNavClick}
                   className={({ isActive }) => `flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'hover:bg-gray-800 hover:text-white'}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={({ isActive }) => isActive ? 'text-white' : 'text-gray-400 group-hover:text-accent'}>{item.icon}</span>
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </div>
-                  {item.badge && <span className="bg-danger text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{item.badge}</span>}
+                  {({ isActive }) => (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <span className={isActive ? 'text-white' : 'text-gray-400 group-hover:text-accent'}>{item.icon}</span>
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </div>
+                      {item.badge && <span className="bg-danger text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{item.badge}</span>}
+                    </>
+                  )}
                 </NavLink>
               )}
             </div>

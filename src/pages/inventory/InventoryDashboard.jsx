@@ -5,11 +5,23 @@ import { useNavigate } from 'react-router-dom';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useInventory } from '../../context/InventoryContext';
+import api from '../../api/axios';
 
 const InventoryDashboard = () => {
   const navigate = useNavigate();
   const {  stats: contextStats, inventory, transactions, loading, fetchInventory, fetchTransactions } = useInventory();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [analysisData, setAnalysisData] = useState(null);
+
+  React.useEffect(() => {
+     const fetchAnalysis = async () => {
+         try {
+             const { data } = await api.get('/reports/analysis');
+             if (data.success) setAnalysisData(data);
+         } catch (e) { console.error("Analysis fetch failed", e); }
+     };
+     fetchAnalysis();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -356,6 +368,76 @@ const InventoryDashboard = () => {
             </div>
         </div>
       </div>
+
+      {/* Today's Stock Analysis */}
+      {analysisData && analysisData.incomingAnalysis && (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 overflow-hidden relative mb-6">
+             <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">
+                 <div>
+                     <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                         <TrendingUp size={20} className="text-emerald-500" /> Today's Stock Analysis
+                     </h3>
+                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Movement Insight for Stock Received Today</p>
+                 </div>
+                 <span className="px-3 py-1 bg-gray-50 dark:bg-gray-700 rounded-lg text-[10px] font-black uppercase text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-600">
+                     {analysisData.incomingAnalysis.length} Items Received
+                 </span>
+             </div>
+             
+             {analysisData.incomingAnalysis.length > 0 ? (
+                 <div className="overflow-x-auto">
+                     <table className="w-full text-left text-sm whitespace-nowrap">
+                         <thead className="bg-gray-50/50 dark:bg-gray-750/50 text-gray-400 dark:text-gray-500">
+                             <tr>
+                                 <th className="px-4 py-3 font-black text-[10px] uppercase tracking-widest">Product / SKU</th>
+                                 <th className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-center">Stock Age</th>
+                                 <th className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-center">Sales (30 Days)</th>
+                                 <th className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-center">Insight</th>
+                             </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                             {analysisData.incomingAnalysis.map((item) => (
+                                 <tr key={item._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                                     <td className="px-4 py-3">
+                                         <p className="font-bold text-gray-800 dark:text-white text-xs">{item.name}</p>
+                                         <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.sku}</p>
+                                     </td>
+                                     <td className="px-4 py-3 text-center">
+                                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border ${
+                                             item.isOldStock 
+                                             ? 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:border-red-800' 
+                                             : 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800'
+                                         }`}>
+                                             {item.ageDays} Days Old
+                                         </span>
+                                     </td>
+                                     <td className="px-4 py-3 text-center">
+                                         <span className="font-black text-gray-800 dark:text-white text-xs">{item.soldLast30} Units</span>
+                                     </td>
+                                     <td className="px-4 py-3 text-center">
+                                          {item.isOldStock && item.soldLast30 === 0 ? (
+                                              <span className="text-red-500 text-[10px] font-black uppercase flex items-center justify-center gap-1"><AlertTriangle size={12}/> Dead Stock Restocked!</span>
+                                          ) : item.isOldStock && item.soldLast30 < 10 ? (
+                                              <span className="text-orange-500 text-[10px] font-black uppercase flex items-center justify-center gap-1"><AlertTriangle size={12}/> Slow Mover (>30d Age)</span>
+                                          ) : item.soldLast30 > 50 ? (
+                                              <span className="text-emerald-500 text-[10px] font-black uppercase flex items-center justify-center gap-1"><TrendingUp size={12}/> High Demand</span>
+                                          ) : (
+                                              <span className="text-gray-400 text-[10px] font-bold uppercase">-</span>
+                                          )}
+                                     </td>
+                                 </tr>
+                             ))}
+                         </tbody>
+                     </table>
+                 </div>
+             ) : (
+                 <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl">
+                     <Package size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">No stock arrivals recorded today</p>
+                 </div>
+             )}
+        </div>
+      )}
 
       {/* Movement List (Refined) */}
        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 overflow-hidden relative">

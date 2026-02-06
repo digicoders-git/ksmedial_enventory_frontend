@@ -215,14 +215,29 @@ const PurchaseReturn = () => {
                     const { data } = await api.post('/purchase-returns', payload);
 
                     if (data.success) {
-                        Swal.fire('Success', 'Debit Note created successfully.', 'success');
-                        setView('list');
-                        setInvoiceData(null);
-                        setInvoiceSearch('');
-                        setReturnItems([]);
-                        setReason('');
-                        setSelectedSupplier(''); // Reset manual selection
-                        fetchReturns();
+                        const newReturn = data.purchaseReturn || data.data; // Handle various response formats
+                        
+                        Swal.fire({
+                            title: 'Success', 
+                            text: 'Debit Note created. Generating copy...', 
+                            icon: 'success',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                        if (newReturn?._id) {
+                            setTimeout(() => {
+                                navigate(`/purchase/return/view/${newReturn._id}?autoPrint=true`);
+                            }, 1500);
+                        } else {
+                            setView('list');
+                            setInvoiceData(null);
+                            setInvoiceSearch('');
+                            setReturnItems([]);
+                            setReason('');
+                            setSelectedSupplier('');
+                            fetchReturns();
+                        }
                     }
                 } catch (error) {
                     console.error("Create Return Error: ", error);
@@ -650,13 +665,25 @@ const PurchaseReturn = () => {
                                 <div className="p-8 bg-gray-50 dark:bg-gray-750/50 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-10 items-start md:items-end justify-between">
                                     <div className="w-full md:w-1/2 text-left">
                                         <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-3">Reason for Return</label>
-                                        <textarea 
-                                            rows="3" 
-                                            placeholder="Specify the reason (e.g. Near expiry, stock adjustment, damaged...)" 
-                                            value={reason}
-                                            onChange={(e) => setReason(e.target.value)}
-                                            className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 font-bold transition-all shadow-sm"
-                                        ></textarea>
+                                        <div className="space-y-3">
+                                            <select 
+                                                value={reason}
+                                                onChange={(e) => setReason(e.target.value)}
+                                                className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold transition-all shadow-sm text-gray-800 dark:text-white"
+                                            >
+                                                <option value="">-- Select Reason --</option>
+                                                {[
+                                                    'Supply Damage', 'Expired SKU', 'Batch Mismatch', 'MRP Issue', 
+                                                    'Item Recalled', 'Non Moving', 'Out of PO', 'Pack Size Issue', 
+                                                    'Received Less Than Invoice', 'Temperature Issue', 'Wrong SKU', 
+                                                    'Wrong Rate', 'Wrong GST', 'Near Expiry', 'Manufacturing Defect'
+                                                ].map(r => (
+                                                    <option key={r} value={r}>{r}</option>
+                                                ))}
+                                            </select>
+                                            
+                                            {/* Optional details box if needed, or just keep select */}
+                                        </div>
                                     </div>
                                     
                                     <div className="w-full md:w-auto text-right">

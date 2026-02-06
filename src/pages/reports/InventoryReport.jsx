@@ -26,7 +26,11 @@ const InventoryReport = () => {
         const fetchReportData = async () => {
             try {
                 setLoading(true);
-                const response = await api.get('/products/report');
+                const params = new URLSearchParams();
+                if (dateRange.start) params.append('startDate', dateRange.start);
+                if (dateRange.end) params.append('endDate', dateRange.end);
+                
+                const response = await api.get(`/reports/inventory?${params.toString()}`);
                 if (response.data.success) {
                     setData(response.data);
                 }
@@ -38,7 +42,7 @@ const InventoryReport = () => {
         };
 
         fetchReportData();
-    }, []);
+    }, [dateRange]);
 
     const { stats, categoryData, lowStockItems, expiryItems } = data;
 

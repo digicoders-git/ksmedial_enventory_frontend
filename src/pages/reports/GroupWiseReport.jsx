@@ -12,9 +12,16 @@ const GroupWiseReport = () => {
     const fetchReport = async () => {
       try {
         setLoading(true);
-        const { data } = await api.get('/sales/groups');
+        const { data } = await api.get('/reports/groups');
         if (data.success) {
-          setReportData(data.report);
+          // Map groupAnalysis to expected format
+          const mappedData = data.groupAnalysis.map(group => ({
+            name: group.name,
+            totalItems: group.totalProducts,
+            stockValue: group.totalValue,
+            totalSales: group.totalSales || 0
+          }));
+          setReportData(mappedData);
         }
       } catch (error) {
         console.error("Error fetching group report:", error);

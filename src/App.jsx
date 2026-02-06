@@ -11,6 +11,7 @@ import ComingSoon from './components/ComingSoon';
 import InventoryDashboard from './pages/inventory/InventoryDashboard';
 import StockList from './pages/inventory/StockList';
 import InventoryStockIn from './pages/inventory/InventoryStockIn';
+import PhysicalValidation from './pages/inventory/PhysicalValidation';
 import InventoryStockOut from './pages/inventory/InventoryStockOut';
 import ExpiryManagement from './pages/inventory/ExpiryManagement';
 import LowStockAlerts from './pages/inventory/LowStockAlerts';
@@ -19,6 +20,7 @@ import StockAdjustment from './pages/inventory/StockAdjustment';
 import StatsHistory from './pages/inventory/StatsHistory';
 import ExpiryReport from './pages/inventory/ExpiryReport';
 import ViewStockOut from './pages/inventory/ViewStockOut';
+import PackingMaterialManager from './pages/inventory/PackingMaterialManager';
 
 // Medicine Pages (Re-mapped to existing files in inventory folder for now to avoid move conflicts)
 import MedicineList from './pages/inventory/MedicineList';
@@ -40,6 +42,8 @@ import ViewPurchaseInvoice from './pages/purchase/ViewPurchaseInvoice';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 import ViewPurchaseReturn from './pages/purchase/ViewPurchaseReturn';
 import GRNList from './pages/purchase/GRNList';
+import GRNWaitlist from './pages/purchase/GRNWaitlist';
+import PutAwayBucket from './pages/purchase/PutAwayBucket';
 import AddGRN from './pages/purchase/AddGRN';
 import ViewGRN from './pages/purchase/ViewGRN';
 import CustomerList from './pages/people/CustomerList';
@@ -55,6 +59,7 @@ import SalesReport from './pages/reports/SalesReport';
 import ViewSalesReport from './pages/reports/ViewSalesReport';
 import ProfitReport from './pages/reports/ProfitReport';
 import ViewProfitReport from './pages/reports/ViewProfitReport';
+import InventoryAnalysis from './pages/reports/InventoryAnalysis';
 
 // Config Pages
 import GeneralSettings from './pages/config/GeneralSettings';
@@ -96,6 +101,7 @@ function App() {
           <Route path="inventory/dashboard" element={<InventoryDashboard />} />
           <Route path="inventory/stock" element={<StockList />} />
           <Route path="inventory/stock-in" element={<InventoryStockIn />} />
+          <Route path="inventory/physical-validation" element={<PhysicalValidation />} />
           <Route path="inventory/stock-out" element={<InventoryStockOut />} />
           <Route path="inventory/expiry" element={<ExpiryManagement />} />
           <Route path="inventory/expiry-report" element={<ExpiryReport />} />
@@ -103,6 +109,7 @@ function App() {
           <Route path="inventory/units" element={<UnitsManagement />} />
           <Route path="inventory/adjustment" element={<StockAdjustment />} />
           <Route path="inventory/stats-history" element={<StatsHistory />} />
+          <Route path="inventory/packing-materials" element={<PackingMaterialManager />} />
 
 
           {/* =======================
@@ -133,6 +140,8 @@ function App() {
           <Route path="purchase/return" element={<PurchaseReturn />} />
           <Route path="purchase/return/view/:id" element={<ViewPurchaseReturn />} />
           <Route path="purchase/grn" element={<GRNList />} />
+          <Route path="purchase/grn/waitlist" element={<GRNWaitlist />} />
+          <Route path="purchase/putaway" element={<PutAwayBucket />} />
           <Route path="purchase/grn/add" element={<AddGRN />} />
           <Route path="purchase/grn/view/:id" element={<ViewGRN />} />
 
@@ -155,6 +164,7 @@ function App() {
           <Route path="reports/profit" element={<ProfitReport />} />
           <Route path="reports/profit/view" element={<ViewProfitReport />} />
           <Route path="reports/groups" element={<GroupWiseReport />} />
+          <Route path="reports/analysis" element={<InventoryAnalysis />} />
 
            {/* =======================
               8. CONFIG & OTHERS 

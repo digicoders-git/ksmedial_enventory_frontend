@@ -1,0 +1,456 @@
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useInventory } from '../../context/InventoryContext';
+import { 
+  ClipboardCheck, 
+  Plus, 
+  Search, 
+  Clock, 
+  CheckCircle, 
+  FileText, 
+  Package, 
+  X
+} from 'lucide-react';
+import api from '../../api/axios';
+import Swal from 'sweetalert2';
+
+const StatusCard = ({ title, value, icon: Icon, colorClass, bgClass }) => (
+  <div className={`p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between group overflow-hidden relative bg-white dark:bg-gray-800`}>
+    <div className="flex items-center justify-between mb-4">
+      <div className={`p-2.5 rounded-xl ${bgClass} ${colorClass}`}>
+          <Icon size={20} />
+      </div>
+    </div>
+    <div>
+      <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">{title}</p>
+      <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{value}</h3>
+    </div>
+  </div>
+);
+
+const PhysicalValidation = () => {
+  const { suppliers } = useInventory();
+  const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
+  const supplierWrapperRef = React.useRef(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+        if (supplierWrapperRef.current && !supplierWrapperRef.current.contains(event.target)) {
+            setShowSupplierSuggestions(false);
+        }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [filters, setFilters] = useState({
+    supplier: '',
+    status: '',
+    startDate: '',
+    endDate: ''
+  });
+
+  // Entry Form State
+  const [formData, setFormData] = useState({
+    supplierName: '',
+    invoiceNumber: '',
+    invoiceValue: '',
+    skuCount: '',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    location: '',
+    poIds: '',
+    isPoNotPresent: false
+  });
+
+  const fetchEntries = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.supplier) params.append('supplier', filters.supplier);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const { data } = await api.get(`/physical-receiving?${params.toString()}`);
+      if (data.success) {
+        setEntries(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch entries", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEntries();
+  }, [filters]);
+
+  const handleInputChange = (e) => {
+      const { name, value, type, checked } = e.target;
+      setFormData(prev => ({
+          ...prev,
+          [name]: type === 'checkbox' ? checked : value
+      }));
+  };
+
+  const handleSubmitEntry = async (e) => {
+    e.preventDefault();
+    if (!formData.supplierName || !formData.invoiceNumber) {
+        Swal.fire('Error', 'Supplier Name and Invoice Number are required', 'error');
+        return;
+    }
+
+    try {
+        const { data } = await api.post('/physical-receiving', formData);
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Entry Created',
+                html: `
+                    <div class="text-left">
+                        <p><strong>Physical ID:</strong> ${data.data.physicalReceivingId}</p>
+                        <p class="text-sm text-gray-500 mt-2">Please write this Physical ID on the invoice.</p>
+                    </div>
+                `
+            });
+            setShowEntryModal(false);
+            setFormData({
+                supplierName: '',
+                invoiceNumber: '',
+                invoiceValue: '',
+                skuCount: '',
+                invoiceDate: new Date().toISOString().split('T')[0],
+                location: '',
+                poIds: '',
+                isPoNotPresent: false
+            });
+            fetchEntries();
+        }
+    } catch (error) {
+        Swal.fire('Error', error.response?.data?.message || 'Failed to create entry', 'error');
+    }
+  };
+
+  const handleValidate = async (id, currentStatus) => {
+      if (currentStatus === 'Done') return;
+
+      const { value: name } = await Swal.fire({
+          title: 'Mark as Validated',
+          input: 'text',
+          inputLabel: 'Enter your name/Staff ID',
+          inputPlaceholder: 'e.g. John Doe',
+          showCancelButton: true,
+          confirmButtonText: 'Mark Done',
+          confirmButtonColor: '#10b981',
+          inputValidator: (value) => {
+              if (!value) {
+                  return 'You need to write your name!'
+              }
+          }
+      });
+
+      if (name) {
+          try {
+              const { data } = await api.put(`/physical-receiving/${id}/validate`, { validatedBy: name });
+              if (data.success) {
+                  Swal.fire('Success', 'Physical validation marked as done.', 'success');
+                  fetchEntries();
+              }
+          } catch (error) {
+              Swal.fire('Error', 'Failed to update status', 'error');
+          }
+      }
+  };
+
+  const pendingCount = entries.filter(e => e.status === 'Pending').length;
+  const doneCount = entries.filter(e => e.status === 'Done').length;
+
+  return (
+    <div className="animate-fade-in-up max-w-[1600px] mx-auto space-y-6 pb-10">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+             <ClipboardCheck className="text-primary" /> Physical Stock Validation
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Manage and validate incoming physical stock before GRN.</p>
+        </div>
+        <button 
+            onClick={() => setShowEntryModal(true)}
+            className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+        >
+            <Plus size={18} /> New Entry
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <StatusCard 
+            title="Pending Validation" 
+            value={pendingCount} 
+            icon={Clock} 
+            bgClass="bg-orange-50 dark:bg-orange-900/20" 
+            colorClass="text-orange-600 dark:text-orange-400" 
+         />
+         <StatusCard 
+            title="Completed Validations" 
+            value={doneCount} 
+            icon={CheckCircle} 
+            bgClass="bg-emerald-50 dark:bg-emerald-900/20" 
+            colorClass="text-emerald-600 dark:text-emerald-400" 
+         />
+         <StatusCard 
+            title="Total Entries" 
+            value={entries.length} 
+            icon={FileText} 
+            bgClass="bg-blue-50 dark:bg-blue-900/20" 
+            colorClass="text-blue-600 dark:text-blue-400" 
+         />
+      </div>
+
+      {/* Filters & Content */}
+      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+        
+        {/* Filter Bar */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+             <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                    placeholder="Search Supplier..." 
+                    value={filters.supplier}
+                    onChange={(e) => setFilters(prev => ({ ...prev, supplier: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-gray-100"
+                />
+             </div>
+             <div className="w-full md:w-48">
+                <select 
+                    value={filters.status}
+                    onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-gray-100"
+                >
+                    <option value="">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Done">Done</option>
+                </select>
+             </div>
+             <div className="w-full md:w-auto flex gap-2">
+                 <input 
+                    type="date" 
+                    value={filters.startDate}
+                    onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="px-3 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-gray-100"
+                 />
+                 <input 
+                    type="date" 
+                    value={filters.endDate}
+                    onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="px-3 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-gray-100"
+                 />
+             </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+             <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase text-xs font-bold">
+                    <tr>
+                        <th className="px-5 py-4 rounded-l-xl">IDs</th>
+                        <th className="px-5 py-4">Invoice Details</th>
+                        <th className="px-5 py-4">Counts</th>
+                        <th className="px-5 py-4">Location</th>
+                        <th className="px-5 py-4">Status</th>
+                        <th className="px-5 py-4 text-right rounded-r-xl">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {loading ? (
+                       <tr><td colSpan="6" className="text-center py-10">Loading entries...</td></tr>
+                    ) : entries.length === 0 ? (
+                       <tr><td colSpan="6" className="text-center py-10 text-gray-400">No entries found</td></tr>
+                    ) : (
+                       entries.map(entry => (
+                           <tr key={entry._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                               <td className="px-5 py-4">
+                                   <div className="font-bold text-gray-800 dark:text-white">{entry.physicalReceivingId}</div>
+                                   <div className="text-xs text-gray-500 font-mono mt-0.5">{entry.systemId}</div>
+                                   <div className="text-[10px] text-gray-400 mt-1">{new Date(entry.createdAt).toLocaleDateString()}</div>
+                               </td>
+                               <td className="px-5 py-4">
+                                   <div className="font-bold text-gray-800 dark:text-gray-200">{entry.supplierName}</div>
+                                   <div className="text-xs text-gray-500 mt-0.5">Inv: {entry.invoiceNumber} • ₹{entry.invoiceValue}</div>
+                               </td>
+                               <td className="px-5 py-4">
+                                   <div className="text-xs space-y-1">
+                                       <div className="font-bold text-primary">Total SKU: {entry.skuCount}</div>
+                                       {entry.poIds && <div className="text-[10px] text-gray-400">PO: {entry.poIds}</div>}
+                                   </div>
+                               </td>
+                               <td className="px-5 py-4">
+                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{entry.location || 'N/A'}</span>
+                               </td>
+                               <td className="px-5 py-4">
+                                   {entry.status === 'Pending' ? (
+                                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-full text-xs font-bold">
+                                           <Clock size={12} /> Pending
+                                       </span>
+                                   ) : (
+                                       <div>
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold">
+                                                <CheckCircle size={12} /> Validated
+                                            </span>
+                                            <div className="text-[10px] text-gray-400 mt-1">by {entry.validatedBy}</div>
+                                       </div>
+                                   )}
+                               </td>
+                               <td className="px-5 py-4 text-right">
+                                   {entry.status === 'Pending' ? (
+                                       <button 
+                                            onClick={() => handleValidate(entry._id, entry.status)}
+                                            className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-xs font-bold hover:shadow-lg transition-all"
+                                       >
+                                           Validate
+                                       </button>
+                                   ) : (
+                                       <button disabled className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-400 rounded-lg text-xs font-bold cursor-not-allowed">
+                                           Completed
+                                       </button>
+                                   )}
+                               </td>
+                           </tr>
+                       ))
+                    )}
+                </tbody>
+             </table>
+        </div>
+
+      </div>
+
+      {/* Entry Modal */}
+      {showEntryModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in text-left">
+            <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-normal text-gray-800 dark:text-white flex items-center gap-2">
+                            Physical Receiving
+                        </h2>
+                        <span className="text-red-500 text-sm font-medium ml-2">(Do not initiate reGRN from this screen)</span>
+                    </div>
+                    
+                    <button onClick={() => setShowEntryModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <form onSubmit={handleSubmitEntry} className="p-6 space-y-5">
+                    
+                    <div className="space-y-1 relative" ref={supplierWrapperRef}>
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Supplier Name</label>
+                        <input 
+                            name="supplierName" 
+                            value={formData.supplierName} 
+                            onChange={(e) => {
+                                handleInputChange(e);
+                                setShowSupplierSuggestions(true);
+                            }}
+                            onClick={() => setShowSupplierSuggestions(true)}
+                            required 
+                            autoComplete="off"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-normal" 
+                            placeholder="Supplier Name" 
+                        />
+                        
+                        {/* Supplier Suggestions Dropdown */}
+                        {showSupplierSuggestions && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto custom-scrollbar animate-fade-in-up">
+                                {suppliers
+                                    .filter(s => s.name.toLowerCase().includes(formData.supplierName.toLowerCase()))
+                                    .map(s => (
+                                        <div 
+                                            key={s.id} 
+                                            onClick={() => {
+                                                setFormData(prev => ({ ...prev, supplierName: s.name }));
+                                                setShowSupplierSuggestions(false);
+                                            }}
+                                            className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0"
+                                        >
+                                            <div className="font-medium">{s.name}</div>
+                                            <div className="text-[10px] text-gray-400">{s.address || 'No address'}</div>
+                                        </div>
+                                    ))
+                                }
+                                {suppliers.filter(s => s.name.toLowerCase().includes(formData.supplierName.toLowerCase())).length === 0 && (
+                                    <div className="px-4 py-3 text-xs text-gray-400 text-center">
+                                        No matching suppliers found. 
+                                        <br/>Type name to use as new.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Invoice Number</label>
+                        <input name="invoiceNumber" value={formData.invoiceNumber} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Invoice Number" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Number of SKUs in the Invoice</label>
+                        <input type="number" name="skuCount" value={formData.skuCount} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Number of SKUs in the Invoice" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Invoice Amount (in rupees)</label>
+                        <input type="number" name="invoiceValue" value={formData.invoiceValue} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Invoice Amount" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Invoice Date</label>
+                        <input type="date" name="invoiceDate" value={formData.invoiceDate} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                    </div>
+
+                     <div className="space-y-1">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Location (Press enter after each input)</label>
+                        <input name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Enter PV staging location" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm text-gray-600 dark:text-gray-400">PO ID</label>
+                        <input name="poIds" value={formData.poIds} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Type first 4 digits to search or paste comma-separated PO IDs" />
+                        
+                        <div className="flex items-center gap-2 mt-1">
+                            <input 
+                                type="checkbox" 
+                                id="poNotPresent" 
+                                name="isPoNotPresent"
+                                checked={formData.isPoNotPresent}
+                                onChange={handleInputChange}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <label htmlFor="poNotPresent" className="text-sm text-gray-600 dark:text-gray-400 select-none">PO not present</label>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 flex justify-end gap-3">
+                        <button type="submit" className="px-6 py-2 bg-blue-500 text-white rounded font-medium text-sm hover:bg-blue-600 shadow-md transition-all">Submit</button>
+                        <button type="button" onClick={() => setFormData(prev => ({ ...prev, supplierName: '', invoiceNumber: '', invoiceValue: '', skuCount: '', location: '', poIds: '', isPoNotPresent: false }))} className="px-6 py-2 bg-white text-blue-500 border border-blue-500 rounded font-medium text-sm hover:bg-blue-50 transition-colors">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </div>,
+        document.body
+      )}
+
+    </div>
+  );
+};
+
+export default PhysicalValidation;

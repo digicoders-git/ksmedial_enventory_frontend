@@ -163,6 +163,15 @@ const SalesReturn = () => {
             return;
         }
 
+        if (!reason) {
+            Swal.fire('Error', 'Please select a return reason.', 'warning');
+            return;
+        }
+
+        const finalReason = reason === 'Other' 
+            ? document.getElementById('customReasonInput')?.value || 'Unspecified Other' 
+            : reason;
+
         const refundAmount = calculateRefund();
 
         Swal.fire({
@@ -187,7 +196,7 @@ const SalesReturn = () => {
                             subtotal: item.price * item.returnQty
                         })),
                         totalAmount: refundAmount,
-                        reason,
+                        reason: finalReason,
                         status: 'Refunded'
                     };
 
@@ -437,7 +446,32 @@ const SalesReturn = () => {
                         <div className="p-6 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-6 items-start md:items-end justify-between">
                              <div className="w-full md:w-1/2">
                                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Return Reason</label>
-                                 <textarea rows="2" placeholder="Reason..." value={reason} onChange={(e) => setReason(e.target.value)} className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"></textarea>
+                                 <div className="space-y-2">
+                                     <select 
+                                        value={reason} 
+                                        onChange={(e) => setReason(e.target.value)} 
+                                        className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm text-gray-800 dark:text-white font-medium focus:ring-2 focus:ring-red-100"
+                                     >
+                                         <option value="">-- Select Reason --</option>
+                                         <option value="Damage">Damage</option>
+                                         <option value="Incorrect SKU">Incorrect SKU</option>
+                                         <option value="Expiry">Expiry</option>
+                                         <option value="Batch Issue">Batch Issue</option>
+                                         <option value="Received Less than Invoice">Received Less than Invoice</option>
+                                         <option value="MRP Issue">MRP Issue</option>
+                                         <option value="Pack Size Issue">Pack Size Issue</option>
+                                         <option value="Other">Other</option>
+                                     </select>
+                                     
+                                     {reason === 'Other' && (
+                                        <textarea 
+                                            rows="2" 
+                                            placeholder="Please specify the reason..." 
+                                            id="customReasonInput"
+                                            className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-sm resize-none text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 animate-fade-in"
+                                        ></textarea>
+                                     )}
+                                 </div>
                              </div>
                              <div className="w-full md:w-auto text-right">
                                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Total Refund (Inc. Tax)</p>

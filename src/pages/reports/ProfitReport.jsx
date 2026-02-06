@@ -10,26 +10,26 @@ const ProfitReport = () => {
     const [loading, setLoading] = useState(true);
 
     const [data, setData] = useState({
-        financials: {
-            revenue: 0,
-            cogs: 0,
+        stats: {
+            totalRevenue: 0,
+            totalCost: 0,
             grossProfit: 0,
-            expenses: 0,
-            netProfit: 0
+            profitMargin: 0,
+            totalPurchases: 0
         },
-        margin: 0,
-        categoryProfit: []
+        productProfits: [],
+        summary: {}
     });
 
     useEffect(() => {
         const fetchReportData = async () => {
             try {
                 setLoading(true);
-                let query = '?';
-                if (dateRange.start) query += `startDate=${dateRange.start}&`;
-                if (dateRange.end) query += `endDate=${dateRange.end}`;
+                const params = new URLSearchParams();
+                if (dateRange.start) params.append('startDate', dateRange.start);
+                if (dateRange.end) params.append('endDate', dateRange.end);
 
-                const response = await api.get(`/sales/profit${query}`);
+                const response = await api.get(`/reports/profit?${params.toString()}`);
                 if (response.data.success) {
                     setData(response.data);
                 }
@@ -43,7 +43,24 @@ const ProfitReport = () => {
         fetchReportData();
     }, [dateRange]);
 
-    const { financials, margin, categoryProfit } = data;
+    const { stats, productProfits } = data;
+    
+    // Map data for display
+    const financials = {
+        revenue: stats.totalRevenue || 0,
+        cogs: stats.totalCost || 0,
+        grossProfit: stats.grossProfit || 0,
+        expenses: stats.totalPurchases || 0,
+        netProfit: stats.grossProfit || 0
+    };
+
+    const margin = stats.profitMargin || 0;
+
+    const categoryProfit = productProfits.slice(0, 5).map(p => ({
+        name: p.name,
+        profit: p.profit,
+        margin: p.margin
+    }));
 
     const handleViewReport = () => {
         navigate('/reports/profit/view');
