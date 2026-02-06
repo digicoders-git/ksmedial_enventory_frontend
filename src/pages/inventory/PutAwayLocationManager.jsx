@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, Save, Upload, MapPin, Package, Filter, Plus, FileText, Download, Printer, Mail, Edit, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Save, Upload, Package, Filter, Plus, FileText, Download, Printer, Edit, Trash2, QrCode, XCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import api from '../../api/axios';
+
 
 const LocationMaster = () => {
     const [locations, setLocations] = useState([]);
@@ -137,11 +138,102 @@ const LocationMaster = () => {
                         fetchLocations();
                     }
                 } catch (error) {
+                    console.error("Bulk upload error:", error);
                     Swal.fire('Error', 'Bulk upload failed', 'error');
                 }
                 e.target.value = '';
             }
         });
+    };
+
+    const handleDownloadSampleCSV = () => {
+        const sampleData = [
+            {
+                Vendor: 'PharmaLink',
+                Category: 'Picking',
+                Aisle: 'A1',
+                Rack: 'R01',
+                Shelf: 'S1',
+                Bin: 'B01',
+                Partition: '0',
+                Status: 'Active',
+                Temperature: 'Normal'
+            },
+            {
+                Vendor: 'MediCare',
+                Category: 'Reserve',
+                Aisle: 'B2',
+                Rack: 'R05',
+                Shelf: 'S3',
+                Bin: 'B10',
+                Partition: '1',
+                Status: 'Active',
+                Temperature: 'Cold'
+            }
+        ];
+        
+        const csvString = Papa.unparse(sampleData);
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, 'sample_location_upload.csv');
+    };
+
+    const handleDelete = async (id) => {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const { data } = await api.delete(`/locations/${id}`);
+                    if (data.success) {
+                        Swal.fire('Deleted!', 'Location has been deleted.', 'success');
+                        fetchLocations();
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Failed to delete location', 'error');
+                }
+            }
+        });
+    };
+
+    const [printLocation, setPrintLocation] = useState(null);
+
+    const handlePrintQR = (loc) => {
+        setPrintLocation(loc);
+    };
+
+    const handlePrintCanvas = () => {
+        const printContent = document.getElementById('qr-print-area');
+        const win = window.open('', '', 'width=600,height=600');
+        win.document.write(`
+          <html>
+            <head>
+              <title>Print Location QR</title>
+              <style>
+                body { font-family: 'Inter', sans-serif; text-align: center; padding: 20px; }
+                .qr-container { border: 2px dashed #000; padding: 20px; display: inline-block; border-radius: 12px; }
+                h1 { margin: 0 0 5px 0; font-size: 20px; font-weight: 900; color: #000; letter-spacing: -0.5px; }
+                p { margin: 2px 0; font-size: 12px; color: #333; font-weight: 500; text-transform: uppercase; }
+                .meta { font-size: 10px; color: #666; margin-top: 5px; }
+                img { max-width: 100%; display: block; margin: 0 auto; }
+              </style>
+            </head>
+            <body>
+              <div class="qr-container">
+                ${printContent.innerHTML}
+              </div>
+              <script>
+                setTimeout(() => { window.print(); window.close(); }, 500);
+              </script>
+            </body>
+          </html>
+        `);
+        win.document.close();
     };
 
     const handleEdit = (loc) => {
@@ -233,37 +325,30 @@ const LocationMaster = () => {
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2 mr-4">
                         <span className="text-xs font-bold text-gray-500">Records per page</span>
-                        <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="border rounded px-2 py-1 text-xs dark:bg-gray-700 dark:border-gray-600">
+                        <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="border rounded px-2 py-1 text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                              <option value={25}>25</option>
                              <option value={50}>50</option>
                              <option value={100}>100</option>
                         </select>
                     </div>
 
-                    <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600">Category Map</button>
-                    <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600">Print QR Code</button>
-                    
-                    <button onClick={handleCreate} className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600 flex items-center gap-1">
-                        Create <Plus size={14} />
+                    <button onClick={handleCreate} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-xs font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5">
+                        <Plus size={16} /> Create
                     </button>
                     
                     <div className="relative">
                         <input type="file" accept=".csv" onChange={handleCSVUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600 flex items-center gap-1">
-                            Upload <Upload size={14} />
+                        <button className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center gap-1.5">
+                            <Upload size={16} /> Upload CSV
                         </button>
                     </div>
 
-                    <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600 flex items-center gap-1">
-                        Sample <Download size={14} />
+                    <button onClick={handleDownloadSampleCSV} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center gap-1.5">
+                        <FileText size={16} /> Sample CSV
                     </button>
                     
-                    <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600">Mail Complete Report</button>
-                    <button className="px-3 py-2 bg-cyan-500 text-white text-xs font-bold rounded shadow hover:bg-cyan-600 flex items-center gap-1">
-                        Update <Upload size={14} />
-                    </button>
-                     <button onClick={handleDownloadCSV} className="p-2 border border-cyan-500 text-cyan-500 rounded-full hover:bg-cyan-50">
-                        <Download size={16} />
+                     <button onClick={handleDownloadCSV} className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center gap-1.5">
+                        <Download size={16} /> Export
                     </button>
                 </div>
             </div>
@@ -286,7 +371,8 @@ const LocationMaster = () => {
                                 <th className="p-3">Partition</th>
                                 <th className="p-3">Status</th>
                                 <th className="p-3">Temperature Type</th>
-                                <th className="p-3 text-center">Edit</th>
+                                <th className="p-3 text-center">QR</th>
+                                <th className="p-3 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -310,9 +396,19 @@ const LocationMaster = () => {
                                         <td className="p-3">{loc.status}</td>
                                         <td className="p-3">{loc.temperatureType}</td>
                                         <td className="p-3 text-center">
-                                            <button onClick={() => handleEdit(loc)} className="text-blue-500 hover:text-blue-700">
-                                                <Edit size={16} />
+                                            <button onClick={() => handlePrintQR(loc)} className="text-purple-500 hover:text-purple-700 p-1 hover:bg-purple-50 rounded" title="View/Print QR">
+                                                <QrCode size={16} />
                                             </button>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button onClick={() => handleEdit(loc)} className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded" title="Edit">
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button onClick={() => handleDelete(loc._id)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded" title="Delete">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -345,7 +441,7 @@ const LocationMaster = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                             <h2 className="text-xl font-bold dark:text-white">{currentLocation ? 'Edit Location' : 'Create New Location'}</h2>
@@ -411,6 +507,51 @@ const LocationMaster = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Print QR Modal */}
+            {printLocation && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center">
+                        <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Location QR Code</h3>
+                            <button onClick={() => setPrintLocation(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+                        
+                        <div id="qr-print-area" className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border-2 border-dashed border-gray-200">
+                             <h1 className="text-xl font-black text-black mb-1">{printLocation.locationCode}</h1>
+                             <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({
+                                    id: printLocation._id,
+                                    code: printLocation.locationCode,
+                                    vendor: printLocation.vendorName || '',
+                                    category: printLocation.category,
+                                    status: printLocation.status,
+                                    // Aisle-Rack-Shelf etc
+                                    loc: {
+                                       a: printLocation.aisle,
+                                       r: printLocation.rack,
+                                       s: printLocation.shelf,
+                                       b: printLocation.bin,
+                                       p: printLocation.partition
+                                    }
+                                }))}`}
+                                alt="Location QR Code"
+                                className="w-[180px] h-[180px]"
+                             />
+                             <p className="mt-2 font-bold uppercase">{printLocation.category} Zone</p>
+                             <p className="meta">{printLocation.vendorName ? `Vendor: ${printLocation.vendorName}` : 'Internal Stock'}</p>
+                        </div>
+
+                        <div className="mt-6 flex justify-center gap-3">
+                             <button onClick={() => setPrintLocation(null)} className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Close</button>
+                             <button onClick={handlePrintCanvas} className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-sm shadow-lg flex items-center gap-2">
+                                <Printer size={16} /> Print Label
+                             </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -71,6 +71,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/inventory',
       subItems: [
         { label: 'Inventory Dashboard', path: '/inventory/dashboard' },
+        { label: 'Location Master', path: '/inventory/locations' },
         { label: 'Stock List', path: '/inventory/stock' },
         { label: 'Physical Validation', path: '/inventory/physical-validation' },
         { label: 'Stock IN (Purchase)', path: '/inventory/stock-in' },

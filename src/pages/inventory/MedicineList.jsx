@@ -202,6 +202,7 @@ const MedicineList = () => {
                   </th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">Medicine Name</th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">SKU / Barcode</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center">Location</th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">Generic Name</th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">Group</th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">Company</th>
@@ -228,6 +229,15 @@ const MedicineList = () => {
                           {item.sku}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                       {item.rackLocation ? (
+                         <span className="inline-block px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs font-semibold border border-gray-200 dark:border-gray-600 shadow-sm">
+                           {item.rackLocation}
+                         </span>
+                       ) : (
+                         <span className="text-gray-400 text-xs">-</span>
+                       )}
+                    </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.generic}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
@@ -249,6 +259,7 @@ const MedicineList = () => {
                     <td className="px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       {item.stock} <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal ml-1 uppercase">{item.unit}</span>
                     </td>
+
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button 

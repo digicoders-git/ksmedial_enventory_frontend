@@ -41,7 +41,8 @@ const ViewInvoice = () => {
                     subtotal: sale.subTotal || 0,
                     taxAmount: sale.taxAmount || 0,
                     discountAmount: sale.discountAmount || 0,
-                    grandTotal: sale.totalAmount
+                    grandTotal: sale.totalAmount,
+                    patientDetails: sale.patientDetails
                 });
             }
         } catch (error) {
@@ -328,9 +329,31 @@ Thank you for your business!
         <div className="p-8 md:p-12 grid md:grid-cols-2 gap-12">
             <div>
                 <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-4">Bill To</h3>
-                <div className="text-lg font-bold text-gray-900 mb-2">{invoice.customer}</div>
-                <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{invoice.address}</div>
-                <div className="mt-3 text-sm font-medium text-gray-700">Tel: {invoice.contact}</div>
+                {invoice.patientDetails?.name ? (
+                     <>
+                        <div className="text-lg font-bold text-gray-900 mb-1">{invoice.patientDetails.name}</div>
+                        <div className="text-sm text-gray-600 mb-1">
+                            {invoice.patientDetails.age && <span className="mr-3">Age: {invoice.patientDetails.age}</span>}
+                            {invoice.patientDetails.gender && <span>Sex: {invoice.patientDetails.gender}</span>}
+                        </div>
+                        <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{invoice.patientDetails.address}</div>
+                        <div className="mt-2 text-sm font-medium text-gray-700">Mob: {invoice.patientDetails.mobile || invoice.contact}</div>
+                        
+                        {(invoice.patientDetails.doctorName || invoice.patientDetails.doctorAddress) && (
+                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
+                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest block mb-1">Prescribed By</span>
+                                {invoice.patientDetails.doctorName && <div className="text-sm font-bold text-gray-800">Dr. {invoice.patientDetails.doctorName}</div>}
+                                {invoice.patientDetails.doctorAddress && <div className="text-xs text-gray-500">{invoice.patientDetails.doctorAddress}</div>}
+                            </div>
+                        )}
+                     </>
+                ) : (
+                     <>
+                        <div className="text-lg font-bold text-gray-900 mb-2">{invoice.customer}</div>
+                        <div className="text-sm text-gray-500 leading-relaxed max-w-xs">{invoice.address}</div>
+                        <div className="mt-3 text-sm font-medium text-gray-700">Tel: {invoice.contact}</div>
+                     </>
+                )}
             </div>
             
             <div className="md:text-right">

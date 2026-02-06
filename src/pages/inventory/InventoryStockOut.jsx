@@ -11,7 +11,14 @@ const InventoryStockOut = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [stockOutReason, setStockOutReason] = useState('Sale');
-  const [customer, setCustomer] = useState({ name: '', phone: '' });
+  const [customer, setCustomer] = useState({ 
+    name: '', 
+    phone: '', 
+    age: '', 
+    address: '', 
+    doctorName: '', 
+    doctorAddress: '' 
+  });
   const [paymentMode, setPaymentMode] = useState('Cash');
 
   // FEFO (First Expiring First Out) + FIFO (First In First Out) Sorting
@@ -103,7 +110,8 @@ const InventoryStockOut = () => {
         if (stockOutReason === 'Sale') {
             const soldItems = cart.map(item => ({ id: item.id, qty: item.qty }));
             saleResult = await sellItems(soldItems, { 
-                customer, 
+                customer: { name: customer.name, phone: customer.phone }, 
+                patientDetails: customer, // Pass full details for the invoice
                 paymentMode,
                 totalAmount: calculateTotal(),
                 subTotal: calculateTotal(),
@@ -133,7 +141,15 @@ const InventoryStockOut = () => {
                 }
             });
             setCart([]);
-            setCustomer({ name: '', phone: '' });
+            setCart([]);
+            setCustomer({ 
+                name: '', 
+                phone: '', 
+                age: '', 
+                address: '', 
+                doctorName: '', 
+                doctorAddress: '' 
+            });
         } else {
             Swal.fire('Error', saleResult.message, 'error');
         }
@@ -287,42 +303,88 @@ const InventoryStockOut = () => {
          </div>
 
          {/* Sales Specific (Customer & Payment) */}
-         {stockOutReason === 'Sale' && (
-            <div className="p-3 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-3">
-               <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Customer Name" 
-                    value={customer.name}
-                    onChange={(e) => setCustomer({...customer, name: e.target.value})}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:border-primary outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                  />
-               </div>
 
-               <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Payment Mode</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                     {['Cash', 'UPI', 'Card', 'Credit'].map((mode) => (
-                        <button
-                           key={mode}
-                           onClick={() => setPaymentMode(mode)}
-                           className={`py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
-                              paymentMode === mode 
-                              ? 'bg-primary/10 border-primary text-primary shadow-sm' 
-                              : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
-                           }`}
-                        >
-                           {mode}
-                        </button>
-                     ))}
-                  </div>
-               </div>
-            </div>
-         )}
 
          {/* Cart Items */}
          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            {stockOutReason === 'Sale' && (
+                <div className="p-3 border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl space-y-3 mb-4 shadow-sm">
+                   {/* Customer Details */}
+                   <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Patient Details</label>
+                       <div className="grid grid-cols-2 gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Patient Name" 
+                            value={customer.name}
+                            onChange={(e) => setCustomer({...customer, name: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                          />
+                          <input 
+                            type="text" 
+                            placeholder="Mobile No." 
+                            value={customer.phone}
+                            onChange={(e) => setCustomer({...customer, phone: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                          />
+                          <input 
+                            type="number" 
+                            placeholder="Age" 
+                            value={customer.age}
+                            onChange={(e) => setCustomer({...customer, age: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                          />
+                          <input 
+                            type="text" 
+                            placeholder="Address" 
+                            value={customer.address}
+                            onChange={(e) => setCustomer({...customer, address: e.target.value})}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                          />
+                       </div>
+                   </div>
+                   
+                   {/* Doctor Details */}
+                   <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Doctor Prescribed</label>
+                        <div className="grid grid-cols-2 gap-2">
+                           <input 
+                             type="text" 
+                             placeholder="Dr. Name" 
+                             value={customer.doctorName}
+                             onChange={(e) => setCustomer({...customer, doctorName: e.target.value})}
+                             className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                           />
+                            <input 
+                             type="text" 
+                             placeholder="Clinic Address" 
+                             value={customer.doctorAddress}
+                             onChange={(e) => setCustomer({...customer, doctorAddress: e.target.value})}
+                             className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs focus:border-primary outline-none text-gray-800 dark:text-gray-100"
+                           />
+                        </div>
+                   </div>
+
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Payment Mode</label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                         {['Cash', 'UPI', 'Card', 'Credit'].map((mode) => (
+                            <button
+                               key={mode}
+                               onClick={() => setPaymentMode(mode)}
+                               className={`py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+                                  paymentMode === mode 
+                                  ? 'bg-primary/10 border-primary text-primary shadow-sm' 
+                                  : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                               }`}
+                            >
+                               {mode}
+                            </button>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+             )}
             {cart.length === 0 ? (
                <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-xl m-2">
                   <ShoppingCart size={24} className="mb-2 opacity-20" />
@@ -354,7 +416,7 @@ const InventoryStockOut = () => {
          </div>
 
          {/* Footer Summary */}
-         <div className="mt-auto bg-gray-50 dark:bg-gray-900/50 p-4 border-t border-gray-100 dark:border-gray-700">
+         <div className="mt-auto bg-gray-50 dark:bg-gray-900 p-4 border-t border-gray-100 dark:border-gray-700 sticky bottom-0 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
             <div className="flex justify-between items-end mb-3">
                <span className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Total Amount</span>
                <span className="text-xl font-bold text-gray-800 dark:text-white leading-none">₹{calculateTotal().toFixed(2)}</span>

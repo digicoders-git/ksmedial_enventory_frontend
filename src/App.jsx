@@ -21,6 +21,7 @@ import StatsHistory from './pages/inventory/StatsHistory';
 import ExpiryReport from './pages/inventory/ExpiryReport';
 import ViewStockOut from './pages/inventory/ViewStockOut';
 import PackingMaterialManager from './pages/inventory/PackingMaterialManager';
+import PutAwayLocationManager from './pages/inventory/PutAwayLocationManager';
 
 // Medicine Pages (Re-mapped to existing files in inventory folder for now to avoid move conflicts)
 import MedicineList from './pages/inventory/MedicineList';
@@ -110,6 +111,7 @@ function App() {
           <Route path="inventory/adjustment" element={<StockAdjustment />} />
           <Route path="inventory/stats-history" element={<StatsHistory />} />
           <Route path="inventory/packing-materials" element={<PackingMaterialManager />} />
+          <Route path="inventory/locations" element={<PutAwayLocationManager />} />
 
 
           {/* =======================

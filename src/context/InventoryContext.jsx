@@ -220,6 +220,7 @@ export const InventoryProvider = ({ children }) => {
                 customerName: typeof metadata.customer === 'string' ? metadata.customer : metadata.customer?.name,
                 paymentMethod: metadata.paymentMode || 'Cash',
                 status: metadata.status || (metadata.paymentMode === 'Credit' ? 'Pending' : 'Paid'),
+                patientDetails: metadata.patientDetails, // Pass full patient details
             };
 
             const response = saleId 

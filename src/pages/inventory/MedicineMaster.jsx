@@ -42,18 +42,21 @@ const MedicineMaster = () => {
 
   const [groups, setGroups] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
 
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [groupsRes, categoriesRes] = await Promise.all([
+        const [groupsRes, categoriesRes, locationsRes] = await Promise.all([
           api.get('/groups'),
-          api.get('/categories')
+          api.get('/categories'),
+          api.get('/locations?pageSize=1000&status=Active')
         ]);
         if (groupsRes.data.success) setGroups(groupsRes.data.groups);
         if (categoriesRes.data.success) setCategories(categoriesRes.data.categories);
+        if (locationsRes.data.success) setLocations(locationsRes.data.locations);
       } catch (error) {
-        console.error("Failed to fetch groups or categories", error);
+        console.error("Failed to fetch groups, categories or locations", error);
       }
     };
     fetchOptions();
@@ -638,14 +641,19 @@ const MedicineMaster = () => {
 
                   <div className="space-y-1.5">
                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Rack / Shelf Location</label>
-                     <input 
-                       type="text" 
+                     <select 
                        name="rackLocation"
                        value={formData.rackLocation}
                        onChange={handleChange}
-                       placeholder="e.g. A-12"
-                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm font-mono text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                     />
+                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm font-mono text-gray-800 dark:text-white cursor-pointer"
+                     >
+                        <option value="">Select Location</option>
+                        {locations.map(loc => (
+                          <option key={loc._id} value={loc.locationCode}>
+                            {loc.locationCode} {loc.category ? `(${loc.category})` : ''}
+                          </option>
+                        ))}
+                     </select>
                   </div>
                </div>
             </div>
