@@ -44,17 +44,36 @@ const GRNWaitlist = () => {
       invoiceNumber: ''
     });
 
-    const handleAutoGrnToggle = () => {
+    const handleAutoGrnToggle = async () => {
         const newState = !autoGrn;
         setAutoGrn(newState);
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: newState ? 'success' : 'info',
-            title: `Auto GRN Mode ${newState ? 'Enabled' : 'Disabled'}`,
-            showConfirmButton: false,
-            timer: 1500
+        
+        // In a real scenario, this would trigger a backend setting update
+        // await api.post('/settings/auto-grn', { enabled: newState });
+        
+        const result = await Swal.fire({
+            title: newState ? 'Enable Auto GRN?' : 'Disable Auto GRN?',
+            text: newState 
+                ? "System will automatically process Small Items (< 5 lines) once physically validated."
+                : "Manual approval will be required for all GRNs.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: newState ? 'Yes, Enable Auto GRN' : 'Yes, Disable',
+            cancelButtonText: 'Cancel'
         });
+
+        if (result.isConfirmed) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: `Auto GRN ${newState ? 'Enabled' : 'Disabled'}`,
+                showConfirmButton: false,
+                timer: 1500
+            });
+        } else {
+            setAutoGrn(!newState); // Revert if cancelled
+        }
     };
 
     const handleBulkUploadClick = () => {
@@ -90,7 +109,9 @@ const GRNWaitlist = () => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        params.append('status', 'Done');
+        // If Re-GRN is toggled, we might look for 'Rejected' or specific 'Re-GRN' status
+        // otherwise default to 'Done' (Ready for GRN)
+        params.append('status', reGrn ? 'Re-GRN' : 'Done'); 
         params.append('grnStatus', 'Pending');
         params.append('pageNumber', page);
         params.append('pageSize', pageSize);
@@ -116,7 +137,7 @@ const GRNWaitlist = () => {
   
     useEffect(() => {
       fetchEntries();
-    }, [page, pageSize]); // Fetch on page/size change check
+    }, [page, pageSize, reGrn]); // Fetch on page/size change or filter toggle
   
     const handleSearch = () => {
         setPage(1); // Reset to page 1 on search
