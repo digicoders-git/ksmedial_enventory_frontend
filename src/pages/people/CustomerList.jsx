@@ -319,6 +319,30 @@ const CustomerList = () => {
         setActiveDropdown(null);
     };
 
+    const handleClearAll = () => {
+        Swal.fire({
+            title: 'Clear All Customers?',
+            text: "This will permanently delete ALL customer records. This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, Clear All'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const { data } = await api.delete('/customers/clear-all');
+                    if (data.success) {
+                        Swal.fire('Cleared!', 'All customers have been deleted.', 'success');
+                        fetchCustomers();
+                    }
+                } catch (error) {
+                    Swal.fire('Error', error.response?.data?.message || 'Failed to clear customers', 'error');
+                }
+            }
+        });
+    };
+
     return (
         <>
             <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto pb-10 px-4">
@@ -361,6 +385,16 @@ const CustomerList = () => {
                             <span className="xl:hidden">List View</span>
                         </button>
                     </div>
+
+                    {!isBulkMode && totalEntries > 0 && (
+                        <button 
+                            onClick={handleClearAll}
+                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 font-black uppercase tracking-widest transition-all text-[11px] flex items-center justify-center gap-2"
+                        >
+                            <Trash2 size={16} strokeWidth={3} />
+                            <span>Clear All</span>
+                        </button>
+                    )}
 
                     {!isBulkMode && (
                         <div className="w-full sm:w-auto relative">

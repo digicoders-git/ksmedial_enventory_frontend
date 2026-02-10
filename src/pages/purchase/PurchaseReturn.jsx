@@ -35,6 +35,10 @@ const PurchaseReturn = () => {
     const [suppliers, setSuppliers] = useState([]);
     const [selectedSupplier, setSelectedSupplier] = useState('');
 
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
+
     const fetchReturns = useCallback(async () => {
         try {
             setLoading(true);
@@ -83,35 +87,80 @@ const PurchaseReturn = () => {
         }
     }, [fetchReturns, fetchSuppliers, view]);
 
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            if (invoiceSearch.trim().length > 1) {
+                setSearchLoading(true);
+                try {
+                    const { data } = await api.get('/purchases', {
+                        params: { keyword: invoiceSearch, pageSize: 8 }
+                    });
+                    if (data.success) {
+                        setSuggestions(data.purchases);
+                        setShowSuggestions(true);
+                    }
+                } catch (error) {
+                    console.error("Error fetching suggestions:", error);
+                } finally {
+                    setSearchLoading(false);
+                }
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchSuggestions, 300);
+        return () => clearTimeout(timeoutId);
+    }, [invoiceSearch]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.relative.flex-1')) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // --- METHODS ---
 
-    const handleInvoiceSearch = async (e) => {
-        e.preventDefault();
-        const trimmedSearch = invoiceSearch.trim();
+    const handleInvoiceSearch = async (e, purchaseFromSuggestion = null) => {
+        if (e) e.preventDefault();
+        const trimmedSearch = purchaseFromSuggestion ? purchaseFromSuggestion.invoiceNumber : invoiceSearch.trim();
         if (!trimmedSearch) return;
+
+        setShowSuggestions(false);
 
         try {
             console.log("Searching for invoice:", trimmedSearch);
-            const { data } = await api.get('/purchases', {
-                params: { keyword: trimmedSearch }
-            });
+            
+            let purchaseToUse = null;
 
-            console.log("Search results:", data);
+            if (purchaseFromSuggestion) {
+                purchaseToUse = purchaseFromSuggestion;
+            } else {
+                const { data } = await api.get('/purchases', {
+                    params: { keyword: trimmedSearch }
+                });
 
-            if (data.success && data.purchases && data.purchases.length > 0) {
-                // Find exact match if possible, otherwise take the first
-                const found = data.purchases.find(p => p.invoiceNumber === trimmedSearch) || data.purchases[0];
-                
-                console.log("Found invoice:", found);
+                if (data.success && data.purchases && data.purchases.length > 0) {
+                    // Try exact invoice match first, otherwise take first
+                    purchaseToUse = data.purchases.find(p => p.invoiceNumber.toLowerCase() === trimmedSearch.toLowerCase()) || data.purchases[0];
+                }
+            }
 
+            if (purchaseToUse) {
                 // Fetch full purchase details
-                const detailRes = await api.get(`/purchases/${found._id}`);
+                const detailRes = await api.get(`/purchases/${purchaseToUse._id}`);
                 
                 if (detailRes.data.success) {
                     const purchaseData = detailRes.data.purchase;
 
                     setInvoiceData(purchaseData);
                     setReturnItems([]);
+                    setInvoiceSearch(purchaseData.invoiceNumber);
                     
                     if (purchaseData.supplierId) {
                          Swal.fire({
@@ -123,7 +172,6 @@ const PurchaseReturn = () => {
                         });
                         setSelectedSupplier('');
                     } else {
-                        // ORPHAN INVOICE HANDLING
                         Swal.fire({
                             icon: 'warning',
                             title: 'Orphan Invoice',
@@ -134,7 +182,7 @@ const PurchaseReturn = () => {
                     }
                 }
             } else {
-                Swal.fire('Not Found', 'Purchase Invoice number not found.', 'error');
+                Swal.fire('Not Found', 'No purchase found matching your search.', 'error');
                 setInvoiceData(null);
             }
         } catch (error) {
@@ -555,15 +603,58 @@ const PurchaseReturn = () => {
                             <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 max-w-md font-medium">Enter the original Purchase Invoice number to fetch items for return. This will automatically deduct stock upon generation.</p>
                             
                             <form onSubmit={handleInvoiceSearch} className="flex gap-2 w-full max-w-lg relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
-                                <input 
-                                    type="text" 
-                                    placeholder="e.g. PUR-12345" 
-                                    value={invoiceSearch}
-                                    onChange={(e) => setInvoiceSearch(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-mono font-bold uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-inner text-lg"
-                                />
-                                <button type="submit" className="px-8 py-4 bg-gray-900 dark:bg-gray-700 text-white font-black rounded-2xl hover:bg-black dark:hover:bg-gray-600 active:scale-95 transition-all outline-none uppercase tracking-widest text-xs">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search by Invoice, SKU or Medicine Name..." 
+                                        value={invoiceSearch}
+                                        onChange={(e) => setInvoiceSearch(e.target.value)}
+                                        onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-inner text-lg"
+                                    />
+                                    
+                                    {/* Suggestions Dropdown */}
+                                    {showSuggestions && suggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] overflow-hidden animate-fade-in text-left">
+                                            <div className="max-h-80 overflow-y-auto">
+                                                {suggestions.map((p) => (
+                                                    <div 
+                                                        key={p._id}
+                                                        onClick={() => handleInvoiceSearch(null, p)}
+                                                        className="px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border-b border-gray-50 dark:border-gray-700 last:border-0"
+                                                    >
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <p className="font-black text-gray-900 dark:text-white text-sm uppercase">#{p.invoiceNumber}</p>
+                                                                <p className="text-xs text-primary font-bold">{p.supplierId?.name || 'Unknown Supplier'}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase">{new Date(p.purchaseDate).toLocaleDateString()}</p>
+                                                                <p className="text-xs font-black text-gray-900 dark:text-white">₹{p.grandTotal.toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                            {p.items.slice(0, 3).map((it, idx) => (
+                                                                <span key={idx} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[9px] font-black rounded uppercase">
+                                                                    {it.productName || it.skuId}
+                                                                </span>
+                                                            ))}
+                                                            {p.items.length > 3 && <span className="text-[9px] text-gray-400 font-bold">+{p.items.length - 3} more</span>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {searchLoading && (
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                            <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button type="submit" className="px-8 py-4 bg-gray-900 dark:bg-gray-700 text-white font-black rounded-2xl hover:bg-black dark:hover:bg-gray-600 active:scale-95 transition-all outline-none uppercase tracking-widest text-xs h-[60px]">
                                     Fetch
                                 </button>
                             </form>

@@ -19,7 +19,8 @@ import {
   Shield,
   Activity,
   HelpCircle,
-  CreditCard 
+  CreditCard,
+  ClipboardList
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -71,16 +72,19 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/inventory',
       subItems: [
         { label: 'Inventory Dashboard', path: '/inventory/dashboard' },
+        { label: 'Inventory Master', path: '/inventory/master' },
         { label: 'Location Master', path: '/inventory/locations' },
         { label: 'Stock List', path: '/inventory/stock' },
         { label: 'Physical Validation', path: '/inventory/physical-validation' },
-        { label: 'Stock IN (Purchase)', path: '/inventory/stock-in' },
         { label: 'Stock OUT', path: '/inventory/stock-out' },
         { label: 'Expiry Management', path: '/inventory/expiry' },
         { label: 'Low Stock Alerts', path: '/inventory/low-stock' },
-        { label: 'Units Management', path: '/inventory/units' },
         { label: 'Packing Materials', path: '/inventory/packing-materials' },
-        { label: 'Stock Adjustment', path: '/inventory/adjustment' }
+
+        { label: 'GRN Waitlist', path: '/inventory/grn/waitlist', badge: 'New' },
+        { label: 'Put Away Bucket', path: '/inventory/putaway' },
+        { label: 'Add GRN (Receive)', path: '/inventory/grn/add' },
+        { label: 'GRN History', path: '/inventory/grn' }
       ]
     },
 
@@ -92,9 +96,19 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       subItems: [
          { label: 'Medicine List', path: '/medicines/list' }, // Was inventory/medicines
          { label: 'Add Medicine', path: '/medicines/add' },   // Was inventory/medicines/add
-         { label: 'Medicine Groups', path: '/medicines/groups' }, // Was inventory/groups
-         { label: 'Categories', path: '/medicines/categories' },
          { label: 'Prescription Check', path: '/medicines/prescriptions' }
+      ]
+    },
+
+    // 3.5 Order Management (NEW)
+    {
+      label: 'Order',
+      icon: <ClipboardList size={20} />,
+      path: '/order',
+      subItems: [
+        { label: 'Online Orders', path: '/sales/online-orders' },
+        { label: 'QC & Packing', path: '/order/processing' },
+        { label: 'Shipping Listing', path: '/order/shipping' }
       ]
     },
 
@@ -106,7 +120,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       subItems: [
         { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
         { label: 'Invoices', path: '/sales/invoices' },
-        { label: 'Online Orders', path: '/sales/online-orders' },
         { label: 'Sales Return', path: '/sales/return' }
       ]
     },
@@ -118,10 +131,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/purchase',
       subItems: [
         { label: 'Supplier List', path: '/purchase/suppliers' },
-        { label: 'GRN Waitlist', path: '/purchase/grn/waitlist', badge: 'New' },
-        { label: 'Put Away Bucket', path: '/purchase/putaway' },
-        { label: 'Add GRN (Receive)', path: '/purchase/grn/add' },
-        { label: 'GRN History', path: '/purchase/grn' },
         { label: 'Purchase Invoices', path: '/purchase/invoices' },
         { label: 'Purchase Return', path: '/purchase/return' }
       ]

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
     Save, X, Plus, Trash2, Calendar, 
     FileText, User, Search, Package, 
@@ -8,9 +8,11 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
+import Papa from 'papaparse';
 
 const AddGRN = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -52,11 +54,146 @@ const AddGRN = () => {
     const [showResults, setShowResults] = useState(false);
     const [showAddSkuModal, setShowAddSkuModal] = useState(false);
     const [modalSearchTerm, setModalSearchTerm] = useState('');
+    const [physicalId, setPhysicalId] = useState('');
+    
+    const prefillHandled = React.useRef(false);
 
     useEffect(() => {
         fetchSuppliers();
         fetchProducts();
     }, []);
+
+    useEffect(() => {
+        // Handle prefill from state
+        if (location.state?.prefill && suppliers.length > 0 && !prefillHandled.current) {
+            const { physicalId: phId, entryData } = location.state.prefill;
+            const supplier = suppliers.find(s => s.name.toLowerCase() === entryData?.supplierName?.toLowerCase());
+            
+            setPhysicalId(phId || '');
+            setFormData(prev => ({ 
+                ...prev, 
+                supplierId: supplier?._id || '',
+                invoiceNumber: entryData?.invoiceNumber || '',
+                invoiceDate: entryData?.invoiceDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+                notes: `Ref: Physical ID ${phId}, Loc: ${entryData?.location || 'N/A'}`
+            }));
+
+            if (supplier) {
+                setSelectedSupplierDetails(supplier);
+            }
+            
+            prefillHandled.current = true;
+            
+            Swal.fire({
+                title: 'Data Loaded',
+                text: `Prefilled details from Physical ID: ${phId}`,
+                icon: 'info',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    }, [location.state, suppliers]);
+
+    const handleLoadPhysical = async () => {
+        if (!physicalId) return;
+        try {
+            setLoading(true);
+            const { data } = await api.get(`/physical-receiving/${physicalId}`);
+            if (data.success) {
+                const entry = data.data;
+                if (entry.status !== 'Done') {
+                    Swal.fire('Warning', 'This physical entry is not marked as Validated yet.', 'warning');
+                    return;
+                }
+                
+                const supplier = suppliers.find(s => s.name.toLowerCase() === entry.supplierName.toLowerCase());
+
+                setFormData(prev => ({
+                    ...prev,
+                    invoiceNumber: entry.invoiceNumber,
+                    invoiceDate: entry.invoiceDate.split('T')[0],
+                    supplierId: supplier?._id || '',
+                    notes: `Ref: Physical ID ${entry.physicalReceivingId}, Loc: ${entry.location || 'N/A'}`
+                }));
+
+                if (supplier) {
+                    setSelectedSupplierDetails(supplier);
+                }
+                
+                Swal.fire('Success', `Loaded details for Invoice ${entry.invoiceNumber}`, 'success');
+            }
+        } catch (error) {
+            Swal.fire('Error', 'Physical Validation ID not found', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCSVUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                if (results.errors.length) {
+                    Swal.fire('Error', 'Failed to parse CSV file', 'error');
+                    return;
+                }
+
+                const newItems = results.data.map(row => {
+                    if (!row['Medicine Name'] && !row['Item Name']) return null;
+                    const name = row['Medicine Name'] || row['Item Name'];
+                    const product = products.find(p => p.name.toLowerCase() === name.toLowerCase());
+                    
+                    return {
+                        productId: product?._id || '',
+                        productName: name,
+                        skuId: product?.sku || row['SKU'] || '',
+                        supplierSkuId: row['Supplier SKU'] || '',
+                        pack: row['Pack'] || row['Packing'] || '',
+                        batchNumber: row['Batch'] || row['Batch Number'] || '',
+                        expiryDate: row['Expiry'] || row['Expiry Date'] || '',
+                        mfgDate: row['Mfg Date'] || '',
+                        systemMrp: product?.mrp || 0,
+                        orderedQty: parseFloat(row['Ordered Qty']) || 0,
+                        receivedQty: parseFloat(row['Received Qty']) || parseFloat(row['Quantity']) || 0,
+                        physicalFreeQty: parseFloat(row['Free Qty']) || 0,
+                        schemeFreeQty: 0,
+                        poRate: parseFloat(row['Rate']) || parseFloat(row['Purchase Rate']) || 0,
+                        ptr: parseFloat(row['PTR']) || 0,
+                        baseRate: parseFloat(row['Base Rate']) || parseFloat(row['Purchase Rate']) || 0,
+                        schemeDiscount: 0,
+                        discountPercent: parseFloat(row['Disc %']) || 0,
+                        amount: 0, // Will be calculated
+                        hsnCode: product?.hsnCode || row['HSN'] || '',
+                        cgst: (parseFloat(row['GST %']) / 2) || 0,
+                        sgst: (parseFloat(row['GST %']) / 2) || 0,
+                        mrp: parseFloat(row['MRP']) || 0,
+                        margin: 0
+                    };
+                }).filter(Boolean);
+
+                if (newItems.length > 0) {
+                    // Enrich items with calculations
+                    const enriched = newItems.map(item => {
+                        const baseAmount = item.baseRate * item.receivedQty;
+                        const discountAmount = baseAmount * (item.discountPercent / 100);
+                        item.amount = baseAmount - discountAmount;
+                        if (item.baseRate > 0 && item.mrp > 0) {
+                            item.margin = ((item.mrp - item.baseRate) / item.baseRate * 100).toFixed(2);
+                        }
+                        return item;
+                    });
+                    setItems(prev => [...prev, ...enriched]);
+                    calculateSummary([...items, ...enriched]);
+                    Swal.fire('Success', `Imported ${newItems.length} items from CSV`, 'success');
+                }
+                e.target.value = '';
+            }
+        });
+    };
 
     const fetchSuppliers = async () => {
         try {
@@ -242,20 +379,22 @@ const AddGRN = () => {
                 taxAmount: invoiceSummary.amountAfterGst - invoiceSummary.taxableAmount,
                 discount: 0,
                 grandTotal: invoiceSummary.invoiceAmount,
-                status: 'Received',
-                paymentStatus: 'Pending'
+                status: 'Putaway_Pending', // Set to pending to trigger Put Away flow
+                paymentStatus: 'Pending',
+                physicalReceivingId: physicalId // Pass Physical ID to backend
             };
 
             const { data } = await api.post('/purchases', payload);
             
             if (data.success) {
                 Swal.fire({
-                    title: 'Success!',
-                    text: 'GRN created successfully',
+                    title: 'GRN Created!',
+                    text: 'Items sent to Put Away Bucket for verification.',
                     icon: 'success',
                     timer: 2000
                 });
-                navigate('/purchase/grn');
+                // Navigate to Invoice View
+                navigate(`/inventory/grn/view/${data.purchase._id}`);
             }
         } catch (error) {
             Swal.fire('Error', error.response?.data?.message || 'Failed to create GRN', 'error');
@@ -275,7 +414,7 @@ const AddGRN = () => {
                     <p className="text-sm text-gray-500 font-medium mt-1">Create new GRN with invoice details</p>
                 </div>
                 <button
-                    onClick={() => navigate('/purchase/grn')}
+                    onClick={() => navigate('/inventory/grn')}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all"
                 >
                     <ArrowLeft size={18} /> Back
@@ -290,6 +429,46 @@ const AddGRN = () => {
                         <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest mb-6">
                             Supplier & Invoice Details
                         </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Physical Validation ID</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        value={physicalId}
+                                        onChange={(e) => setPhysicalId(e.target.value)}
+                                        placeholder="e.g. PV-1234"
+                                        className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold uppercase"
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={handleLoadPhysical}
+                                        className="px-4 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                                    >
+                                        Load
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bulk Import (CSV)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="file" 
+                                        id="csv-upload"
+                                        className="hidden" 
+                                        accept=".csv"
+                                        onChange={handleCSVUpload}
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={() => document.getElementById('csv-upload').click()}
+                                        className="w-full h-[40px] flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 rounded-xl text-xs font-bold uppercase hover:bg-blue-100 transition-all"
+                                    >
+                                        <Upload size={14} /> Upload CSV
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supplier *</label>
@@ -607,7 +786,7 @@ const AddGRN = () => {
                 <div className="flex justify-end gap-4">
                     <button
                         type="button"
-                        onClick={() => navigate('/purchase/grn')}
+                        onClick={() => navigate('/inventory/grn')}
                         className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-200 transition-all"
                     >
                         Cancel

@@ -95,12 +95,17 @@ export const InventoryProvider = ({ children }) => {
                      note: l.note,
                      date: l.date,
                      totalQty: l.quantity,
-                     items: [{
-                         name: l.productName || 'Unknown Product',
-                         qty: l.quantity,
-                         batch: l.batchNumber || 'N/A',
-                         sku: 'N/A'
-                     }]
+                    adjustedBy: {
+                        name: l.adjustedByName,
+                        email: l.adjustedByEmail,
+                        mobile: l.adjustedByMobile
+                    },
+                    items: [{
+                        name: l.productName || 'Unknown Product',
+                        qty: l.quantity,
+                        batch: l.batchNumber || 'N/A',
+                        sku: 'N/A'
+                    }]
                  }));
                  allTransactions = [...allTransactions, ...mappedLogs];
              }
@@ -248,13 +253,16 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
-    const adjustStock = async (id, type, quantity, reason, note) => {
+    const adjustStock = async (id, type, quantity, reason, note, adjusterName, adjusterEmail, adjusterMobile) => {
         try {
              const { data } = await api.put(`/products/${id}/adjust`, {
                  type,
                  quantity,
                  reason,
-                 note
+                 note,
+                 adjusterName,
+                 adjusterEmail,
+                 adjusterMobile
              });
 
              if(data.success) {
@@ -265,10 +273,16 @@ export const InventoryProvider = ({ children }) => {
                      const newLog = {
                          id: data.log._id,
                          type: data.log.type,
+                         source: 'ADJUSTMENT',
                          reason: data.log.reason,
                          note: data.log.note,
                          date: data.log.date,
                          totalQty: data.log.quantity,
+                         adjustedBy: {
+                             name: data.log.adjustedByName,
+                             email: data.log.adjustedByEmail,
+                             mobile: data.log.adjustedByMobile
+                         },
                          items: [{
                              name: data.log.productName,
                              qty: data.log.quantity,
@@ -355,6 +369,19 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
+    const clearInventory = async () => {
+        try {
+            const { data } = await api.delete('/products/clear-all');
+            if (data.success) {
+                await fetchInventory();
+                return { success: true, message: "Inventory cleared" };
+            }
+            return { success: false, message: data.message };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || "Clear failed" };
+        }
+    };
+
     const deleteTransaction = async (id) => {
         try {
             const { data } = await api.delete(`/sales/${id}`);
@@ -373,13 +400,18 @@ export const InventoryProvider = ({ children }) => {
 
     const clearAllTransactions = async () => {
         try {
-            const { data } = await api.delete('/sales');
-            if (data.success) {
+            const [salesRes, logsRes, pReturnRes] = await Promise.all([
+                api.delete('/sales'),
+                api.delete('/products/logs/clear'),
+                api.delete('/purchase-returns/clear-all')
+            ]);
+
+            if (salesRes.data.success && logsRes.data.success && pReturnRes.data.success) {
                 await fetchTransactions();
                 await fetchInventory();
-                return { success: true, message: "All transactions cleared" };
+                return { success: true, message: "All transactions, logs and purchase returns cleared" };
             }
-            return { success: false, message: data.message };
+            return { success: false, message: "Clear operation partially failed" };
         } catch (error) {
              return { success: false, message: error.response?.data?.message || "Clear invalid" };
         }
@@ -435,6 +467,7 @@ export const InventoryProvider = ({ children }) => {
             adjustStock,
             bulkAdjustStock,
             deleteItem,
+            clearInventory,
             deleteTransaction,
             clearAllTransactions,
             transactions,

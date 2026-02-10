@@ -152,7 +152,7 @@ const GRNWaitlist = () => {
     };
   
     const handleCreateGRN = (entry) => {
-      navigate('/inventory/stock-in', { 
+      navigate('/inventory/grn/add', { 
         state: { 
           prefill: {
             physicalId: entry.physicalReceivingId,

@@ -164,6 +164,37 @@ const PurchaseInvoices = () => {
         });
     };
 
+    const handleClearAll = () => {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "All purchase invoices will be deleted. This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#EF4444',
+            cancelButtonColor: '#6B7280',
+            confirmButtonText: 'Yes, Clear All!',
+            cancelButtonText: 'Cancel'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const { data } = await api.delete('/purchases/clear');
+                    if (data.success) {
+                        fetchInvoices();
+                        Swal.fire({
+                            title: 'Cleared!',
+                            text: 'All invoices have been deleted.',
+                            icon: 'success',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Failed to clear invoices', 'error');
+                }
+            }
+        });
+    };
+
     const handleExport = () => {
         Swal.fire({
             title: 'Export Data',
@@ -255,7 +286,13 @@ const PurchaseInvoices = () => {
                                 <Download size={18} strokeWidth={2.5} /> Export List
                             </button>
                             <button 
-                                onClick={() => navigate('/inventory/stock-in')} 
+                                onClick={handleClearAll}
+                                className="w-full sm:w-auto px-6 py-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-900/20 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                            >
+                                <Trash2 size={18} strokeWidth={2.5} /> Clear All
+                            </button>
+                            <button 
+                                onClick={() => navigate('/inventory/grn/add')} 
                                 className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
                                 <Plus size={18} strokeWidth={3} /> New Purchase

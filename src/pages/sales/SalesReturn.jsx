@@ -221,6 +221,40 @@ const SalesReturn = () => {
         });
     };
 
+    const handleClearAll = () => {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "All sales returns will be deleted. This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6B7280',
+            confirmButtonText: 'Yes, Clear All!',
+            cancelButtonText: 'Cancel'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    Swal.fire({ title: 'Clearing...', didOpen: () => Swal.showLoading() });
+                    const { data } = await api.delete('/sales/returns/clear');
+                    Swal.close();
+                    if (data.success) {
+                        fetchReturns();
+                        Swal.fire({
+                            title: 'Cleared!',
+                            text: 'All sales returns have been deleted.',
+                            icon: 'success',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }
+                } catch (error) {
+                    Swal.close();
+                    Swal.fire('Error', 'Failed to clear sales returns', 'error');
+                }
+            }
+        });
+    };
+
     const handleDownloadReport = () => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -344,35 +378,39 @@ const SalesReturn = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
                             <input 
                                 type="text" 
-                                placeholder="e.g. INV-2024-001" 
+                                placeholder="Search Invoice, Customer or Item Name..." 
                                 value={invoiceSearch}
                                 onFocus={() => setShowSuggestions(true)}
                                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                                 onChange={(e) => setInvoiceSearch(e.target.value)}
                                 className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition-all font-mono uppercase text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                             />
-                            <button type="submit" className="px-6 py-3 bg-gray-900 dark:bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-600 active:scale-95 transition-all">Find Invoice</button>
+                            <button type="submit" className="px-6 py-3 bg-gray-900 dark:bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-600 active:scale-95 transition-all">Find</button>
                         </form>
 
                         {/* Suggestions Dropdown */}
                         {showSuggestions && invoiceSuggestions.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto text-left">
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] max-h-80 overflow-y-auto text-left animate-fade-in-up">
                                 {invoiceSuggestions.map(inv => (
                                     <div 
                                         key={inv._id}
                                         onClick={() => {
                                             setInvoiceSearch(inv.invoiceNumber);
                                             setShowSuggestions(false);
-                                            // Trigger search for this specific invoice
                                             handleInvoiceSearch(null, inv.invoiceNumber);
                                         }}
-                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors group"
                                     >
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-bold text-sm text-gray-800 dark:text-gray-100">{inv.invoiceNumber}</p>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="font-bold text-sm text-gray-800 dark:text-gray-100 group-hover:text-red-600 transition-colors">{inv.invoiceNumber}</p>
                                             <span className="text-[10px] font-bold text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</span>
                                         </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{inv.customerName || 'Walk-in'}</p>
+                                        <p className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                            <User size={10} /> {inv.customerName || 'Walk-in'}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                                            {inv.items?.map(i => i.name).join(', ')}
+                                        </p>
                                     </div>
                                 ))}
                             </div>
@@ -506,6 +544,12 @@ const SalesReturn = () => {
                         className="w-full sm:w-auto px-6 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-[11px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
                      >
                         <FileText size={18} className="text-red-500" strokeWidth={2.5} /> Return Report PDF
+                    </button>
+                    <button 
+                        onClick={handleClearAll}
+                        className="w-full sm:w-auto px-6 py-3.5 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-900/20 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                    >
+                        <AlertOctagon size={18} strokeWidth={2.5} /> Clear All
                     </button>
                     <button 
                         onClick={() => setView('create')}

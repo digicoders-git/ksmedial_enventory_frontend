@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../../context/InventoryContext';
 import { 
   ClipboardCheck, 
@@ -29,6 +30,7 @@ const StatusCard = ({ title, value, icon: Icon, colorClass, bgClass }) => (
 );
 
 const PhysicalValidation = () => {
+  const navigate = useNavigate();
   const { suppliers } = useInventory();
   const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
   const supplierWrapperRef = React.useRef(null);
@@ -169,6 +171,30 @@ const PhysicalValidation = () => {
       }
   };
 
+  const handleClearAll = () => {
+      Swal.fire({
+          title: 'Are you sure?',
+          text: "This will DELETE ALL physical validation entries. This action cannot be undone!",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Yes, clear all!'
+      }).then(async (result) => {
+          if (result.isConfirmed) {
+              try {
+                  const { data } = await api.delete('/physical-receiving/clear-all');
+                  if (data.success) {
+                      Swal.fire('Deleted!', 'All entries have been cleared.', 'success');
+                      fetchEntries();
+                  }
+              } catch (error) {
+                  Swal.fire('Error', 'Failed to clear entries', 'error');
+              }
+          }
+      });
+  };
+
   const pendingCount = entries.filter(e => e.status === 'Pending').length;
   const doneCount = entries.filter(e => e.status === 'Done').length;
 
@@ -183,12 +209,22 @@ const PhysicalValidation = () => {
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Manage and validate incoming physical stock before GRN.</p>
         </div>
-        <button 
-            onClick={() => setShowEntryModal(true)}
-            className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
-        >
-            <Plus size={18} /> New Entry
-        </button>
+        <div className="flex gap-2">
+            {entries.length > 0 && (
+                <button 
+                    onClick={handleClearAll}
+                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-sm hover:bg-red-100 transition-all flex items-center gap-2"
+                >
+                    <X size={18} /> Clear All
+                </button>
+            )}
+            <button 
+                onClick={() => setShowEntryModal(true)}
+                className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+            >
+                <Plus size={18} /> New Entry
+            </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -319,9 +355,30 @@ const PhysicalValidation = () => {
                                            Validate
                                        </button>
                                    ) : (
-                                       <button disabled className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-400 rounded-lg text-xs font-bold cursor-not-allowed">
-                                           Completed
-                                       </button>
+                                       <div className="flex gap-2 justify-end">
+                                            {entry.grnStatus !== 'Done' ? (
+                                                <button 
+                                                    onClick={() => navigate('/inventory/grn/add', { 
+                                                        state: { 
+                                                            prefill: {
+                                                                physicalId: entry.physicalReceivingId,
+                                                                entryData: entry
+                                                            } 
+                                                        } 
+                                                    })}
+                                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+                                                >
+                                                    <Plus size={14} /> Start GRN
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => navigate(`/inventory/grn/view/${entry.grnId || ''}`)}
+                                                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-100"
+                                                >
+                                                    View GRN
+                                                </button>
+                                            )}
+                                       </div>
                                    )}
                                </td>
                            </tr>

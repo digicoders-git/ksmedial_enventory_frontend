@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Phone, Mail, Printer, ArrowLeft, Download, Share2, FileText } from 'lucide-react';
+import { MapPin, Phone, Mail, Printer, ArrowLeft, Download, Share2, FileText, Package } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import KS2Logo from '/KS2-Logo.png'; 
@@ -42,7 +42,8 @@ const ViewInvoice = () => {
                     taxAmount: sale.taxAmount || 0,
                     discountAmount: sale.discountAmount || 0,
                     grandTotal: sale.totalAmount,
-                    patientDetails: sale.patientDetails
+                    patientDetails: sale.patientDetails,
+                    shippingDetails: sale.shippingDetails || { packingType: 'Box', boxCount: 1, polyCount: 0, isColdStorage: false } // Default if missing
                 });
             }
         } catch (error) {
@@ -77,6 +78,90 @@ Thank you for your business!
   `.trim()) : '';
 
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
+  const handlePrintLabel = () => {
+      if (!invoice) return;
+
+      const w = window.open('', '_blank');
+      // Use invoice data directly
+      const details = {
+          patient: invoice.patientDetails || {},
+          shipping: invoice.shippingDetails || { packingType: 'Box', boxCount: 1, polyCount: 0, isColdStorage: false }
+      };
+      
+      // Fallbacks if patient details are empty but generic customer exists
+      if (!details.patient.name) details.patient.name = invoice.customer;
+      if (!details.patient.mobile) details.patient.mobile = invoice.contact;
+      if (!details.patient.address) details.patient.address = invoice.address;
+
+      w.document.write(`
+          <html>
+          <head>
+              <title>Shipping Label - ${invoice.id}</title>
+              <style>
+                  body { font-family: sans-serif; padding: 20px; border: 2px solid #000; max-width: 400px; margin: 20px auto; }
+                  h1 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin: 0 0 20px 0; }
+                  .row { margin: 10px 0; display: flex; justify-content: space-between; }
+                  .label { font-weight: bold; font-size: 0.9em; text-transform: uppercase; color: #555; }
+                  .value { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
+                  .box { border: 2px solid #000; padding: 15px; margin-top: 20px; text-align: center; font-weight: bold; font-size: 1.4em; background: #f9f9f9; }
+                  .cold { background: #e0f7fa; color: #006064; padding: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; border: 2px dashed #0097a7; font-size: 1.2em; }
+                  .section { margin-bottom: 20px; }
+                  .address { white-space: pre-wrap; line-height: 1.4; }
+                  @media print {
+                      body { border: none; margin: 0; padding: 0; max-width: 100%; }
+                      .no-print { display: none; }
+                  }
+              </style>
+          </head>
+          <body>
+              ${details.shipping.isColdStorage ? '<div class="cold">❄️ COLD STORAGE ITEM ❄️</div>' : ''}
+              <h1>SHIPPING LABEL</h1>
+              
+              <div class="section">
+                  <div class="label">SHIP TO:</div>
+                  <div class="value" style="font-size: 1.3em;">${details.patient.name || 'Valued Customer'}</div>
+                  <div class="address">${details.patient.address || 'Address Not Provided'}</div>
+                  <div style="margin-top: 5px;">Ph: <strong>${details.patient.mobile || 'N/A'}</strong></div>
+              </div>
+
+              <div class="section" style="text-align: right; border-top: 1px dotted #ccc; padding-top: 10px;">
+                  <div class="label">FROM:</div>
+                  <div class="value">KS Pharma Net</div>
+                  <div class="address">123, Health Avenue, Medical District\nNew Delhi - 110001</div>
+                  <div>Ph: +91 98765 43210</div>
+              </div>
+
+              <div class="row" style="border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 10px 0;">
+                  <div>
+                      <span class="label">Inv #:</span> <strong>${invoice.id}</strong>
+                  </div>
+                  <div>
+                      <span class="label">Date:</span> <strong>${invoice.date}</strong>
+                  </div>
+              </div>
+              
+              <div class="box">
+                  ${details.shipping.packingType.toUpperCase()}<br/>
+                  <span style="font-size: 0.7em; font-weight: normal;">CONTENTS:</span><br/>
+                  ${details.shipping.boxCount} BOX / ${details.shipping.polyCount} POLY
+              </div>
+              
+              ${details.patient.doctorName ? `
+              <div style="margin-top: 20px; font-size: 0.9em; border-top: 1px dotted #ccc; padding-top: 10px;">
+                  <span class="label">Ref. Doctor:</span><br/>
+                  <strong>Dr. ${details.patient.doctorName}</strong><br/>
+                  ${details.patient.doctorAddress || ''}
+              </div>` : ''}
+
+              <script>
+                  window.onload = function() { window.print(); }
+              </script>
+          </body>
+          </html>
+      `);
+      w.document.close();
+  };
 
   const handleDownloadPDF = () => {
     if (!invoice) return;
@@ -259,6 +344,13 @@ Thank you for your business!
             >
                 <Download size={18} strokeWidth={2.5} />
                 <span className="uppercase text-xs tracking-widest">PDF</span>
+            </button>
+            <button 
+                onClick={handlePrintLabel}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition-all font-bold active:scale-95"
+            >
+                <Package size={18} strokeWidth={2.5} />
+                <span className="uppercase text-xs tracking-widest">Label</span>
             </button>
             <button 
                 onClick={() => window.print()} 

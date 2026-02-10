@@ -1,16 +1,59 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Download, Search, ChevronDown, BarChart3, FileText, Printer } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Download, Search, ChevronDown, BarChart3, FileText, Printer, Settings } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
+import Swal from 'sweetalert2';
+import api from '../../api/axios';
 
 const StatsHistory = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { type = 'products', title = 'History' } = location.state || {};
+  const { type = 'products', title = 'History', threshold: initialThreshold = 5 } = location.state || {}; // Get threshold from nav state
 
   const { inventory, transactions } = useInventory();
 
-
+  const handleConfigureAlert = () => {
+    Swal.fire({
+      title: 'Configure Status Alert',
+      text: 'Set the maximum number of Out-of-Stock items allowed before showing an "Alert" status.',
+      input: 'number',
+      inputValue: initialThreshold,
+      inputAttributes: {
+        min: 1,
+        step: 1
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Update Threshold',
+      confirmButtonColor: '#059669',
+      showLoaderOnConfirm: true,
+      preConfirm: async (value) => {
+        if (!value) return Swal.showValidationMessage('Please enter a value');
+        try {
+          const { data } = await api.put('/profile', {
+            inventorySettings: {
+              outOfStockAlertThreshold: parseInt(value)
+            }
+          });
+          if (!data.success) throw new Error(data.message);
+          return value;
+        } catch (error) {
+          Swal.showValidationMessage(`Request failed: ${error}`);
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({
+          title: 'Updated!',
+          text: `Dashboard will now alert if more than ${result.value} items are out of stock.`,
+          icon: 'success'
+        }).then(() => {
+           // Optionally refresh or just let dashboard reload on next visit (navigate back?)
+           // For now, staying on page is fine.
+        });
+      }
+    });
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
@@ -26,6 +69,23 @@ const StatsHistory = () => {
     const data = [];
 
     switch(type) {
+      case 'critical_stock':
+        inventory.filter(item => item.stock === 0).forEach((item, idx) => {
+             data.push({
+            id: `crit-${item.id}`,
+            date: item.updatedAt ? new Date(item.updatedAt) : now,
+            type: 'OUT_OF_STOCK',
+            productName: item.name,
+            category: item.category,
+            quantity: 0,
+            batch: item.batch,
+            user: 'System',
+            severity: 'critical',
+            details: `Critical: Item is completely OUT OF STOCK. Please reorder immediately.`
+          });
+        });
+        break;
+
       case 'products':
         inventory.forEach((item) => {
           data.push({
@@ -92,7 +152,9 @@ const StatsHistory = () => {
                 quantity: item.qty || item.quantity,
                 amount: tx.totalAmount,
                 batch: item.batch || 'N/A',
-                user: tx.user || 'System',
+                user: tx.adjustedBy?.name || tx.user || 'System',
+                userEmail: tx.adjustedBy?.email,
+                userMobile: tx.adjustedBy?.mobile,
                 reference: tx.reference || (tx.id ? `TXN-${tx.id.slice(-6).toUpperCase()}` : `TXN-${1000 + idx}`),
                 details: `${tx.reason || (tx.type === 'IN' ? 'Restocked' : 'Dispatched')} - ${item.qty || item.quantity} units ${tx.reference ? '[Ref: '+tx.reference+']' : ''}`
               });
@@ -238,12 +300,22 @@ const StatsHistory = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Complete transaction history and analytics</p>
           </div>
         </div>
-        <button
-          onClick={() => alert('Export feature coming soon!')}
-          className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
-        >
-          <Download size={18} strokeWidth={3} /> Export Data
-        </button>
+        <div className="flex items-center gap-3">
+            {type === 'critical_stock' && (
+                <button
+                onClick={handleConfigureAlert}
+                className="w-full sm:w-auto px-6 py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-indigo-100 dark:border-indigo-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                >
+                <Settings size={18} strokeWidth={3} /> Configure Alert
+                </button>
+            )}
+            <button
+            onClick={() => alert('Export feature coming soon!')}
+            className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+            >
+            <Download size={18} strokeWidth={3} /> Export Data
+            </button>
+        </div>
       </div>
 
       {/* Stats Summary */}
@@ -446,7 +518,14 @@ const StatsHistory = () => {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-gray-800 dark:text-white truncate">{item.productName}</h4>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-black text-gray-800 dark:text-white truncate">{item.productName}</h4>
+                        {item.user && (
+                          <span className="text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 rounded-md border border-primary/20 flex items-center gap-1 shrink-0">
+                            By: {item.user}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium italic">{item.details}</p>
                     </div>
                   </div>
@@ -511,9 +590,11 @@ const StatsHistory = () => {
                       </div>
                     )}
                     {item.user && (
-                      <div>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5 opacity-70">Generated By</p>
+                      <div className="col-span-2 lg:col-span-1">
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5 opacity-70">Adjusted By</p>
                         <p className="text-sm text-gray-800 dark:text-white font-black">{item.user}</p>
+                        {item.userEmail && <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{item.userEmail}</p>}
+                        {item.userMobile && <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{item.userMobile}</p>}
                       </div>
                     )}
                     {item.reference && (

@@ -25,7 +25,7 @@ const LocationMaster = () => {
     const [showModal, setShowModal] = useState(false);
     const [currentLocation, setCurrentLocation] = useState(null);
     const [formData, setFormData] = useState({
-        vendorName: '',
+
         category: 'Picking',
         aisle: '',
         rack: '',
@@ -79,12 +79,11 @@ const LocationMaster = () => {
         
         const csvRows = [];
         // Header
-        csvRows.push(['Location Code', 'Vendor', 'Category', 'Aisle', 'Rack', 'Shelf', 'Bin', 'Partition', 'Status', 'Temperature']);
+        csvRows.push(['Location Code', 'Category', 'Aisle', 'Rack', 'Shelf', 'Bin', 'Partition', 'Status', 'Temperature']);
         
         locations.forEach(loc => {
             csvRows.push([
                 loc.locationCode,
-                loc.vendorName || '',
                 loc.category,
                 loc.aisle,
                 loc.rack,
@@ -115,7 +114,7 @@ const LocationMaster = () => {
                 }
 
                 const bulkData = results.data.map(row => ({
-                    vendorName: row['Vendor'] || '',
+
                     category: row['Category'] || 'Picking',
                     aisle: row['Aisle'],
                     rack: row['Rack'],
@@ -149,7 +148,7 @@ const LocationMaster = () => {
     const handleDownloadSampleCSV = () => {
         const sampleData = [
             {
-                Vendor: 'PharmaLink',
+
                 Category: 'Picking',
                 Aisle: 'A1',
                 Rack: 'R01',
@@ -160,7 +159,7 @@ const LocationMaster = () => {
                 Temperature: 'Normal'
             },
             {
-                Vendor: 'MediCare',
+
                 Category: 'Reserve',
                 Aisle: 'B2',
                 Rack: 'R05',
@@ -239,7 +238,7 @@ const LocationMaster = () => {
     const handleEdit = (loc) => {
         setCurrentLocation(loc);
         setFormData({
-            vendorName: loc.vendorName,
+
             category: loc.category,
             aisle: loc.aisle,
             rack: loc.rack,
@@ -255,7 +254,7 @@ const LocationMaster = () => {
     const handleCreate = () => {
         setCurrentLocation(null);
         setFormData({
-            vendorName: '',
+
             category: 'Picking',
             aisle: '',
             rack: '',
@@ -361,7 +360,7 @@ const LocationMaster = () => {
                             <tr>
                                 <th className="p-3 w-8"><input type="checkbox" /></th>
                                 <th className="p-3">ID</th>
-                                <th className="p-3">Vendor Name</th>
+
                                 <th className="p-3">Location Name</th>
                                 <th className="p-3">Category</th>
                                 <th className="p-3">Aisle</th>
@@ -385,7 +384,7 @@ const LocationMaster = () => {
                                     <tr key={loc._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                         <td className="p-3"><input type="checkbox" /></td>
                                         <td className="p-3 font-mono text-gray-500">{loc._id.slice(-6)}</td>
-                                        <td className="p-3">{loc.vendorName || '-'}</td>
+
                                         <td className="p-3 font-bold text-gray-800 dark:text-gray-200">{loc.locationCode}</td>
                                         <td className="p-3">{loc.category}</td>
                                         <td className="p-3">{loc.aisle}</td>
@@ -450,10 +449,7 @@ const LocationMaster = () => {
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Vendor Name</label>
-                                <input value={formData.vendorName} onChange={(e) => setFormData({...formData, vendorName: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                            </div>
+
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
                                 <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -524,26 +520,12 @@ const LocationMaster = () => {
                         <div id="qr-print-area" className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border-2 border-dashed border-gray-200">
                              <h1 className="text-xl font-black text-black mb-1">{printLocation.locationCode}</h1>
                              <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({
-                                    id: printLocation._id,
-                                    code: printLocation.locationCode,
-                                    vendor: printLocation.vendorName || '',
-                                    category: printLocation.category,
-                                    status: printLocation.status,
-                                    // Aisle-Rack-Shelf etc
-                                    loc: {
-                                       a: printLocation.aisle,
-                                       r: printLocation.rack,
-                                       s: printLocation.shelf,
-                                       b: printLocation.bin,
-                                       p: printLocation.partition
-                                    }
-                                }))}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(printLocation.locationCode)}`}
                                 alt="Location QR Code"
                                 className="w-[180px] h-[180px]"
                              />
                              <p className="mt-2 font-bold uppercase">{printLocation.category} Zone</p>
-                             <p className="meta">{printLocation.vendorName ? `Vendor: ${printLocation.vendorName}` : 'Internal Stock'}</p>
+
                         </div>
 
                         <div className="mt-6 flex justify-center gap-3">

@@ -1,27 +1,56 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Filter, Eye, Edit2, Ban, Calendar, X, Save, AlertTriangle, Plus, Package, Trash2, ChevronLeft, ChevronRight, QrCode, Download } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
-import { useNavigate } from 'react-router-dom';
+import { Search, Filter, Eye, Edit2, Ban, Calendar, X, Save, AlertTriangle, Plus, Package, Trash2, ChevronLeft, ChevronRight, QrCode, Download, ArrowDownCircle, ArrowUpCircle, User, Shield, FileText } from 'lucide-react';
+// import { QRCodeCanvas } from 'qrcode.react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { useInventory } from '../../context/InventoryContext';
+import { useAuth } from '../../context/AuthContext';
 
 const StockList = () => {
   const navigate = useNavigate();
-  const { inventory, deleteItem, adjustStock, loading } = useInventory(); // Use context
+  const location = useLocation();
+  const { inventory, deleteItem, clearInventory, adjustStock, loading } = useInventory(); // Use context
+  const { shop } = useAuth(); // Get current shop/user info
   
-  // Local loading state not needed if using context's loading, or alias it
-  // const [inventory, setInventory] = useState([]); // REMOVED
-  // const [loading, setLoading] = useState(true); // REMOVED
+  // Handle incoming navigation state for filtering
+  useEffect(() => {
+    if (location.state?.filter) {
+        setSearchTerm(location.state.filter);
+    }
+  }, [location.state]);
 
-  // fetchStock REMOVED - InventoryContext handles it
+  const handleClearAll = () => {
+      Swal.fire({
+          title: 'Are you absolutely sure?',
+          text: "This will DELETE ALL items from the inventory master. This action is irreversible!",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Yes, CLEAR EVERYTHING!'
+      }).then(async (result) => {
+          if (result.isConfirmed) {
+              const res = await clearInventory();
+              if (res.success) {
+                  Swal.fire('Cleared!', 'Inventory has been fully cleared.', 'success');
+              } else {
+                  Swal.fire('Error', res.message, 'error');
+              }
+          }
+      });
+  };
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [selectedStock, setSelectedStock] = useState(null);
   const [adjustmentData, setAdjustmentData] = useState({
-    type: 'add',
+    type: 'deduct', // 'add' or 'deduct'
     quantity: '',
-    reason: ''
+    reason: 'Damage',
+    note: '',
+    adjusterName: shop?.ownerName || '',
+    adjusterEmail: shop?.email || '',
+    adjusterMobile: shop?.contactNumber || ''
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -45,7 +74,15 @@ const StockList = () => {
 
   const openAdjustModal = (stock) => {
     setSelectedStock(stock);
-    setAdjustmentData({ type: 'add', quantity: '', reason: '' });
+    setAdjustmentData({ 
+        type: 'deduct', 
+        quantity: '', 
+        reason: 'Damage',
+        note: '',
+        adjusterName: shop?.ownerName || '',
+        adjusterEmail: shop?.email || '',
+        adjusterMobile: shop?.contactNumber || ''
+    });
     setShowAdjustModal(true);
   };
 
@@ -77,7 +114,17 @@ const StockList = () => {
   
   const handleAdjustmentChange = (e) => {
     const { name, value } = e.target;
-    setAdjustmentData(prev => ({ ...prev, [name]: value }));
+    setAdjustmentData(prev => {
+        // Reset reason when type changes
+        if (name === 'type') {
+            return { 
+                ...prev, 
+                [name]: value,
+                reason: value === 'add' ? 'Found' : 'Damage'
+            };
+        }
+        return { ...prev, [name]: value };
+    });
   };
 
   const handleAdjustSubmit = async (e) => {
@@ -89,22 +136,15 @@ const StockList = () => {
 
     const qtyChange = parseInt(adjustmentData.quantity);
     
-    // adjustStock(id, type, quantity, reason)
-    // Note: InventoryContext adjustStock expects 'add' or 'deduct'. 
-    // StockList uses 'add', 'subtract', 'damage', 'expired'. 
-    // Need to map 'subtract'/'damage'/'expired' to 'deduct' but pass reason correctly?
-    // Wait, InventoryContext adjustStock takes (id, type, ...). Check backend.
-    // Backend productController: type === 'add' ? + : -. So 'deduct' or anything else works as minus.
-    // But better to be explicit.
-    
-    const contextType = adjustmentData.type === 'add' ? 'add' : 'deduct';
-    // If reason is needed, pass it.
-    
     const result = await adjustStock(
         selectedStock.id, 
-        contextType, 
+        adjustmentData.type, 
         qtyChange, 
-        adjustmentData.reason || adjustmentData.type // Use detailed type as reason if empty
+        adjustmentData.reason,
+        adjustmentData.note,
+        adjustmentData.adjusterName,
+        adjustmentData.adjusterEmail,
+        adjustmentData.adjusterMobile
     );
 
     if (result.success) {
@@ -205,10 +245,26 @@ const StockList = () => {
         </div>
         <div className="flex gap-2">
            <button 
-             onClick={() => navigate('/inventory/stock-in')}
+             onClick={() => navigate('/inventory/grn/add')}
              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-secondary shadow-md active:scale-95 transition-all flex items-center gap-2"
            >
              <Plus size={16} /> New Stock Entry
+           </button>
+           {inventory.length > 0 && (
+             <button 
+                onClick={handleClearAll}
+                className="px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm font-medium hover:bg-red-100 shadow-sm active:scale-95 transition-all flex items-center gap-2"
+                title="Wipe entire inventory"
+             >
+                <Trash2 size={16} /> Clear All
+             </button>
+           )}
+           <button 
+                onClick={() => navigate('/inventory/stats-history', { state: { type: 'movement', title: 'Adjustment History' } })}
+                className="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-900/20 dark:border-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 shadow-sm active:scale-95 transition-all flex items-center gap-2"
+                title="View stock movement logs"
+           >
+                <FileText size={16} /> View Logs
            </button>
            <div className="relative filter-dropdown-container">
              <button 
@@ -535,17 +591,7 @@ const StockList = () => {
                     <div className="row-span-2 flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-xl">
                       <div className="bg-white p-2 rounded-lg shadow-sm mb-2">
                         <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({
-                                id: selectedStock.id,
-                                name: selectedStock.name,
-                                batch: selectedStock.batch,
-                                expiry: selectedStock.exp,
-                                mrp: selectedStock.rate, // map rate to mrp for consistency
-                                stock: selectedStock.stock,
-                                sku: selectedStock.sku,
-                                generic: selectedStock.generic,
-                                company: selectedStock.company
-                            }))}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(selectedStock.sku || selectedStock._id)}`}
                             alt="QR Code"
                             className="w-[120px] h-[120px]"
                         />
@@ -554,17 +600,7 @@ const StockList = () => {
                       <button 
                         onClick={async () => {
                             try {
-                                const dataStart = JSON.stringify({
-                                    id: selectedStock.id,
-                                    name: selectedStock.name,
-                                    batch: selectedStock.batch,
-                                    expiry: selectedStock.exp,
-                                    mrp: selectedStock.rate,
-                                    stock: selectedStock.stock,
-                                    sku: selectedStock.sku,
-                                    generic: selectedStock.generic,
-                                    company: selectedStock.company
-                                });
+                                const dataStart = selectedStock.sku || selectedStock._id;
                                 const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(dataStart)}`;
                                 const response = await fetch(url);
                                 const blob = await response.blob();
@@ -662,69 +698,138 @@ const StockList = () => {
                    </div>
                 </div>
 
-                <div className="space-y-3">
+                {/* Adjuster Info - DYNAMIC */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-xl relative overflow-hidden group">
+                   <div className="flex items-center gap-3 relative z-10 w-full">
+                      <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center text-primary shadow-sm border border-gray-100 dark:border-gray-600 shrink-0">
+                        <User size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-3">
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">Adjuster Name</p>
+                            <input 
+                                type="text"
+                                name="adjusterName"
+                                value={adjustmentData.adjusterName}
+                                onChange={handleAdjustmentChange}
+                                placeholder="Enter adjuster name"
+                                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm placeholder:text-gray-400 shadow-sm"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-none">Email Address</p>
+                                <input 
+                                    type="email"
+                                    name="adjusterEmail"
+                                    value={adjustmentData.adjusterEmail}
+                                    onChange={handleAdjustmentChange}
+                                    placeholder="email@example.com"
+                                    className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-[11px] placeholder:text-gray-400 shadow-sm"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-none">Mobile No.</p>
+                                <input 
+                                    type="text"
+                                    name="adjusterMobile"
+                                    value={adjustmentData.adjusterMobile}
+                                    onChange={handleAdjustmentChange}
+                                    placeholder="Enter mobile"
+                                    className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-[11px] placeholder:text-gray-400 shadow-sm"
+                                />
+                            </div>
+                        </div>
+                      </div>
+                   </div>
+                   <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
+                      <Shield size={80} />
+                   </div>
+                </div>
+
+                <div className="space-y-4">
                   <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block">Adjustment Type</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className={`cursor-pointer relative overflow-hidden rounded-xl border p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200 group
-                      ${adjustmentData.type === 'add' ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-700 dark:text-green-400 shadow-sm' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                      <input type="radio" name="type" value="add" className="hidden" checked={adjustmentData.type === 'add'} onChange={handleAdjustmentChange} />
-                      <div className={`p-1.5 rounded-full ${adjustmentData.type === 'add' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-600'}`}>
-                         <Plus size={18} />
-                      </div>
-                      <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">Add Stock</span>
-                    </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                        type="button"
+                        onClick={() => handleAdjustmentChange({ target: { name: 'type', value: 'deduct' } })}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                            adjustmentData.type === 'deduct' 
+                            ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' 
+                            : 'border-gray-100 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        <ArrowDownCircle size={24} />
+                        <span className="font-bold text-sm">Deduct Stock</span>
+                    </button>
 
-                    <label className={`cursor-pointer relative overflow-hidden rounded-xl border p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200 group
-                      ${['subtract', 'damage', 'expired'].includes(adjustmentData.type) ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-700 dark:text-red-400 shadow-sm' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                       <input type="radio" name="type" value="subtract" className="hidden" checked={adjustmentData.type === 'subtract'} onChange={handleAdjustmentChange} />
-                      <div className={`p-1.5 rounded-full ${['subtract', 'damage', 'expired'].includes(adjustmentData.type) ? 'bg-red-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-600'}`}>
-                         <Ban size={18} />
-                      </div>
-                      <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">Remove Stock</span>
-                    </label>
-                  </div>
-
-                  {/* Sub-options for Remove */}
-                   <div className="grid grid-cols-2 gap-3 pt-1">
-                     <label className={`cursor-pointer rounded-lg border px-3 py-2 flex items-center justify-center gap-2 transition-all text-xs font-medium
-                        ${adjustmentData.type === 'damage' ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 text-orange-700 dark:text-orange-400 shadow-sm' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                        <input type="radio" name="type" value="damage" className="hidden" checked={adjustmentData.type === 'damage'} onChange={handleAdjustmentChange} />
-                        <AlertTriangle size={14} /> Damaged
-                      </label>
-                      <label className={`cursor-pointer rounded-lg border px-3 py-2 flex items-center justify-center gap-2 transition-all text-xs font-medium
-                        ${adjustmentData.type === 'expired' ? 'bg-gray-100 dark:bg-gray-700 border-gray-400 text-gray-800 dark:text-gray-200 shadow-sm' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                        <input type="radio" name="type" value="expired" className="hidden" checked={adjustmentData.type === 'expired'} onChange={handleAdjustmentChange} />
-                        <Calendar size={14} /> Expired/Lost
-                      </label>
+                    <button
+                        type="button"
+                        onClick={() => handleAdjustmentChange({ target: { name: 'type', value: 'add' } })}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                            adjustmentData.type === 'add' 
+                            ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+                            : 'border-gray-100 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        <ArrowUpCircle size={24} />
+                        <span className="font-bold text-sm">Add Stock</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 pt-2">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Quantity <span className="text-red-500">*</span></label>
-                    <input 
-                        type="number" 
-                        name="quantity"
-                        min="1"
-                        autoFocus
-                        placeholder="0" 
-                        value={adjustmentData.quantity}
-                        onChange={handleAdjustmentChange}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all"
-                      />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Reason</label>
+                        <select 
+                            name="reason"
+                            value={adjustmentData.reason}
+                            onChange={handleAdjustmentChange}
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
+                        >
+                            {adjustmentData.type === 'deduct' ? (
+                                <>
+                                    <option value="Damage">Damaged / Broken</option>
+                                    <option value="Expired">Expired</option>
+                                    <option value="Theft">Theft / Lost</option>
+                                    <option value="Correction">Counting Correction</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="Found">Stock Found</option>
+                                    <option value="Return">Customer Return</option>
+                                    <option value="Correction">Counting Correction</option>
+                                </>
+                            )}
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Remarks</label>
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Quantity <span className="text-red-500">*</span></label>
+                        <input 
+                            type="number" 
+                            name="quantity"
+                            min="1"
+                            autoFocus
+                            placeholder="0" 
+                            value={adjustmentData.quantity}
+                            onChange={handleAdjustmentChange}
+                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Note / Remarks</label>
                     <textarea 
-                      name="reason"
-                      rows="2"
-                      placeholder="Reason for adjustment..." 
-                      value={adjustmentData.reason}
-                      onChange={handleAdjustmentChange}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white"
+                        name="note"
+                        rows="2"
+                        placeholder="Optional details..." 
+                        value={adjustmentData.note}
+                        onChange={handleAdjustmentChange}
+                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm resize-none text-gray-800 dark:text-white"
                     ></textarea>
-                  </div>
                 </div>
               </div>
 
@@ -741,10 +846,10 @@ const StockList = () => {
                   type="submit" 
                   disabled={!adjustmentData.quantity}
                   className={`px-6 py-2.5 rounded-xl text-white font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed
-                    ${adjustmentData.type === 'add' ? 'bg-primary hover:bg-secondary shadow-primary/20' : 'bg-red-600 hover:bg-red-700 shadow-red-200'}`}
+                    ${adjustmentData.type === 'add' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'}`}
                 >
                   <Save size={18} />
-                  Confirm
+                  Confirm {adjustmentData.type === 'add' ? 'Addition' : 'Deduction'}
                 </button>
               </div>
             </form>

@@ -204,7 +204,7 @@ const ViewGRN = () => {
             {/* Header / Actions */}
             <div className="flex justify-between items-center print:hidden">
                 <button 
-                    onClick={() => navigate('/purchase/grn')}
+                    onClick={() => navigate('/inventory/grn')}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all"
                 >
                     <ArrowLeft size={18} />

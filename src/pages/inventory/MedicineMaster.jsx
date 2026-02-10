@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, AlertCircle, UploadCloud, FileText, Activity, Layers, Tag, DollarSign, Package, Check, ScanLine, RefreshCw } from 'lucide-react';
+import { Save, X, AlertCircle, UploadCloud, FileText, Activity, Layers, Tag, DollarSign, Package, Check, ScanLine, RefreshCw, Plus } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { useInventory } from '../../context/InventoryContext';
@@ -8,7 +8,7 @@ import Papa from 'papaparse';
 
 const MedicineMaster = () => {
   const navigate = useNavigate();
-  const { addMedicine, generateSKU, fetchInventory } = useInventory();
+  const { generateSKU, fetchInventory } = useInventory();
   const location = useLocation();
   const editData = location.state?.medicine;
   const mode = location.state?.mode;
@@ -37,28 +37,35 @@ const MedicineMaster = () => {
     purchasePrice: '',
     sellingPrice: '',
     group: '',
-    category: ''
+    category: '',
+    batchNumber: '',
+    manufacturingDate: '',
+    expiryDate: ''
   });
 
   const [groups, setGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [units, setUnits] = useState([]);
+
+  const fetchOptions = async () => {
+    try {
+      const [groupsRes, categoriesRes, locationsRes, unitsRes] = await Promise.all([
+        api.get('/groups'),
+        api.get('/categories'),
+        api.get('/locations?pageSize=1000&status=Active'),
+        api.get('/units')
+      ]);
+      if (groupsRes.data.success) setGroups(groupsRes.data.groups);
+      if (categoriesRes.data.success) setCategories(categoriesRes.data.categories);
+      if (locationsRes.data.success) setLocations(locationsRes.data.locations);
+      if (unitsRes.data.success) setUnits(unitsRes.data.units);
+    } catch (error) {
+      console.error("Failed to fetch options", error);
+    }
+  };
 
   useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [groupsRes, categoriesRes, locationsRes] = await Promise.all([
-          api.get('/groups'),
-          api.get('/categories'),
-          api.get('/locations?pageSize=1000&status=Active')
-        ]);
-        if (groupsRes.data.success) setGroups(groupsRes.data.groups);
-        if (categoriesRes.data.success) setCategories(categoriesRes.data.categories);
-        if (locationsRes.data.success) setLocations(locationsRes.data.locations);
-      } catch (error) {
-        console.error("Failed to fetch groups, categories or locations", error);
-      }
-    };
     fetchOptions();
   }, []);
 
@@ -81,7 +88,10 @@ const MedicineMaster = () => {
         purchasePrice: editData.rate || '',
         sellingPrice: editData.mrp || '',
         group: editData.group || '',
-        category: editData.category || ''
+        category: editData.category || '',
+        batchNumber: editData.batch || '',
+        manufacturingDate: editData.manufacturingDate || '',
+        expiryDate: editData.expiry || ''
       });
       if (editData.image) {
           setImagePreview(editData.image);
@@ -90,7 +100,8 @@ const MedicineMaster = () => {
       // Auto-generate SKU for new medicine
       setFormData(prev => ({
         ...prev,
-        barcode: generateSKU ? generateSKU() : 'SKU-' + Math.floor(10000 + Math.random() * 90000)
+        barcode: generateSKU ? generateSKU() : 'SKU-' + Math.floor(10000 + Math.random() * 90000),
+        batchNumber: ''
       }));
     }
   }, [editData, generateSKU]);
@@ -202,7 +213,52 @@ const MedicineMaster = () => {
       setIsBulkMode(false);
   };
 
-  const handleSubmit = async (e) => {
+  const handleAddUnit = async () => {
+    const { value: formValues } = await Swal.fire({
+      title: 'Add New Measurement Unit',
+      html:
+        '<div class="flex flex-col gap-3 p-2">' +
+        '<input id="swal-input1" class="swal2-input !m-0 w-full" placeholder="Unit Name (e.g. Kilogram)">' +
+        '<input id="swal-input2" class="swal2-input !m-0 w-full" placeholder="Abbreviation (e.g. kg)">' +
+        '</div>',
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Create Unit',
+      confirmButtonColor: '#0D9488',
+      preConfirm: () => {
+        return [
+          document.getElementById('swal-input1').value,
+          document.getElementById('swal-input2').value
+        ]
+      }
+    });
+
+    if (formValues) {
+      const [name, code] = formValues;
+      if (!name || !code) {
+        Swal.fire('Error', 'Please fill both Name and Code', 'error');
+        return;
+      }
+      try {
+        const { data } = await api.post('/units', { name, code });
+        if (data.success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Created!',
+            text: 'New unit added successfully',
+            timer: 1500,
+            showConfirmButton: false
+          });
+          await fetchOptions(); // Refresh the list
+          setFormData(prev => ({ ...prev, unit: data.unit.name }));
+        }
+      } catch (error) {
+        Swal.fire('Error', error.response?.data?.message || 'Failed to create unit', 'error');
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
     try {
       if (isBulkMode) {
           Swal.fire({
@@ -288,8 +344,11 @@ const MedicineMaster = () => {
         isPrescriptionRequired: formData.isPrescriptionRequired,
         group: formData.group,
         category: formData.category,
-        batchNumber: editData?.batch || 'N/A',
-        expiryDate: editData?.expiry || 'N/A',
+        group: formData.group,
+        category: formData.category,
+        batchNumber: formData.batchNumber || 'N/A',
+        manufacturingDate: formData.manufacturingDate || 'N/A',
+        expiryDate: formData.expiryDate || 'N/A',
         image: imagePreview
       };
 
@@ -529,51 +588,129 @@ const MedicineMaster = () => {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Medicine Group</label>
-                    <select 
-                      name="group"
-                      value={formData.group}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
-                    >
-                      <option value="">Select Group</option>
-                      {groups.map(g => (
-                        <option key={g._id} value={g.name}>{g.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select 
+                        name="group"
+                        value={formData.group}
+                        onChange={handleChange}
+                        className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
+                      >
+                        <option value="">Select Group</option>
+                        {groups.map(g => (
+                          <option key={g._id} value={g.name}>{g.name}</option>
+                        ))}
+                      </select>
+                      <button 
+                         type="button"
+                         onClick={async () => {
+                             const { value: newGroup } = await Swal.fire({
+                                 title: 'Add New Medicine Group',
+                                 input: 'text',
+                                 inputLabel: 'Group Name',
+                                 inputPlaceholder: 'e.g. Antibiotics',
+                                 showCancelButton: true
+                             });
+                             if (newGroup) {
+                                 try {
+                                     const { data } = await api.post('/groups', { name: newGroup });
+                                     if (data.success) {
+                                         Swal.fire('Success', 'Group added successfully', 'success');
+                                         fetchOptions(); // Refresh lists
+                                         setFormData(prev => ({ ...prev, group: data.group.name }));
+                                     }
+                                 } catch (error) {
+                                     Swal.fire('Error', error.response?.data?.message || 'Failed to add group', 'error');
+                                 }
+                             }
+                         }}
+                         className="p-2.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 hover:text-primary transition-all active:scale-95 shadow-sm"
+                         title="Add New Group"
+                       >
+                          <Plus size={18} />
+                       </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Therapeutic Category</label>
-                    <select 
-                      name="category"
-                      value={formData.category}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(c => (
-                        <option key={c._id} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                        <select 
+                          name="category"
+                          value={formData.category}
+                          onChange={handleChange}
+                          className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
+                        >
+                          <option value="">Select Category</option>
+                          {categories.map(c => (
+                            <option key={c._id} value={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <button 
+                             type="button"
+                             onClick={async () => {
+                                 const { value: newCat } = await Swal.fire({
+                                     title: 'Add New Category',
+                                     input: 'text',
+                                     inputLabel: 'Category Name',
+                                     inputPlaceholder: 'e.g. Analgesic',
+                                     showCancelButton: true
+                                 });
+                                 if (newCat) {
+                                     try {
+                                         const { data } = await api.post('/categories', { name: newCat });
+                                         if (data.success) {
+                                             Swal.fire('Success', 'Category added successfully', 'success');
+                                             fetchOptions(); // Refresh lists
+                                             setFormData(prev => ({ ...prev, category: data.category.name }));
+                                         }
+                                     } catch (error) {
+                                         Swal.fire('Error', error.response?.data?.message || 'Failed to add category', 'error');
+                                     }
+                                 }
+                             }}
+                             className="p-2.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 hover:text-primary transition-all active:scale-95 shadow-sm"
+                             title="Add New Category"
+                           >
+                              <Plus size={18} />
+                           </button>
+                    </div>
                   </div>
 
-                 <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Base Unit</label>
-                    <select 
-                      name="unit"
-                      value={formData.unit}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
-                    >
-                      <option value="">Select Unit</option>
-                      <option value="Strip">Strip</option>
-                      <option value="Bottle">Bottle</option>
-                      <option value="Tube">Tube</option>
-                      <option value="Vial">Vial</option>
-                      <option value="Box">Box</option>
-                      <option value="Pc">Piece</option>
-                    </select>
-                 </div>
+                    <div className="flex gap-2">
+                       <select 
+                         name="unit"
+                         value={formData.unit}
+                         onChange={handleChange}
+                         className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
+                       >
+                         <option value="">Select Unit</option>
+                         {units.map(u => (
+                           <option key={u._id} value={u.name}>{u.name}</option>
+                         ))}
+                         {/* Fallbacks if units empty */}
+                         {units.length === 0 && (
+                           <>
+                             <option value="Strip">Strip</option>
+                             <option value="Bottle">Bottle</option>
+                             <option value="Tube">Tube</option>
+                             <option value="Vial">Vial</option>
+                             <option value="Box">Box</option>
+                             <option value="Pc">Piece</option>
+                           </>
+                         )}
+                       </select>
+                       <button 
+                         type="button"
+                         onClick={handleAddUnit}
+                         className="p-2.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 hover:text-primary transition-all active:scale-95 shadow-sm"
+                         title="Add New Unit"
+                       >
+                          <Plus size={18} />
+                       </button>
+                    </div>
+                  </div>
 
                  {/* Packing - Advanced */}
                  <div className="space-y-1.5">
@@ -599,6 +736,68 @@ const MedicineMaster = () => {
                        <option value="Active">Active</option>
                        <option value="Inactive">Inactive</option>
                      </select>
+                  </div>
+               </div>
+            </div>
+
+            {/* Section 2: Batch & Expiry Details */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+                  <Activity className="text-indigo-500" size={20} /> Batch & Expiry Details
+               </h3>
+               
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Batch Number */}
+                  <div className="space-y-1.5">
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Batch Number</label>
+                     <div className="relative flex gap-2">
+                        <input 
+                           type="text" 
+                           name="batchNumber"
+                           value={formData.batchNumber}
+                           onChange={handleChange}
+                           placeholder="e.g. BATCH-001"
+                           className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm font-mono font-bold text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        />
+                        <button 
+                           type="button"
+                           onClick={() => {
+                               const random = Math.floor(1000 + Math.random() * 9000);
+                               const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+                               setFormData(prev => ({ ...prev, batchNumber: `BN${date}-${random}` }));
+                           }}
+                           className="px-3 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-500 hover:text-primary hover:bg-white dark:hover:bg-gray-600 transition-all shadow-sm"
+                           title="Auto Generate Batch"
+                        >
+                           <RefreshCw size={18} />
+                        </button>
+                     </div>
+                  </div>
+
+                  {/* Manufacturing Date */}
+                  <div className="space-y-1.5">
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Manufacturing Date</label>
+                     <input 
+                       type="date" 
+                       name="manufacturingDate"
+                       value={formData.manufacturingDate}
+                       onChange={handleChange}
+                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white cursor-pointer"
+                     />
+                  </div>
+
+                  {/* Expiry Date */}
+                  <div className="space-y-1.5">
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Expiry Date</label>
+                     <input 
+                       type="date" 
+                       name="expiryDate"
+                       value={formData.expiryDate}
+                       onChange={handleChange}
+                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white cursor-pointer"
+                     />
                   </div>
                </div>
             </div>

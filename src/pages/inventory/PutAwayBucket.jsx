@@ -145,9 +145,22 @@ const PutAwayBucket = () => {
                 });
                 
                 if (data.success) {
-                    Swal.fire('Success', 'Stock is now LIVE!', 'success');
-                    setSelectedPurchase(null);
-                    fetchPendingPurchases();
+                    Swal.fire({
+                        title: 'Success!',
+                        text: 'Stock is now LIVE! What would you like to do next?',
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonText: 'View Stock List',
+                        cancelButtonText: 'Stay Here',
+                        reverseButtons: true
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            navigate('/inventory/stock');
+                        } else {
+                            setSelectedPurchase(null);
+                            fetchPendingPurchases();
+                        }
+                    });
                 }
             } catch (error) {
                 Swal.fire('Error', error.response?.data?.message || 'Failed', 'error');
