@@ -363,46 +363,93 @@ const Dashboard = () => {
 
       {/* 4.5 Supplier & Purchase Analytics */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Supplier Pending Amount Chart */}
-            <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                <h3 className="text-lg font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Truck size={20} className="text-indigo-500" /> Supplier Pending Liability
-                </h3>
-                <div className="h-[300px]">
-                    <HighchartsReact
-                        highcharts={Highcharts}
-                        options={{
-                            chart: { type: 'column', backgroundColor: 'transparent', height: 300 },
-                            title: { text: null },
-                            xAxis: {
-                                categories: stats.pendingGrnStats?.supplierBreakup.map(s => s.name) || [],
-                                labels: { style: { fontSize: '11px', fontWeight: 'bold' } }
-                            },
-                            yAxis: {
-                                title: { text: 'Pending Amount (₹)' },
-                                gridLineDashStyle: 'Dash'
-                            },
-                            tooltip: {
-                                shared: true,
-                                headerFormat: '<b>{point.key}</b><br/>',
-                                pointFormat: 'Pending Invoices: <b>{point.count}</b><br/>Total Amount: <b>₹{point.y}</b>'
-                            },
-                            plotOptions: {
-                                column: {
-                                    borderRadius: 6,
-                                    color: '#6366F1',
-                                    dataLabels: { enabled: true, format: '₹{point.y:.0f}' }
-                                }
-                            },
-                            series: [{
-                                name: 'Pending Amount',
-                                data: stats.pendingGrnStats?.supplierBreakup.map(s => ({ y: s.amount, count: s.y })) || []
-                            }],
-                            credits: { enabled: false },
-                            legend: { enabled: false }
-                        }}
-                    />
+            {/* Supplier Analytics Charts */}
+            <div className="xl:col-span-2 space-y-6">
+                
+                {/* 1. Operational Liability (Goods not yet Received) */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 className="text-lg font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Truck size={20} className="text-indigo-500" /> Pending Goods Verification (Operational)
+                    </h3>
+                    <div className="h-[250px]">
+                        <HighchartsReact
+                            highcharts={Highcharts}
+                            options={{
+                                chart: { type: 'column', backgroundColor: 'transparent', height: 250 },
+                                title: { text: null },
+                                xAxis: {
+                                    categories: stats.pendingGrnStats?.supplierBreakup.map(s => s.name) || [],
+                                    labels: { style: { fontSize: '10px', fontWeight: 'bold' } }
+                                },
+                                yAxis: {
+                                    title: { text: null }, 
+                                    gridLineDashStyle: 'Dash'
+                                },
+                                tooltip: {
+                                    shared: true,
+                                    headerFormat: '<b>{point.key}</b><br/>',
+                                    pointFormat: 'Pending Invoices: <b>{point.count}</b><br/>Total Value: <b>₹{point.y}</b>'
+                                },
+                                plotOptions: {
+                                    column: {
+                                        borderRadius: 4,
+                                        color: '#6366F1',
+                                        dataLabels: { enabled: true, format: '₹{point.y:.0f}', style: { fontSize: '9px' } }
+                                    }
+                                },
+                                series: [{
+                                    name: 'Pending Goods Value',
+                                    data: stats.pendingGrnStats?.supplierBreakup.map(s => ({ y: s.amount, count: s.y })) || []
+                                }],
+                                credits: { enabled: false },
+                                legend: { enabled: false }
+                            }}
+                        />
+                    </div>
                 </div>
+
+                {/* 2. Financial Liability (Goods Received, Payment Pending) */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 className="text-lg font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Banknote size={20} className="text-rose-500" /> Outstanding Payments (Financial Liability)
+                    </h3>
+                    <div className="h-[250px]">
+                        <HighchartsReact
+                            highcharts={Highcharts}
+                            options={{
+                                chart: { type: 'column', backgroundColor: 'transparent', height: 250 },
+                                title: { text: null },
+                                xAxis: {
+                                    categories: stats.pendingGrnStats?.financialLiability?.map(s => s.name) || [],
+                                    labels: { style: { fontSize: '10px', fontWeight: 'bold' } }
+                                },
+                                yAxis: {
+                                    title: { text: null },
+                                    gridLineDashStyle: 'Dash'
+                                },
+                                tooltip: {
+                                    shared: true,
+                                    headerFormat: '<b>{point.key}</b><br/>',
+                                    pointFormat: 'Unpaid Invoices: <b>{point.count}</b><br/>Payable Amount: <b>₹{point.y}</b>'
+                                },
+                                plotOptions: {
+                                    column: {
+                                        borderRadius: 4,
+                                        color: '#F43F5E',
+                                        dataLabels: { enabled: true, format: '₹{point.y:.0f}', style: { fontSize: '9px' } }
+                                    }
+                                },
+                                series: [{
+                                    name: 'Outstanding Payment',
+                                    data: stats.pendingGrnStats?.financialLiability?.map(s => ({ y: s.amount, count: s.y })) || []
+                                }],
+                                credits: { enabled: false },
+                                legend: { enabled: false }
+                            }}
+                        />
+                    </div>
+                </div>
+
             </div>
 
             {/* Pending Invoices List */}
