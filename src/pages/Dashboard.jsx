@@ -14,7 +14,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [grnPage, setGrnPage] = useState(1);
+
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -210,6 +210,29 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* 1.5. Daily Closing Summary */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 animate-fade-in-up delay-100">
+        <h2 className="text-lg font-black text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+            <Activity size={20} className="text-emerald-500" /> Today's Collection (Closing Summary)
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+             {stats.dailyClosingStats && Object.entries(stats.dailyClosingStats).map(([mode, amount]) => (
+                <div key={mode} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 flex flex-col items-center justify-center text-center hover:bg-white hover:shadow-md transition-all duration-300">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{mode}</span>
+                    <span className="text-xl font-black text-gray-800 dark:text-white">
+                        ₹{amount.toLocaleString()}
+                    </span>
+                </div>
+             ))}
+             <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 flex flex-col items-center justify-center text-center shadow-sm">
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Total Today</span>
+                <span className="text-xl font-black text-emerald-700 dark:text-emerald-300">
+                    ₹{stats.dailyClosingStats ? Object.values(stats.dailyClosingStats).reduce((a, b) => a + b, 0).toLocaleString() : 0}
+                </span>
+             </div>
+        </div>
+      </div>
+
      {/* 2. Order Workflow Bar (Restored) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 overflow-x-auto no-scrollbar">
         <div className="flex items-center min-w-max gap-1">
@@ -336,6 +359,92 @@ const Dashboard = () => {
             </div>
       </div>
 
+
+
+      {/* 4.5 Supplier & Purchase Analytics */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Supplier Pending Amount Chart */}
+            <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                    <Truck size={20} className="text-indigo-500" /> Supplier Pending Liability
+                </h3>
+                <div className="h-[300px]">
+                    <HighchartsReact
+                        highcharts={Highcharts}
+                        options={{
+                            chart: { type: 'column', backgroundColor: 'transparent', height: 300 },
+                            title: { text: null },
+                            xAxis: {
+                                categories: stats.pendingGrnStats?.supplierBreakup.map(s => s.name) || [],
+                                labels: { style: { fontSize: '11px', fontWeight: 'bold' } }
+                            },
+                            yAxis: {
+                                title: { text: 'Pending Amount (₹)' },
+                                gridLineDashStyle: 'Dash'
+                            },
+                            tooltip: {
+                                shared: true,
+                                headerFormat: '<b>{point.key}</b><br/>',
+                                pointFormat: 'Pending Invoices: <b>{point.count}</b><br/>Total Amount: <b>₹{point.y}</b>'
+                            },
+                            plotOptions: {
+                                column: {
+                                    borderRadius: 6,
+                                    color: '#6366F1',
+                                    dataLabels: { enabled: true, format: '₹{point.y:.0f}' }
+                                }
+                            },
+                            series: [{
+                                name: 'Pending Amount',
+                                data: stats.pendingGrnStats?.supplierBreakup.map(s => ({ y: s.amount, count: s.y })) || []
+                            }],
+                            credits: { enabled: false },
+                            legend: { enabled: false }
+                        }}
+                    />
+                </div>
+            </div>
+
+            {/* Pending Invoices List */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full">
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
+                        <FileText size={20} className="text-amber-500" /> Pending Invoices
+                    </h3>
+                    <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-md text-xs font-bold">
+                        {stats.pendingGrnStats?.totalPending} Pending
+                    </span>
+                </div>
+               
+                <div className="flex-1 overflow-y-auto pr-1 space-y-3 max-h-[300px] custom-scrollbar">
+                    {stats.pendingGrnStats?.invoiceQueue.length > 0 ? (
+                        stats.pendingGrnStats.invoiceQueue.map((invoice) => (
+                            <div key={invoice.id} className="group p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-amber-200 dark:hover:border-amber-900 bg-gray-50 dark:bg-gray-700/30 hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all cursor-pointer"
+                                 onClick={() => navigate(`/purchase/grn/waitlist`)}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="font-bold text-gray-800 dark:text-gray-200 text-sm">{invoice.supplier}</span>
+                                    <span className="font-black text-amber-600 dark:text-amber-500 text-sm">₹{invoice.amount?.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-gray-400 dark:text-gray-500">
+                                    <span className="font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-100 dark:border-gray-600">
+                                        #{invoice.invoiceNumber}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <Clock size={10} /> {new Date(invoice.date).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                            <ShieldCheck size={40} className="mb-2 opacity-50" />
+                            <p className="text-sm">No Pending Invoices</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+      </div>
+
       {/* 5. Inbound Queues Grid (From Images) */}
       <div>
             <h2 className="text-lg font-black text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
@@ -344,9 +453,9 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[
                     { title: 'Overall Inbound', data: stats.queueStats?.inbound?.overall, color: '#14B8A6' },
-                    { title: 'Pending Invoices', data: stats.queueStats?.inbound?.grn, color: '#F97316' },
-                    { title: 'Physical Validation', data: stats.queueStats?.inbound?.grn, color: '#8B5CF6' },
-                    { title: 'GRN', data: stats.queueStats?.inbound?.grn, color: '#0EA5E9' }
+                    { title: 'Pending Invoices', data: stats.queueStats?.inbound?.pendingInvoices, color: '#F97316' },
+                    { title: 'Physical Validation', data: stats.queueStats?.inbound?.physicalValidation, color: '#8B5CF6' },
+                    { title: 'GRN Queue', data: stats.queueStats?.inbound?.grn, color: '#0EA5E9' }
                 ].map((queue, idx) => (
                     <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all">
                         <div className="flex justify-between items-center mb-4">
