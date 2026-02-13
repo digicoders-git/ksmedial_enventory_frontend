@@ -197,7 +197,7 @@ const SalesReturn = () => {
                         })),
                         totalAmount: refundAmount,
                         reason: finalReason,
-                        status: 'Refunded'
+                        status: 'Putaway_Pending'
                     };
 
                     const { data } = await api.post('/sales/returns', payload);

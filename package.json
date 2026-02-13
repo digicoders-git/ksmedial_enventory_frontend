@@ -23,6 +23,7 @@
     "@fontsource/ubuntu": "^5.2.8",
     "axios": "^1.13.4",
     "file-saver": "^2.0.5",
+    "framer-motion": "^12.34.0",
     "highcharts": "^12.5.0",
     "highcharts-react-official": "^3.2.3",
     "jspdf": "^3.0.4",

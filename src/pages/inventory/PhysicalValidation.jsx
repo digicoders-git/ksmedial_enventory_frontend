@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useInventory } from '../../context/InventoryContext';
 import { 
   ClipboardCheck, 
@@ -31,15 +31,53 @@ const StatusCard = ({ title, value, icon: Icon, colorClass, bgClass }) => (
 
 const PhysicalValidation = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { suppliers } = useInventory();
   const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
   const supplierWrapperRef = React.useRef(null);
+  
+  // New: Dispatched POs
+  const [dispatchedPOs, setDispatchedPOs] = useState([]);
+  const [showPOSuggestions, setShowPOSuggestions] = useState(false);
+  const poWrapperRef = React.useRef(null);
+
+
+  useEffect(() => {
+    const fetchDispatchedPOs = async () => {
+        try {
+            const { data } = await api.get('/purchase-orders?status=Dispatched');
+            const dispatched = Array.isArray(data) ? data.filter(po => po.status === 'Dispatched') : [];
+            setDispatchedPOs(dispatched);
+
+            // Handle Prefill from navigation state if present
+            if (location.state?.prefill?.poData) {
+                const po = location.state.prefill.poData;
+                setFormData(prev => ({
+                    ...prev,
+                    poIds: po.poNumber,
+                    supplierName: po.supplierName,
+                    skuCount: po.items.length,
+                    invoiceValue: po.totalAmount
+                }));
+                setShowEntryModal(true);
+                // Clear state to prevent re-opening if location persists
+                window.history.replaceState({}, document.title);
+            }
+        } catch (error) {
+            console.error("Failed to fetch dispatched POs", error);
+        }
+    };
+    fetchDispatchedPOs();
+  }, [location.state]);
 
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event) {
         if (supplierWrapperRef.current && !supplierWrapperRef.current.contains(event.target)) {
             setShowSupplierSuggestions(false);
+        }
+        if (poWrapperRef.current && !poWrapperRef.current.contains(event.target)) {
+             setShowPOSuggestions(false);
         }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -475,14 +513,50 @@ const PhysicalValidation = () => {
                     </div>
 
                      <div className="space-y-1">
-                        <label className="text-sm text-gray-600 dark:text-gray-400">Location (Press enter after each input)</label>
-                        <input name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Enter PV staging location" />
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Staging / Receiving Area</label>
+                        <input name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Where are items kept? (e.g. Receive Dock, Table 1)" />
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm text-gray-600 dark:text-gray-400">PO ID</label>
-                        <input name="poIds" value={formData.poIds} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Type first 4 digits to search or paste comma-separated PO IDs" />
+                    <div className="space-y-2 relative" ref={poWrapperRef}>
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Select Purchase Order (Optional)</label>
+                        <input 
+                            name="poIds" 
+                            value={formData.poIds} 
+                            onChange={handleInputChange} 
+                            onClick={() => setShowPOSuggestions(true)}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md outline-none text-sm text-gray-700 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-bold" 
+                            placeholder="Select Dispatched PO..." 
+                            autoComplete="off"
+                        />
                         
+                        {showPOSuggestions && dispatchedPOs.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto custom-scrollbar animate-fade-in-up">
+                                {dispatchedPOs.map(po => (
+                                    <div 
+                                        key={po._id} 
+                                        onClick={() => {
+                                            setFormData(prev => ({ 
+                                                ...prev, 
+                                                poIds: po.poNumber,
+                                                supplierName: po.supplierName,
+                                                skuCount: po.items.length, 
+                                                // Estimate Invoice Value from PO Total (though real invoice may differ)
+                                                invoiceValue: po.totalAmount
+                                            }));
+                                            setShowPOSuggestions(false);
+                                        }}
+                                        className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0"
+                                    >
+                                        <div className="font-bold text-primary">{po.poNumber}</div>
+                                        <div className="text-xs text-gray-500 flex justify-between">
+                                            <span>{po.supplierName}</span>
+                                            <span>₹{po.totalAmount}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-2 mt-1">
                             <input 
                                 type="checkbox" 
@@ -492,7 +566,7 @@ const PhysicalValidation = () => {
                                 onChange={handleInputChange}
                                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <label htmlFor="poNotPresent" className="text-sm text-gray-600 dark:text-gray-400 select-none">PO not present</label>
+                            <label htmlFor="poNotPresent" className="text-sm text-gray-600 dark:text-gray-400 select-none">PO not present / Direct Purchase</label>
                         </div>
                     </div>
 

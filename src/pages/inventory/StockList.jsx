@@ -10,11 +10,12 @@ import { useAuth } from '../../context/AuthContext';
 const StockList = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { inventory, deleteItem, clearInventory, adjustStock, loading } = useInventory(); // Use context
+  const { inventory, deleteItem, clearInventory, adjustStock, loading, fetchInventory } = useInventory(); // Use context
   const { shop } = useAuth(); // Get current shop/user info
   
-  // Handle incoming navigation state for filtering
+  // Handle incoming navigation state for filtering & auto-refresh
   useEffect(() => {
+    fetchInventory(); // Force refresh on entry
     if (location.state?.filter) {
         setSearchTerm(location.state.filter);
     }

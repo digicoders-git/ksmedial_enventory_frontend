@@ -44,7 +44,9 @@ import SupplierList from './pages/purchase/SupplierList';
 import PurchaseInvoices from './pages/purchase/PurchaseInvoices';
 import ViewPurchaseInvoice from './pages/purchase/ViewPurchaseInvoice';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
+import CreatePurchaseOrder from './pages/purchase/CreatePurchaseOrder';
 import ViewPurchaseReturn from './pages/purchase/ViewPurchaseReturn';
+import PurchaseOrderList from './pages/purchase/PurchaseOrderList';
 import GRNList from './pages/inventory/GRNList';
 import GRNWaitlist from './pages/inventory/GRNWaitlist';
 import PutAwayBucket from './pages/inventory/PutAwayBucket';
@@ -152,6 +154,8 @@ function App() {
               5. PURCHASE ROUTES 
              ======================= */}
           <Route path="purchase/suppliers" element={<SupplierList />} />
+          <Route path="purchase/create-order" element={<CreatePurchaseOrder />} />
+          <Route path="purchase/orders" element={<PurchaseOrderList />} />
           <Route path="purchase/invoices" element={<PurchaseInvoices />} />
           <Route path="purchase/return" element={<PurchaseReturn />} />
           <Route path="purchase/return/view/:id" element={<ViewPurchaseReturn />} />

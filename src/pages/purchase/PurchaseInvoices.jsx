@@ -292,10 +292,10 @@ const PurchaseInvoices = () => {
                                 <Trash2 size={18} strokeWidth={2.5} /> Clear All
                             </button>
                             <button 
-                                onClick={() => navigate('/inventory/grn/add')} 
+                                onClick={() => navigate('/purchase/create-order')} 
                                 className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-secondary shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
-                                <Plus size={18} strokeWidth={3} /> New Purchase
+                                <Plus size={18} strokeWidth={3} /> Create Purchase Order
                             </button>
                         </div>
                     </div>

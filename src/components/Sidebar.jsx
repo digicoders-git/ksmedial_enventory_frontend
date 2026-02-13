@@ -64,7 +64,21 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   // UPDATED MENU STRUCTURE BASED ON USER REQUEST
   const navItems = [
     { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
-    
+
+    // 5. Purchase & Suppliers
+    {
+      label: 'Purchase',
+      icon: <Truck size={20} />,
+      path: '/purchase',
+      subItems: [
+        // { label: 'Create Purchase Order', path: '/purchase/create-order' },
+        { label: 'Purchase Orders', path: '/purchase/orders' },
+        { label: 'Supplier List', path: '/purchase/suppliers' },
+        { label: 'Purchase Invoices', path: '/purchase/invoices' },
+        { label: 'Purchase Return', path: '/purchase/return' }
+      ]
+    },
+
     // 2. Inventory
     { 
       label: 'Inventory', 
@@ -74,21 +88,33 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { label: 'Inventory Dashboard', path: '/inventory/dashboard' },
         { label: 'Inventory Master', path: '/inventory/master' },
         { label: 'Location Master', path: '/inventory/locations' },
-        { label: 'Stock List', path: '/inventory/stock' },
-        { label: 'Physical Validation', path: '/inventory/physical-validation' },
-        { label: 'Stock OUT', path: '/inventory/stock-out' },
-        { label: 'Expiry Management', path: '/inventory/expiry' },
-        { label: 'Low Stock Alerts', path: '/inventory/low-stock' },
-        { label: 'Packing Materials', path: '/inventory/packing-materials' },
-
-        { label: 'GRN Waitlist', path: '/inventory/grn/waitlist', badge: 'New' },
+        { label: 'GRN Waitlist', path: '/inventory/physical-validation' },
+        { label: 'Add GRN', path: '/inventory/grn/add' },
+        { label: 'GRN List', path: '/inventory/grn' },
         { label: 'Put Away Bucket', path: '/inventory/putaway' },
-        { label: 'Add GRN (Receive)', path: '/inventory/grn/add' },
-        { label: 'GRN History', path: '/inventory/grn' }
+        { label: 'Stock List', path: '/inventory/stock' },
+
+
+        { label: 'Packing Materials', path: '/inventory/packing-materials' },
+        { label: 'Low Stock Alerts', path: '/inventory/low-stock' },
+        { label: 'Expiry Management', path: '/inventory/expiry' }
+
       ]
     },
 
-    // 3. Medicines (Product Master)
+    // 4. Sales & Billing
+   { 
+     label: 'Sales & Billing', 
+     icon: <ShoppingCart size={20} />, 
+     path: '/sales',
+     subItems: [
+       { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
+       { label: 'Invoices', path: '/sales/invoices' },
+       { label: 'Sales Return', path: '/sales/return' }
+     ]
+   },
+
+     // 3. Medicines (Product Master)
     { 
       label: 'Medicines', 
       icon: <Pill size={20} />, 
@@ -100,6 +126,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       ]
     },
 
+
     // 3.5 Order Management (NEW)
     {
       label: 'Order',
@@ -109,30 +136,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { label: 'Online Orders', path: '/sales/online-orders' },
         { label: 'QC & Packing', path: '/order/processing' },
         { label: 'Shipping Listing', path: '/order/shipping' }
-      ]
-    },
-
-    // 4. Sales & Billing
-    { 
-      label: 'Sales & Billing', 
-      icon: <ShoppingCart size={20} />, 
-      path: '/sales',
-      subItems: [
-        { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
-        { label: 'Invoices', path: '/sales/invoices' },
-        { label: 'Sales Return', path: '/sales/return' }
-      ]
-    },
-
-    // 5. Purchase & Suppliers
-    {
-      label: 'Purchase',
-      icon: <Truck size={20} />,
-      path: '/purchase',
-      subItems: [
-        { label: 'Supplier List', path: '/purchase/suppliers' },
-        { label: 'Purchase Invoices', path: '/purchase/invoices' },
-        { label: 'Purchase Return', path: '/purchase/return' }
       ]
     },
 

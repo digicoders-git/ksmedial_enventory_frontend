@@ -64,35 +64,171 @@ const AddGRN = () => {
     }, []);
 
     useEffect(() => {
-        // Handle prefill from state
-        if (location.state?.prefill && suppliers.length > 0 && !prefillHandled.current) {
-            const { physicalId: phId, entryData } = location.state.prefill;
-            const supplier = suppliers.find(s => s.name.toLowerCase() === entryData?.supplierName?.toLowerCase());
+        // Handle prefill from state (Physical or Purchase Order)
+        if (location.state?.prefill && suppliers.length > 0 && products.length > 0 && !prefillHandled.current) {
+            const { physicalId: phId, entryData, poData } = location.state.prefill;
             
-            setPhysicalId(phId || '');
-            setFormData(prev => ({ 
-                ...prev, 
-                supplierId: supplier?._id || '',
-                invoiceNumber: entryData?.invoiceNumber || '',
-                invoiceDate: entryData?.invoiceDate?.split('T')[0] || new Date().toISOString().split('T')[0],
-                notes: `Ref: Physical ID ${phId}, Loc: ${entryData?.location || 'N/A'}`
-            }));
+            // 1. Prefill from Physical Validation
+            if (phId) {
+                const supplier = suppliers.find(s => s.name.toLowerCase() === entryData?.supplierName?.toLowerCase());
+                setPhysicalId(phId || '');
+                setFormData(prev => ({ 
+                    ...prev, 
+                    supplierId: supplier?._id || '',
+                    invoiceNumber: entryData?.invoiceNumber || '',
+                    invoiceDate: entryData?.invoiceDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+                    notes: `Ref: Physical ID ${phId}, Loc: ${entryData?.location || 'N/A'}`
+                }));
+                if (supplier) setSelectedSupplierDetails(supplier);
+                
+                // Fetch PO Items if PO ID is present
+                if (entryData?.poIds) {
+                    const fetchPOItems = async () => {
+                        try {
+                            // Fetch PO by Number (backend now supports this)
+                            const { data: po } = await api.get(`/purchase-orders/${entryData.poIds}`);
+                            if (po && po.items) {
+                                const poItems = po.items.map(item => {
+                                    const prodId = item.product?._id || item.product;
+                                    const product = products.find(p => p._id === prodId); // Handle populated or ID
+                                    return {
+                                        productId: product?._id || prodId || '',
+                                        productName: item.medicineName || product?.name || '',
+                                        supplierSkuId: '',
+                                        skuId: product?.sku || '',
+                                        pack: product?.packSize || '',
+                                        batchNumber: '',
+                                        expiryDate: '',
+                                        mfgDate: '',
+                                        systemMrp: product?.mrp || 0,
+                                        orderedQty: item.quantity || 0,
+                                        receivedQty: item.quantity || 0, // Default to ordered
+                                        physicalFreeQty: 0,
+                                        schemeFreeQty: 0,
+                                        poRate: item.purchaseRate || 0,
+                                        ptr: 0,
+                                        baseRate: item.purchaseRate || 0,
+                                        schemeDiscount: 0,
+                                        discountPercent: 0,
+                                        amount: 0, // Will recalculate
+                                        hsnCode: product?.hsnCode || '',
+                                        cgst: (item.gst || 0) / 2,
+                                        sgst: (item.gst || 0) / 2,
+                                        igst: 0,
+                                        purchasePrice: item.purchaseRate || 0,
+                                        sellingPrice: product?.sellingPrice || 0,
+                                        mrp: product?.mrp || 0,
+                                        margin: 0
+                                    };
+                                });
+                                
+                                // Trigger calculation for enriched items
+                                const enriched = poItems.map(i => {
+                                    i.amount = i.baseRate * i.receivedQty;
+                                    return i;
+                                });
+                                
+                                setItems(enriched);
+                                calculateSummary(enriched);
+                                Swal.fire({
+                                    title: 'Data Loaded',
+                                    text: `Prefilled from Physical ID: ${phId} & PO: ${entryData.poIds}`,
+                                    icon: 'success',
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                            }
+                        } catch (error) {
+                            console.error("Failed to fetch PO details", error);
+                            Swal.fire({
+                                title: 'Data Loaded',
+                                text: `Prefilled from Physical ID: ${phId}. (Could not fetch items for PO: ${entryData.poIds})`,
+                                icon: 'info',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        }
+                    };
+                    fetchPOItems();
+                } else {
+                     Swal.fire({
+                        title: 'Data Loaded',
+                        text: `Prefilled details from Physical ID: ${phId}`,
+                        icon: 'info',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            }
+            
+            // 2. Prefill from Purchase Order (Direct)
+            else if (poData) {
+                const supplier = suppliers.find(s => s._id === poData.supplierId || s.name === poData.supplierName);
+                setFormData(prev => ({
+                    ...prev,
+                    supplierId: supplier?._id || poData.supplierId || '',
+                    notes: `Ref: PO #${poData.poNumber}`,
+                    invoiceNumber: '' 
+                }));
+                
+                if (supplier) setSelectedSupplierDetails(supplier);
 
-            if (supplier) {
-                setSelectedSupplierDetails(supplier);
+                // Prefill Items from PO
+                if (poData.items && poData.items.length > 0) {
+                    const poItems = poData.items.map(item => {
+                        const product = products.find(p => p._id === item.product || p._id === item.productId); 
+                        return {
+                            productId: product?._id || item.product || '',
+                            productName: item.medicineName || product?.name || '',
+                            supplierSkuId: '',
+                            skuId: product?.sku || '',
+                            pack: product?.packSize || '',
+                            batchNumber: '',
+                            expiryDate: '',
+                            mfgDate: '',
+                            systemMrp: product?.mrp || 0,
+                            orderedQty: item.quantity || 0,
+                            receivedQty: item.quantity || 0, 
+                            physicalFreeQty: 0,
+                            schemeFreeQty: 0,
+                            poRate: item.purchaseRate || 0,
+                            ptr: 0,
+                            baseRate: item.purchaseRate || 0,
+                            schemeDiscount: 0,
+                            discountPercent: 0,
+                            amount: 0, 
+                            hsnCode: product?.hsnCode || '',
+                            cgst: (item.gst || 0) / 2,
+                            sgst: (item.gst || 0) / 2,
+                            igst: 0,
+                            purchasePrice: item.purchaseRate || 0,
+                            sellingPrice: product?.sellingPrice || 0,
+                            mrp: product?.mrp || 0,
+                            margin: 0
+                        };
+                    });
+                    
+                    const enriched = poItems.map(i => {
+                        i.amount = i.baseRate * i.receivedQty;
+                        return i;
+                    });
+                    
+                    setItems(enriched);
+                    calculateSummary(enriched);
+                }
+
+                Swal.fire({
+                    title: 'PO Loaded',
+                    text: `Prefilled details from Purchase Order: ${poData.poNumber}`,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
             }
             
             prefillHandled.current = true;
-            
-            Swal.fire({
-                title: 'Data Loaded',
-                text: `Prefilled details from Physical ID: ${phId}`,
-                icon: 'info',
-                timer: 2000,
-                showConfirmButton: false
-            });
         }
-    }, [location.state, suppliers]);
+    }, [location.state, suppliers, products]);
 
     const handleLoadPhysical = async () => {
         if (!physicalId) return;
