@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-    ArrowLeft, Calendar, FileText, 
-    User, Truck, Package, CheckCircle, Download 
+    ArrowLeft, Download, CheckCircle 
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import api from '../../api/axios';
 
 const ViewGRN = () => {
@@ -33,411 +30,262 @@ const ViewGRN = () => {
     if (loading) return <div className="p-8 text-center">Loading...</div>;
     if (!purchase) return <div className="p-8 text-center">GRN not found</div>;
 
-    const exportToPDF = () => {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        
-        // Header
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.text('GOODS RECEIPT NOTE', pageWidth / 2, 20, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Purchase Receive Order', pageWidth / 2, 27, { align: 'center' });
-        
-        // Invoice Number and Date (Right side)
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text(purchase.invoiceNumber || 'N/A', pageWidth - 15, 20, { align: 'right' });
-        
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        const invoiceDate = purchase.invoiceDate || purchase.purchaseDate;
-        doc.text(`Date: ${invoiceDate ? new Date(invoiceDate).toLocaleDateString('en-IN') : 'N/A'}`, pageWidth - 15, 27, { align: 'right' });
-        
-        // Horizontal line
-        doc.setDrawColor(200);
-        doc.line(15, 33, pageWidth - 15, 33);
-        
-        // Supplier Details (Left)
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('SUPPLIER DETAILS', 15, 42);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(purchase.supplierId?.name || 'N/A', 15, 49);
-        
-        const address = purchase.supplierId?.address || 'N/A';
-        const splitAddress = doc.splitTextToSize(address, 80);
-        doc.text(splitAddress, 15, 55);
-        
-        const addressHeight = splitAddress.length * 5;
-        doc.text(`GST: ${purchase.supplierId?.gstNumber || 'N/A'}`, 15, 55 + addressHeight);
-        doc.text(`Phone: ${purchase.supplierId?.phone || 'N/A'}`, 15, 60 + addressHeight);
-        
-        // Invoice Summary (Right)
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('INVOICE SUMMARY', pageWidth - 75, 42);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        const summary = purchase.invoiceSummary || {};
-        
-        let summaryY = 49;
-        doc.text(`Taxable Amount:`, pageWidth - 75, summaryY);
-        doc.text(`Rs ${(summary.taxableAmount || 0).toFixed(2)}`, pageWidth - 15, summaryY, { align: 'right' });
-        
-        summaryY += 6;
-        doc.text(`MRP Value:`, pageWidth - 75, summaryY);
-        doc.text(`Rs ${(summary.mrpValue || 0).toFixed(2)}`, pageWidth - 15, summaryY, { align: 'right' });
-        
-        summaryY += 6;
-        doc.text(`Amount After GST:`, pageWidth - 75, summaryY);
-        doc.text(`Rs ${(summary.amountAfterGst || 0).toFixed(2)}`, pageWidth - 15, summaryY, { align: 'right' });
-        
-        summaryY += 6;
-        doc.text(`Round Amount:`, pageWidth - 75, summaryY);
-        doc.text(`Rs ${(summary.roundAmount || 0).toFixed(2)}`, pageWidth - 15, summaryY, { align: 'right' });
-        
-        summaryY += 8;
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Invoice Amount:`, pageWidth - 75, summaryY);
-        doc.text(`Rs ${(summary.invoiceAmount || purchase.grandTotal || 0).toFixed(2)}`, pageWidth - 15, summaryY, { align: 'right' });
-        
-        // Items Table
-        const tableStartY = Math.max(70 + addressHeight, summaryY + 10);
-        
-        const tableColumn = ["#", "Product", "SKU", "Batch", "Expiry", "Qty", "Free", "Rate", "MRP", "Amount"];
-        const tableRows = purchase.items.map((item, index) => {
-            const totalFree = (item.physicalFreeQty || 0) + (item.schemeFreeQty || 0);
-            return [
-                index + 1,
-                item.productName || item.productId?.name || 'N/A',
-                item.skuId || item.productId?.sku || '-',
-                item.batchNumber || '-',
-                item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('en-IN') : '-',
-                item.receivedQty || item.quantity || 0,
-                totalFree || '-',
-                `Rs ${(item.baseRate || item.purchasePrice || 0).toFixed(2)}`,
-                `Rs ${(item.mrp || 0).toFixed(2)}`,
-                `Rs ${(item.amount || 0).toFixed(2)}`
-            ];
-        });
-        
-        autoTable(doc, {
-            startY: tableStartY,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [16, 185, 129], 
-                textColor: [255, 255, 255],
-                fontSize: 8,
-                fontStyle: 'bold',
-                halign: 'center'
-            },
-            bodyStyles: { 
-                fontSize: 8,
-                cellPadding: 2
-            },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 8 },
-                1: { halign: 'left', cellWidth: 35 },
-                2: { halign: 'left', cellWidth: 20 },
-                3: { halign: 'center', cellWidth: 18 },
-                4: { halign: 'center', cellWidth: 20 },
-                5: { halign: 'center', cellWidth: 12 },
-                6: { halign: 'center', cellWidth: 12 },
-                7: { halign: 'right', cellWidth: 20 },
-                8: { halign: 'right', cellWidth: 20 },
-                9: { halign: 'right', cellWidth: 25 }
-            },
-            margin: { left: 15, right: 15 }
-        });
-        
-        const finalY = doc.lastAutoTable.finalY + 10;
-        
-        // Tax Breakup
-        if (purchase.taxBreakup) {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(10);
-            doc.text('TAX BREAKUP', 15, finalY);
-            
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            let yPos = finalY + 7;
-            
-            const taxEntries = [
-                { label: 'GST 5%', key: 'gst5' },
-                { label: 'GST 12%', key: 'gst12' },
-                { label: 'GST 18%', key: 'gst18' },
-                { label: 'GST 28%', key: 'gst28' }
-            ];
-            
-            taxEntries.forEach(({ label, key }) => {
-                const taxData = purchase.taxBreakup[key];
-                if (taxData && taxData.taxable > 0) {
-                    doc.text(`${label}:`, 15, yPos);
-                    doc.text(`Taxable: Rs ${taxData.taxable.toFixed(2)}`, 50, yPos);
-                    doc.text(`Tax: Rs ${taxData.tax.toFixed(2)}`, 100, yPos);
-                    yPos += 5;
-                }
-            });
-        }
-        
-        // Footer
-        const pageHeight = doc.internal.pageSize.getHeight();
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(100);
-        doc.text('This is a computer generated document.', pageWidth / 2, pageHeight - 15, { align: 'center' });
-        doc.text(`Status: ${purchase.status || 'N/A'} | Payment: ${purchase.paymentStatus || 'N/A'}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-        
-        doc.save(`GRN_${purchase.invoiceNumber}.pdf`);
+    // Generate comprehensive QR Data
+    const qrData = purchase ? `
+GRN No: ${purchase.invoiceNumber}
+Date: ${new Date(purchase.invoiceDate || purchase.purchaseDate).toLocaleDateString('en-IN')}
+Supplier: ${purchase.supplierId?.name || 'N/A'}
+PO No: ${purchase.poNumber || 'N/A'}
+Inv No: ${purchase.externalInvoiceNumber || purchase.invoiceNumber}
+Total Amount: ₹${purchase.grandTotal?.toFixed(2)}
+Items: ${purchase.items?.length || 0}
+Status: ${purchase.status}
+    `.trim() : '';
+
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
+
+    const handlePrint = () => {
+        window.print();
     };
 
     return (
-        <div className="max-w-7xl mx-auto pb-20 space-y-6">
-            {/* Header / Actions */}
+        <div className="max-w-5xl mx-auto pb-20 space-y-6">
+            {/* Header / Actions - Hidden in Print */}
             <div className="flex justify-between items-center print:hidden">
                 <button 
                     onClick={() => navigate('/inventory/grn')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all font-medium"
                 >
                     <ArrowLeft size={18} />
                     Back to List
                 </button>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={exportToPDF}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all"
-                    >
-                        <Download size={18} />
-                        Export
-                    </button>
-                </div>
+                <button 
+                    onClick={handlePrint}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-secondary shadow-lg shadow-primary/20 transition-all"
+                >
+                    <Download size={18} />
+                    Print / Download PDF
+                </button>
             </div>
 
             {/* GRN Document */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden print:shadow-none print:border-0">
-                {/* Header Banner */}
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-8 print:bg-gray-100 print:text-black">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h1 className="text-3xl font-black uppercase tracking-tight">Goods Receipt Note</h1>
-                            <p className="mt-2 text-emerald-100 print:text-gray-600 font-medium">Purchase Receive Order</p>
+            {/* Added 'w-full' and removed max-width constraints for print */}
+            <div className="bg-white text-gray-800 shadow-xl print:shadow-none print:w-[100%] print:max-w-full p-8 md:p-12 font-sans box-border" id="grn-document">
+                
+                {/* 1. Header Title */}
+                <div className="text-center border-b-2 border-primary/20 pb-4 mb-6">
+                    <h1 className="text-2xl md:text-3xl font-black text-primary uppercase tracking-wide">Goods Receipt Note (GRN)</h1>
+                </div>
+
+                {/* 2. Company & GRN Meta */}
+                <div className="flex flex-col md:flex-row print:flex-row justify-between gap-6 mb-8">
+                    {/* Company Info */}
+                    <div className="flex-1">
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">KS4 PharmaNet Ltd.</h2>
+                        <div className="text-sm text-gray-600 space-y-1">
+                            <p>123, Pharma Tech Park, Industrial Area</p>
+                            <p>New Delhi - 110020</p>
+                            <p>Phone: +91-9876543210 | Email: support@ks4pharmanet.com</p>
+                            <p className="font-semibold mt-2">GSTIN: 07AABCU9603R1ZN</p>
                         </div>
-                        <div className="text-right">
-                            <h2 className="text-2xl font-mono font-black">{purchase.invoiceNumber}</h2>
-                            <div className="mt-2 text-emerald-100 print:text-gray-600 text-sm font-bold">
-                                Date: {new Date(purchase.invoiceDate || purchase.purchaseDate).toLocaleDateString()}
+                    </div>
+
+                    {/* GRN Details & QR */}
+                    <div className="flex-1 flex flex-col md:flex-row print:flex-row justify-end gap-6">
+                        <div className="text-sm space-y-2 text-right">
+                             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-left md:text-right">
+                                <span className="font-bold text-primary whitespace-nowrap">GRN No:</span>
+                                <span className="font-mono font-bold text-gray-900">{purchase.invoiceNumber}</span>
+                                
+                                <span className="font-bold text-primary whitespace-nowrap">GRN Date:</span>
+                                <span className="text-gray-900">{new Date(purchase.invoiceDate || purchase.purchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                
+                                <span className="font-bold text-primary whitespace-nowrap">PO No:</span>
+                                <span className="text-gray-900">{purchase.poNumber || 'N/A'}</span>
+                                
+                                <span className="font-bold text-primary whitespace-nowrap">Invoice No:</span>
+                                <span className="text-gray-900">{purchase.externalInvoiceNumber || purchase.invoiceNumber}</span>
+                            </div>
+                        </div>
+                         {/* QR Code */}
+                         <div className="flex justify-end md:justify-start">
+                            <img src={qrCodeUrl} alt="GRN QR" className="w-28 h-28 border border-gray-200 p-1 bg-white" />
+                         </div>
+                    </div>
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 mb-8"></div>
+
+                {/* 3. Supplier & Receiving Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-8 mb-8">
+                    {/* Supplier */}
+                    <div className="bg-gray-50/50 p-4 rounded-lg border border-gray-100 print:border-gray-200">
+                        <h3 className="text-sm font-bold text-primary uppercase border-b border-gray-200 pb-2 mb-3">Supplier Details</h3>
+                        <div className="text-sm text-gray-700 space-y-2">
+                             <p className="font-bold text-lg text-gray-900">{purchase.supplierId?.name || 'Unknown Supplier'}</p>
+                             <p className="whitespace-pre-line text-gray-600">{purchase.supplierId?.address || 'Address Not Available'}</p>
+                             <div className="grid grid-cols-2 gap-2 mt-2">
+                                <p><span className="font-semibold text-gray-500">GSTIN:</span> {purchase.supplierId?.gstNumber || 'N/A'}</p>
+                                <p><span className="font-semibold text-gray-500">Phone:</span> {purchase.supplierId?.phone || 'N/A'}</p>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Receiving */}
+                    <div className="bg-gray-50/50 p-4 rounded-lg border border-gray-100 print:border-gray-200">
+                        <h3 className="text-sm font-bold text-primary uppercase border-b border-gray-200 pb-2 mb-3">Receiving Details</h3>
+                        <div className="grid grid-cols-[120px_1fr] gap-y-2 text-sm text-gray-700">
+                             <span className="font-semibold text-gray-500">Received By:</span>
+                             <span className="font-medium text-gray-900">{purchase.receivedBy?.name || 'Admin'}</span>
+                             
+                             <span className="font-semibold text-gray-500">Receiving Date:</span>
+                             <span className="font-medium text-gray-900">{new Date(purchase.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                             
+                             <span className="font-semibold text-gray-500">Payment Status:</span>
+                             <span className={`font-bold ${purchase.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-orange-600'}`}>{purchase.paymentStatus}</span>
+
+                             <span className="font-semibold text-gray-500">Delivery Note:</span>
+                             <span className="font-medium text-gray-900">{purchase.deliveryNote || '-'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4. Items Table */}
+                <div className="mb-8 rounded-lg border border-gray-200 print:border-0 print:overflow-visible">
+                     <table className="w-full text-sm border-collapse">
+                        <thead>
+                            <tr className="bg-[#003B5C] text-white print:bg-[#003B5C] print:text-white">
+                                <th className="py-3 px-3 text-center border-r border-[#004e7a] w-12 font-semibold">Sr.</th>
+                                <th className="py-3 px-3 text-left border-r border-[#004e7a] font-semibold">Item Name</th>
+                                <th className="py-3 px-3 text-left border-r border-[#004e7a] w-24 font-semibold">Batch</th>
+                                <th className="py-3 px-3 text-center border-r border-[#004e7a] w-24 font-semibold">Expiry</th>
+                                <th className="py-3 px-3 text-center border-r border-[#004e7a] w-16 font-semibold">Qty</th>
+                                <th className="py-3 px-3 text-center border-r border-[#004e7a] w-16 font-semibold">Free</th>
+                                <th className="py-3 px-3 text-right border-r border-[#004e7a] w-24 font-semibold">Rate</th>
+                                <th className="py-3 px-3 text-center border-r border-[#004e7a] w-16 font-semibold">GST</th>
+                                <th className="py-3 px-3 text-right w-28 font-semibold">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {purchase.items?.map((item, index) => {
+                                const totalFree = (item.physicalFreeQty || 0) + (item.schemeFreeQty || 0);
+                                const totalGst = item.gst || item.tax || (item.productId?.tax) || ((item.cgst || 0) + (item.sgst || 0) + (item.igst || 0)) || 0;
+                                return (
+                                    <tr key={index} className="border-b border-gray-200 odd:bg-white even:bg-gray-50 print:even:bg-gray-100 break-inside-avoid">
+                                        <td className="py-2 px-3 text-center border-r border-gray-200 text-gray-500">{index + 1}</td>
+                                        <td className="py-2 px-3 border-r border-gray-200 font-bold text-gray-800">{item.productName || item.productId?.name}</td>
+                                        <td className="py-2 px-3 border-r border-gray-200 font-mono text-xs text-gray-600 uppercase">{item.batchNumber}</td>
+                                        <td className="py-2 px-3 text-center border-r border-gray-200 text-gray-600">{item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('en-IN', {month: '2-digit', year: '2-digit'}) : '-'}</td>
+                                        <td className="py-2 px-3 text-center border-r border-gray-200 font-bold text-gray-900">{item.receivedQty || item.quantity}</td>
+                                        <td className="py-2 px-3 text-center border-r border-gray-200 text-xs text-gray-500">{totalFree > 0 ? totalFree : '-'}</td>
+                                        <td className="py-2 px-3 text-right border-r border-gray-200 text-gray-700">{item.baseRate?.toFixed(2)}</td>
+                                        <td className="py-2 px-3 text-center border-r border-gray-200 text-xs text-gray-600">{totalGst}%</td>
+                                        <td className="py-2 px-3 text-right font-bold text-gray-900">{item.amount?.toFixed(2)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                     </table>
+                </div>
+
+                {/* 5. Footer & Totals */}
+                <div className="flex flex-col md:flex-row print:flex-row gap-8 break-inside-avoid page-break-inside-avoid">
+                    {/* Left: Remarks & Signatures */}
+                    <div className="flex-1 flex flex-col justify-between">
+                         <div className="mb-4">
+                            <h4 className="font-bold text-primary mb-2 text-sm uppercase">Remarks</h4>
+                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm italic text-gray-600 min-h-[60px]">
+                                {purchase.notes || "All items received in good condition and verified against the purchase order."}
+                            </div>
+                         </div>
+                         
+                         <div className="mt-8 flex justify-between gap-10">
+                             <div className="border-t-2 border-gray-300 pt-2 w-40 text-center text-sm font-bold text-gray-500 uppercase">Checked By</div>
+                             <div className="border-t-2 border-gray-300 pt-2 w-40 text-center text-sm font-bold text-gray-500 uppercase">Approved By</div>
+                         </div>
+                    </div>
+
+                    {/* Right: Totals */}
+                    <div className="w-full md:w-80">
+                        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <div className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
+                                <span className="font-semibold text-gray-600">Total Quantity</span>
+                                <span className="font-bold text-gray-900">{purchase.items.reduce((acc, item) => acc + (item.receivedQty || item.quantity || 0), 0)}</span>
+                            </div>
+                             <div className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
+                                <span className="font-semibold text-gray-600">Subtotal</span>
+                                <span className="font-bold text-gray-900">₹{purchase.invoiceSummary?.taxableAmount?.toFixed(2) || '0.00'}</span>
+                            </div>
+                             <div className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
+                                <span className="font-semibold text-gray-600">Total GST</span>
+                                <span className="font-bold text-gray-900">₹{((purchase.invoiceSummary?.amountAfterGst || 0) - (purchase.invoiceSummary?.taxableAmount || 0)).toFixed(2)}</span>
+                            </div>
+                             <div className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
+                                <span className="font-semibold text-gray-600">Round Off</span>
+                                <span className="font-bold text-gray-900">₹{purchase.invoiceSummary?.roundAmount?.toFixed(2) || '0.00'}</span>
+                            </div>
+                            <div className="flex justify-between px-4 py-3 bg-primary text-white text-lg print:bg-[#007242] print:text-white">
+                                <span className="font-bold">Grand Total</span>
+                                <span className="font-black">₹{purchase.grandTotal?.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Top Section: Supplier + Summary */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 p-8 border-b border-gray-100 dark:border-gray-700">
-                    {/* Supplier Details */}
-                    <div className="xl:col-span-2">
-                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4">Supplier Details</h3>
-                        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700">
-                            <p className="text-lg font-black text-gray-800 dark:text-white uppercase">{purchase.supplierId?.name || 'Unknown Supplier'}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{purchase.supplierId?.address}</p>
-                            <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                                <div>
-                                    <span className="text-gray-500">GST:</span>
-                                    <span className="ml-2 font-bold text-gray-800 dark:text-white">{purchase.supplierId?.gstNumber || 'N/A'}</span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">Phone:</span>
-                                    <span className="ml-2 font-bold text-gray-800 dark:text-white">{purchase.supplierId?.phone}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Invoice Summary */}
-                    <div>
-                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4">Invoice Summary</h3>
-                        <div className="bg-emerald-50 dark:bg-emerald-900/10 p-6 rounded-xl border border-emerald-100 dark:border-emerald-800">
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Taxable Amount:</span>
-                                    <span className="font-bold">₹{purchase.invoiceSummary?.taxableAmount?.toFixed(2) || '0.00'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">MRP Value:</span>
-                                    <span className="font-bold">₹{purchase.invoiceSummary?.mrpValue?.toFixed(2) || '0.00'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Amount After GST:</span>
-                                    <span className="font-bold">₹{purchase.invoiceSummary?.amountAfterGst?.toFixed(2) || '0.00'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Round Amount:</span>
-                                    <span className="font-bold">₹{purchase.invoiceSummary?.roundAmount?.toFixed(2) || '0.00'}</span>
-                                </div>
-                                <div className="flex justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800">
-                                    <span className="font-black text-gray-800 dark:text-white">Invoice Amount:</span>
-                                    <span className="font-black text-emerald-600 text-lg">₹{purchase.invoiceSummary?.invoiceAmount || purchase.grandTotal}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Tax Breakup */}
-                        <div className="mt-4 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-                            <h4 className="text-xs font-black text-gray-500 uppercase mb-3">Tax Breakup</h4>
-                            <div className="space-y-1.5 text-xs">
-                                {[
-                                    { label: '5%', key: 'gst5' },
-                                    { label: '12%', key: 'gst12' },
-                                    { label: '18%', key: 'gst18' },
-                                    { label: '28%', key: 'gst28' }
-                                ].map(({ label, key }) => (
-                                    purchase.taxBreakup?.[key]?.tax > 0 && (
-                                        <div key={key} className="grid grid-cols-3 gap-2">
-                                            <span className="font-bold text-gray-600">{label}</span>
-                                            <span className="text-right text-gray-600">₹{purchase.taxBreakup[key].taxable?.toFixed(2)}</span>
-                                            <span className="text-right font-bold text-blue-600">₹{purchase.taxBreakup[key].tax?.toFixed(2)}</span>
-                                        </div>
-                                    )
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Items Table */}
-                <div className="p-8">
-                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4">Received Items</h3>
-                    <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black uppercase tracking-wider">
-                                <tr>
-                                    <th className="py-4 px-4 text-center">#</th>
-                                    <th className="py-4 px-4 min-w-[200px]">Product Name</th>
-                                    <th className="py-4 px-4 min-w-[120px]">SKU</th>
-                                    <th className="py-4 px-4 min-w-[100px]">Batch</th>
-                                    <th className="py-4 px-4 min-w-[100px]">Expiry</th>
-                                    <th className="py-4 px-4 text-center min-w-[80px]">Received</th>
-                                    <th className="py-4 px-4 text-center min-w-[80px]">Free Qty</th>
-                                    <th className="py-4 px-4 text-right min-w-[100px]">Base Rate</th>
-                                    <th className="py-4 px-4 text-right min-w-[100px]">Amount</th>
-                                    <th className="py-4 px-4 text-center min-w-[60px]">GST</th>
-                                    <th className="py-4 px-4 text-right min-w-[100px]">MRP</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                                {purchase.items?.map((item, index) => {
-                                    const totalFree = (item.physicalFreeQty || 0) + (item.schemeFreeQty || 0);
-                                    const totalGst = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
-                                    return (
-                                        <tr key={index} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                                            <td className="py-4 px-4 text-center text-gray-500 font-bold">{index + 1}</td>
-                                            <td className="py-4 px-4 font-bold text-gray-900 dark:text-white">
-                                                {item.productName || item.productId?.name || 'N/A'}
-                                            </td>
-                                            <td className="py-4 px-4 text-gray-600 dark:text-gray-400 font-mono text-xs">
-                                                {item.skuId || item.productId?.sku || 'N/A'}
-                                            </td>
-                                            <td className="py-4 px-4">
-                                                <div className="text-gray-900 dark:text-white font-mono text-xs bg-gray-100 dark:bg-gray-700 inline-block px-3 py-1 rounded-lg font-bold">
-                                                    {item.batchNumber || 'N/A'}
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 text-gray-600 dark:text-gray-400 text-xs">
-                                                {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('en-IN') : 'N/A'}
-                                            </td>
-                                            <td className="py-4 px-4 text-center">
-                                                <span className="font-black text-emerald-600 dark:text-emerald-400 text-base">
-                                                    {item.receivedQty || item.quantity || 0}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-4 text-center">
-                                                <span className="font-bold text-blue-600 dark:text-blue-400">
-                                                    {totalFree > 0 ? totalFree : '-'}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-bold text-gray-900 dark:text-white">
-                                                ₹{(item.baseRate || item.purchasePrice || 0).toFixed(2)}
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-black text-gray-900 dark:text-white text-base">
-                                                ₹{(item.amount || 0).toFixed(2)}
-                                            </td>
-                                            <td className="py-4 px-4 text-center">
-                                                <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-lg font-black text-xs">
-                                                    {totalGst}%
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-bold text-purple-600 dark:text-purple-400">
-                                                ₹{(item.mrp || 0).toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Footer Notes */}
-                {purchase.notes && (
-                    <div className="p-8 pt-0 border-t border-gray-100 dark:border-gray-700">
-                        <h4 className="text-xs font-black text-gray-500 uppercase mb-3">Remarks:</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                            {purchase.notes}
-                        </p>
-                    </div>
-                )}
-
-                {/* Status Footer */}
-                <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <CheckCircle size={20} className="text-emerald-500" />
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Status:</span>
-                        <span className="px-3 py-1 rounded-lg text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-black uppercase border border-emerald-200 dark:border-emerald-800">
-                            {purchase.status}
-                        </span>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                        Payment: <span className="font-bold text-gray-700 dark:text-gray-300">{purchase.paymentStatus}</span>
-                    </div>
+                {/* Footer Disclaimer */}
+                <div className="mt-12 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400 uppercase tracking-wider">
+                    <p>This is a computer-generated document and does not require a physical signature. | Printed on: {new Date().toLocaleString('en-IN')}</p>
                 </div>
             </div>
 
-            {/* Print Styles */}
+            {/* Print Styles Override */}
             <style>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    
-                    .max-w-7xl, .max-w-7xl * {
-                        visibility: visible;
-                    }
-                    
-                    .max-w-7xl {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        max-width: 100%;
-                        margin: 0;
-                        padding: 0;
-                    }
-                    
                     @page {
-                        size: auto;
                         margin: 10mm;
+                        size: A4;
                     }
-                    
-                    * {
+                    body {
+                        background: white;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                    }
+                    
+                    /* Important for multi-page tables */
+                    table { page-break-inside: auto; }
+                    tr { page-break-inside: avoid; page-break-after: auto; }
+                    thead { display: table-header-group; }
+                    tfoot { display: table-footer-group; }
+                    
+                    /* Spacing adjustments */
+                    .break-inside-avoid {
+                        page-break-inside: avoid;
+                    }
+                    
+                    /* Hide everything else */
+                    body > * {
+                        display: none;
+                    }
+                    /* Show only the React app root, but specifically target our document */
+                    #root, #root > * {
+                        display: block; 
+                    }
+                    .max-w-5xl {
+                        max-width: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                    }
+                    /* Re-hide header/sidebar if they are part of layout wrapper which we can't easily detach */
+                    nav, aside, header {
+                        display: none !important;
+                    }
+                    #grn-document {
+                        box-shadow: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        overflow: visible !important;
                     }
                 }
             `}</style>

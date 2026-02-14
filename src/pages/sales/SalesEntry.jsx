@@ -337,6 +337,15 @@ const SalesEntry = () => {
                     placeholder="Search medicines..." 
                     value={searchTerm}
                     onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && paginatedInventory.length > 0) {
+                            const item = paginatedInventory[0];
+                            if (item.stock > 0) {
+                                addToCart(item);
+                                setSearchTerm('');
+                            }
+                        }
+                    }}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border-none rounded-xl focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-primary/10 transition-all text-sm"
                 />
            </div>

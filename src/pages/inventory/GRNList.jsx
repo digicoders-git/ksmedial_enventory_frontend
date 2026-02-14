@@ -132,50 +132,54 @@ const GRNList = () => {
     };
 
     const handlePrintQR = (grn) => {
-        const qrData = grn.invoiceNumber || grn._id;
+        const qrData = `
+GRN No: ${grn.invoiceNumber}
+Date: ${new Date(grn.invoiceDate || grn.createdAt).toLocaleDateString('en-IN')}
+Supplier: ${grn.supplierId?.name || 'N/A'}
+Total Amount: ₹${(grn.grandTotal || grn.invoiceSummary?.invoiceAmount || 0).toFixed(2)}
+Items: ${grn.items?.length || 0}
+Status: ${grn.status}
+        `.trim();
+
+        // Use higher resolution for better quality
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
         Swal.fire({
             title: 'GRN QR Code',
             html: `
                 <div style="display: flex; flex-direction: column; align-items: center; padding: 10px;">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}" alt="QR Code" style="width: 150px; height: 150px; margin-bottom: 15px;" />
-                    <p>Scan to track GRN: <strong>${qrData}</strong></p>
-                    <p style="font-size: 12px; color: #666;">Use this code for warehouse receiving.</p>
+                    <img src="${qrUrl}" alt="QR Code" style="width: 200px; height: 200px; margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;" />
+                    <div style="text-align: left; width: 100%; font-size: 13px; color: #4b5563; background: #f3f4f6; padding: 12px; border-radius: 8px;">
+                        <p style="margin-bottom: 4px;"><strong>GRN:</strong> ${grn.invoiceNumber}</p>
+                        <p style="margin-bottom: 4px;"><strong>Supplier:</strong> ${grn.supplierId?.name || 'N/A'}</p>
+                        <p style="margin-bottom: 0;"><strong>Amount:</strong> ₹${(grn.grandTotal || grn.invoiceSummary?.invoiceAmount || 0).toFixed(2)}</p>
+                    </div>
                 </div>
             `,
-            confirmButtonText: 'Done',
-            confirmButtonColor: '#8B5CF6'
-        });
-    };
-
-    const handleVerify = async (grn) => {
-        if (grn.status !== 'Pending') {
-            Swal.fire('Info', 'Only Pending GRNs can be sent for verification.', 'info');
-            return;
-        }
-
-        const result = await Swal.fire({
-            title: 'Send for Verification?',
-            html: `<div style="padding: 10px;">
-                <p>Send <strong>${grn.invoiceNumber}</strong> for physical verification?</p>
-                <p style="margin-top: 10px; color: #666;">Status will change to <strong>Putaway Pending</strong></p>
-            </div>`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, Send for Verification',
-            confirmButtonColor: '#10B981'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                const { data } = await api.put(`/purchases/${grn._id}`, { status: 'Putaway_Pending' });
-                if (data.success) {
-                    Swal.fire('Success', 'GRN sent for verification', 'success');
-                    fetchGRNs();
+            showDenyButton: true,
+            confirmButtonText: 'Close',
+            denyButtonText: 'Download',
+            confirmButtonColor: '#6B7280',
+            denyButtonColor: '#003B5C',
+        }).then(async (result) => {
+            if (result.isDenied) {
+                try {
+                    const response = await fetch(qrUrl);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `GRN_QR_${grn.invoiceNumber}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error("Download failed", error);
+                    Swal.fire('Error', 'Failed to download QR Code', 'error');
                 }
-            } catch (error) {
-                Swal.fire('Error', 'Failed to update status', 'error');
             }
-        }
+        });
     };
 
     const handlePrintReceipt = (grn) => {
@@ -485,14 +489,6 @@ const GRNList = () => {
                                                     title="Print Receipt"
                                                 >
                                                     <Printer size={16} />
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleVerify(grn)} 
-                                                    className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 transition-all" 
-                                                    title="Send for Verification"
-                                                    disabled={grn.status !== 'Pending'}
-                                                >
-                                                    <CheckCircle size={16} />
                                                 </button>
                                                 <button 
                                                     onClick={() => handlePrintQR(grn)} 

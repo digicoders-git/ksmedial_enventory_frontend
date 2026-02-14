@@ -239,6 +239,58 @@ const CreatePurchaseOrder = () => {
         }
     };
 
+    const handleQuickAddSupplier = async () => {
+        const { value: formValues } = await Swal.fire({
+            title: 'Add New Supplier',
+            html: `
+                <input id="swal-name" class="swal2-input" placeholder="Name *" style="margin-bottom: 10px;">
+                <input id="swal-phone" class="swal2-input" placeholder="Phone *" style="margin-bottom: 10px;">
+                <input id="swal-city" class="swal2-input" placeholder="City (Optional)">
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Add Supplier',
+            confirmButtonColor: '#007242',
+            preConfirm: () => {
+                const name = document.getElementById('swal-name').value;
+                const phone = document.getElementById('swal-phone').value;
+                const city = document.getElementById('swal-city').value;
+                if (!name || !phone) {
+                    Swal.showValidationMessage('Name and Phone are required');
+                    return false;
+                }
+                return { name, phone, city };
+            }
+        });
+
+        if (formValues) {
+            try {
+                Swal.fire({ title: 'Saving...', didOpen: () => Swal.showLoading() });
+                const { data } = await api.post('/suppliers', formValues);
+                
+                if (data.success) {
+                    // Assuming API returns the created supplier in data.supplier
+                    // If not, we might need to re-fetch suppliers, but let's try pushing first for speed
+                    const newSupplier = data.supplier || { ...formValues, _id: data.supplierId }; 
+                    
+                    setSuppliers(prev => [...prev, newSupplier]);
+                    setFormData(prev => ({ ...prev, supplierId: newSupplier._id || newSupplier.id }));
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Supplier Added',
+                        text: `${newSupplier.name} has been selected.`,
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            } catch (error) {
+                console.error("Error adding supplier:", error);
+                Swal.fire('Error', error.response?.data?.message || 'Failed to add supplier', 'error');
+            }
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in pb-20">
             {/* Header */}
@@ -368,16 +420,25 @@ const CreatePurchaseOrder = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supplier</label>
-                                <select 
-                                    value={formData.supplierId}
-                                    onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-bold"
-                                >
-                                    <option value="">Select Supplier</option>
-                                    {suppliers.map(s => (
-                                        <option key={s._id} value={s._id}>{s.name}</option>
-                                    ))}
-                                </select>
+                                <div className="flex gap-2">
+                                    <select 
+                                        value={formData.supplierId}
+                                        onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-bold"
+                                    >
+                                        <option value="">Select Supplier</option>
+                                        {suppliers.map(s => (
+                                            <option key={s._id} value={s._id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                    <button 
+                                        onClick={handleQuickAddSupplier}
+                                        className="px-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors border border-primary/20"
+                                        title="Add New Supplier"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">PO Date</label>
