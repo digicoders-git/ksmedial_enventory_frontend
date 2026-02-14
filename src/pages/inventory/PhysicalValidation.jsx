@@ -10,7 +10,8 @@ import {
   CheckCircle, 
   FileText, 
   Package, 
-  X
+  X,
+  Download
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
@@ -41,51 +42,7 @@ const PhysicalValidation = () => {
   const [showPOSuggestions, setShowPOSuggestions] = useState(false);
   const poWrapperRef = React.useRef(null);
 
-
-  useEffect(() => {
-    const fetchDispatchedPOs = async () => {
-        try {
-            const { data } = await api.get('/purchase-orders?status=Dispatched');
-            const dispatched = Array.isArray(data) ? data.filter(po => po.status === 'Dispatched') : [];
-            setDispatchedPOs(dispatched);
-
-            // Handle Prefill from navigation state if present
-            if (location.state?.prefill?.poData) {
-                const po = location.state.prefill.poData;
-                setFormData(prev => ({
-                    ...prev,
-                    poIds: po.poNumber,
-                    supplierName: po.supplierName,
-                    skuCount: po.items.length,
-                    invoiceValue: po.totalAmount
-                }));
-                setShowEntryModal(true);
-                // Clear state to prevent re-opening if location persists
-                window.history.replaceState({}, document.title);
-            }
-        } catch (error) {
-            console.error("Failed to fetch dispatched POs", error);
-        }
-    };
-    fetchDispatchedPOs();
-  }, [location.state]);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-        if (supplierWrapperRef.current && !supplierWrapperRef.current.contains(event.target)) {
-            setShowSupplierSuggestions(false);
-        }
-        if (poWrapperRef.current && !poWrapperRef.current.contains(event.target)) {
-             setShowPOSuggestions(false);
-        }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
+  // State Declarations moved to top
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEntryModal, setShowEntryModal] = useState(false);
@@ -107,6 +64,80 @@ const PhysicalValidation = () => {
     poIds: '',
     isPoNotPresent: false
   });
+
+
+  useEffect(() => {
+    const fetchDispatchedPOs = async () => {
+        try {
+            const { data } = await api.get('/purchase-orders'); // Removed status query to filter client-side properly
+            const allowedStatuses = ['Dispatched', 'Sent to Supplier', 'Approved by Supplier'];
+            const dispatched = Array.isArray(data) ? data.filter(po => allowedStatuses.includes(po.status)) : [];
+            setDispatchedPOs(dispatched);
+
+            // Handle Prefill from navigation state if present
+            if (location.state?.prefill?.poData) {
+                const po = location.state.prefill.poData;
+                setFormData(prev => ({
+                    ...prev,
+                    poIds: po.poNumber,
+                    supplierName: po.supplierName,
+                    skuCount: po.items.length,
+                    invoiceValue: po.totalAmount
+                }));
+                setShowEntryModal(true);
+                window.history.replaceState({}, document.title);
+            }
+        } catch (error) {
+            console.error("Failed to fetch dispatched POs", error);
+        }
+    };
+    fetchDispatchedPOs();
+  }, [location.state]);
+
+  // Auto-fill logic when PO ID is typed or scanned
+  useEffect(() => {
+    if (formData.poIds && dispatchedPOs.length > 0) {
+        const matchedPO = dispatchedPOs.find(po => po.poNumber.toLowerCase() === formData.poIds.trim().toLowerCase());
+        if (matchedPO) {
+             // Only update if data is missing or different to avoid overriding manual edits unnecessarily, 
+             // but ensure we fill if it's a match.
+             if (formData.supplierName !== matchedPO.supplierName || formData.skuCount != matchedPO.items.length) {
+                 setFormData(prev => ({
+                     ...prev,
+                     supplierName: matchedPO.supplierName,
+                     skuCount: matchedPO.items.length,
+                     invoiceValue: matchedPO.totalAmount
+                 }));
+                 Swal.fire({
+                     toast: true,
+                     position: 'top-end',
+                     icon: 'success',
+                     title: 'PO Details Auto-filled',
+                     showConfirmButton: false,
+                     timer: 1500
+                 });
+             }
+        }
+    }
+  }, [formData.poIds, dispatchedPOs]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+        if (supplierWrapperRef.current && !supplierWrapperRef.current.contains(event.target)) {
+            setShowSupplierSuggestions(false);
+        }
+        if (poWrapperRef.current && !poWrapperRef.current.contains(event.target)) {
+             setShowPOSuggestions(false);
+        }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -233,6 +264,38 @@ const PhysicalValidation = () => {
       });
   };
 
+  const downloadPendingReport = () => {
+    const pendingEntries = entries.filter(e => e.status === 'Pending');
+    
+    if (pendingEntries.length === 0) {
+        Swal.fire('Info', 'No pending entries to download.', 'info');
+        return;
+    }
+
+    const csvHeaders = ['Physical ID', 'Date', 'Supplier', 'Invoice No', 'Invoice Value', 'SKU Count', 'Location', 'PO Number'];
+    
+    const csvRows = pendingEntries.map(e => [
+        e.physicalReceivingId,
+        new Date(e.createdAt).toLocaleDateString(),
+        `"${e.supplierName.replace(/"/g, '""')}"`,
+        `"${e.invoiceNumber.replace(/"/g, '""')}"`,
+        e.invoiceValue,
+        e.skuCount,
+        `"${(e.location || '').replace(/"/g, '""')}"`,
+        `"${(e.poIds || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [csvHeaders.join(','), ...csvRows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Pending_Physical_Validation_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const pendingCount = entries.filter(e => e.status === 'Pending').length;
   const doneCount = entries.filter(e => e.status === 'Done').length;
 
@@ -256,6 +319,12 @@ const PhysicalValidation = () => {
                     <X size={18} /> Clear All
                 </button>
             )}
+            <button 
+                onClick={downloadPendingReport}
+                className="px-5 py-2.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl font-bold text-sm hover:bg-blue-100 transition-all flex items-center gap-2"
+            >
+                <Download size={18} /> Pending Report
+            </button>
             <button 
                 onClick={() => setShowEntryModal(true)}
                 className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
@@ -396,7 +465,7 @@ const PhysicalValidation = () => {
                                        <div className="flex gap-2 justify-end">
                                             {entry.grnStatus !== 'Done' ? (
                                                 <button 
-                                                    onClick={() => navigate('/inventory/grn/add', { 
+                                                    onClick={() => navigate('/purchase/grn/add', { 
                                                         state: { 
                                                             prefill: {
                                                                 physicalId: entry.physicalReceivingId,
@@ -410,7 +479,7 @@ const PhysicalValidation = () => {
                                                 </button>
                                             ) : (
                                                 <button 
-                                                    onClick={() => navigate(`/inventory/grn/view/${entry.grnId || ''}`)}
+                                                    onClick={() => navigate(`/purchase/grn/view/${entry.grnId || ''}`)}
                                                     className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-100"
                                                 >
                                                     View GRN

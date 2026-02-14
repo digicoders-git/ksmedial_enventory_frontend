@@ -1,10 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Phone, Mail, Printer, ArrowLeft, Download, Share2, FileText, Truck, Calendar } from 'lucide-react';
+import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import KS2Logo from '/KS2-Logo.png'; 
+import html2canvas from 'html2canvas';
+import { QRCodeCanvas } from 'qrcode.react'; 
 import api from '../../api/axios';
+
+// Utility to convert number to words
+const numberToWords = (num) => {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    const format = (n) => {
+        if (n < 20) return a[n];
+        const digit = n % 10;
+        if (n < 100) return b[Math.floor(n / 10)] + (digit ? '-' + a[digit] : ' ');
+        if (n < 1000) return a[Math.floor(n / 100)] + 'Hundred ' + (n % 100 === 0 ? '' : 'and ' + format(n % 100));
+        return format(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? format(n % 1000) : '');
+    };
+    
+    if (num === 0) return "Zero ";
+    return "Rupees " + format(Math.floor(num)) + "Only"; 
+};
 
 const ViewPurchaseInvoice = () => {
   const { id } = useParams();
@@ -15,518 +32,382 @@ const ViewPurchaseInvoice = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!loading && invoice && searchParams.get('autoPrint') === 'true') {
-        setTimeout(() => {
-            window.print();
-        }, 500); // Small delay to ensuring rendering
-    }
-  }, [loading, invoice, searchParams]);
-
-  // Generate QR Data for scanning - using JSON format for better scannability
-  const qrData = invoice ? JSON.stringify({
-    type: 'PURCHASE_INVOICE',
-    company: 'KS Pharma Net',
-    invoiceNo: invoice.id,
-    date: invoice.date,
-    supplier: invoice.supplier,
-    amount: invoice.grandTotal,
-    payment: invoice.payment,
-    status: invoice.status,
-    verified: true
-  }) : '';
-
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
-
-  useEffect(() => {
     const fetchInvoice = async () => {
         try {
-            // Check if id is local or mongoId. 
-            // Usually we might need a specific endpoint or filter.
-            // Assuming '/purchases/:id' works with mongoId.
-            // If 'id' from params is invoiceNumber (e.g. INV-2024...), we might need to search or use different endpoint.
-            // Let's assume we pass mongoId in URL or backend supports lookup.
-            // If URL is /purchase/invoice/view/INV-001, backend needs to support it. 
-            // Standardizing to use mongoId is safest if we linked it that way. 
-            // But let's check how Sales does it. Sales uses `ViewInvoice` which simulates fetch.
-            
-            // For now, I'll try to fetch all and find, or assume ID is mongoID.
-            // Better: Fetch by ID.
-            let response = null;
-            try {
-                response = await api.get(`/purchases/${id}`);
-            } catch(e) {
-                 // specific lookup by invoice number could be needed if id is not mongoid
-                 // For now let's hope it's mongoId or backend handles it.
-                 // Actually the user URL example was `/sales/invoices/view/INV-2024-001`.
-                 // If I want to support that, I need lookup by invoice number.
-                 // But typically I'll link to `_id`.
-                 console.error("Direct fetch failed", e);
-            }
+            setLoading(true);
+            const { data } = await api.get(`/purchases/${id}`);
+            if (data.success) {
+                const p = data.purchase;
+                const items = mapItems(p.items);
 
-            if (response && response.data.success) {
-                const p = response.data.purchase;
+                // Calculate Summary from items to be safe
+                const subTotal = items.reduce((sum, item) => sum + parseFloat(item.taxable), 0);
+                const taxAmount = items.reduce((sum, item) => sum + parseFloat(item.gstAmt), 0);
+                
                 setInvoice({
-                    id: p.invoiceNumber,
-                    date: (p.purchaseDate && !isNaN(new Date(p.purchaseDate).getTime())) ? new Date(p.purchaseDate).toISOString().split('T')[0] : 'N/A',
-                    supplier: p.supplierId?.name || 'Unknown Supplier',
-                    contact: p.supplierId?.phone || 'N/A',
-                    address: p.supplierId?.address || 'N/A',
-                    gst: p.supplierId?.gstNumber || 'N/A',
+                    id: p.invoiceNumber || p._id, // Use Invoice Number if available
+                    grnId: p._id,
+                    externalInvoice: p.externalInvoiceNumber || 'N/A',
+                    date: p.invoiceDate ? new Date(p.invoiceDate).toLocaleDateString() : new Date(p.createdAt).toLocaleDateString(),
+                    displayDate: p.invoiceDate ? new Date(p.invoiceDate).toISOString().split('T')[0] : new Date(p.createdAt).toISOString().split('T')[0],
+                    
+                    // Supplier (Sold By)
+                    supplierName: p.supplierId?.name || 'Unknown Supplier',
+                    supplierAddress: p.supplierId?.address || 'N/A',
+                    supplierGst: p.supplierId?.gstNumber || 'N/A',
+                    supplierPhone: p.supplierId?.phone || 'N/A',
+                    supplierDL: p.supplierId?.drugLicenseNumber || 'N/A',
+
                     payment: p.paymentStatus,
-                    status: p.status || 'Received',
-                    items: p.items.map(i => ({
-                         name: i.productName || i.productId?.name || i.name, 
-                         qty: i.receivedQty || i.quantity || 0,
-                         rate: i.purchasePrice || i.baseRate || 0,
-                         tax: i.cgst + i.sgst + i.igst || 0,
-                         amount: i.amount || 0
-                    })),
-                    subtotal: p.subTotal,
-                    taxAmount: p.taxAmount,
-                    discountAmount: p.discount,
-                    grandTotal: p.grandTotal
+                    status: p.status,
+                    items: items,
+                    subtotal: subTotal,
+                    taxAmount: taxAmount,
+                    discountAmount: p.discount || 0,
+                    grandTotal: p.grandTotal,
+                    notes: p.notes
                 });
             } else {
-                // If ID was invoice number (string), we might need to fetch all and find? Or backend search.
-                // Let's fallback to list fetch if needed or error.
                 setError("Invoice not found");
             }
-
         } catch (err) {
+            console.error("Error fetching invoice:", err);
             setError("Failed to load invoice");
-            console.error(err);
         } finally {
             setLoading(false);
         }
     };
-
-    if(id) fetchInvoice();
+    fetchInvoice();
   }, [id]);
 
+  useEffect(() => {
+      if (!loading && invoice && searchParams.get('autoPrint') === 'true') {
+          setTimeout(() => {
+              window.print();
+          }, 1000);
+      }
+  }, [loading, invoice, searchParams]);
 
-  const handleDownloadPDF = () => {
-    if (!invoice) return;
+  const mapItems = (items) => items.map(i => {
+      const qty = i.receivedQty || i.quantity || 0;
+      const rate = i.purchasePrice || i.baseRate || i.rate || 0;
+      
+      // Calculate tax rate if not explicit
+      let taxRate = i.gst || i.tax || 0;
+      if (!taxRate && (i.cgst || i.sgst)) {
+          taxRate = (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0);
+      }
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Helper to add Logo
-    const img = new Image();
-    img.src = KS2Logo;
-    
-    img.onload = () => {
-        // Add QR Code to PDF
-        const qrImg = new Image();
-        qrImg.crossOrigin = "anonymous";
-        qrImg.src = qrCodeUrl;
-        
-        qrImg.onload = () => {
-            doc.addImage(img, 'PNG', 14, 10, 45, 20);
-            
-            // QR Code in Top Right corner of PDF
-            doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
+      const taxableValue = i.amount || (rate * qty);
+      const gstAmt = taxableValue * (taxRate / 100);
+      const lineTotal = taxableValue + gstAmt;
 
-        // Company Info
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text('KS Pharma Net', 14, 40);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.text('123, Health Avenue, Medical District', 14, 46);
-        doc.text('Phone: +91 98765 43210', 14, 51);
-        doc.text('Email: support@kspharma.com', 14, 56);
+      return {
+          name: i.productName || i.productId?.name || 'Item',
+          batch: i.batchNumber || 'N/A',
+          exp: i.expiryDate ? new Date(i.expiryDate).toLocaleDateString() : '-',
+          qty: qty,
+          mrp: i.mrp || 0,
+          rate: rate,
+          taxable: taxableValue.toFixed(2),
+          hsn: i.hsnCode || i.productId?.hsnCode || '-',
+          gstRate: taxRate,
+          gstAmt: gstAmt.toFixed(2),
+          total: lineTotal // Taxable + Tax
+      };
+  });
 
-        // Invoice Header
-        doc.setFontSize(36);
-        doc.setTextColor(230, 230, 230);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PURCHASE', pageWidth - 14, 25, { align: 'right' });
-        
-        doc.setFontSize(16);
-        doc.setTextColor(0);
-        doc.text(`#${invoice.id}`, pageWidth - 14, 38, { align: 'right' });
-        
-        // Status Badge - moved to left side to avoid QR overlap
-        const statusX = 14;
-        const statusY = 62;
-        doc.setDrawColor(220, 252, 231);
-        doc.setFillColor(240, 253, 244);
-        doc.roundedRect(statusX, statusY, 20, 6, 1, 1, 'FD');
-        doc.setTextColor(22, 101, 52);
-        doc.setFontSize(8);
-        doc.text(invoice.status.toUpperCase(), statusX + 10, statusY + 4.2, { align: 'center' });
+  const handleDownloadPDF = async () => {
+      const input = document.getElementById('invoice-content');
+      if (!input) return;
 
-        doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.text(`Date: ${invoice.date}`, 14, 72);
+      try {
+          const clone = input.cloneNode(true);
+          clone.style.width = '210mm'; 
+          clone.style.minHeight = '297mm';
+          clone.style.position = 'absolute';
+          clone.style.left = '-9999px';
+          clone.style.top = '0';
+          clone.style.background = 'white';
+          clone.style.color = 'black';
+          clone.style.margin = '0';
+          clone.style.transform = 'none';
+          
+          document.body.appendChild(clone);
 
-        doc.setDrawColor(245);
-        doc.line(14, 75, pageWidth - 14, 75);
+          const canvas = await html2canvas(clone, { 
+              scale: 3, 
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff'
+          });
 
-        // Bill To & Payment Info (Dual Column)
-        doc.setFontSize(8);
-        doc.setTextColor(160);
-        doc.setFont('helvetica', 'bold');
-        doc.text('SUPPLIER', 14, 85);
-        doc.text('PAYMENT INFO', pageWidth - 14, 85, { align: 'right' });
+          document.body.removeChild(clone);
 
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.text(invoice.supplier, 14, 93);
-        
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.setFont('helvetica', 'normal');
-        const splitAddress = doc.splitTextToSize(invoice.address, 70);
-        doc.text(splitAddress, 14, 100);
-        doc.text(`Tel: ${invoice.contact}`, 14, 100 + (splitAddress.length * 5));
-        doc.text(`GST: ${invoice.gst}`, 14, 100 + (splitAddress.length * 5) + 5);
-
-
-        // Right side - Payment info details
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text('Payment Status:', pageWidth - 45, 93, { align: 'right' });
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(invoice.payment, pageWidth - 14, 93, { align: 'right' });
-        
-        // Items Table
-        const tableColumn = ["#", "Item Name", "Qty", "Rate", "Total"];
-        const tableRows = invoice.items.map((item, index) => [
-            index + 1,
-            item.name,
-            item.qty,
-            `Rs. ${item.rate.toFixed(2)}`,
-            `Rs. ${item.amount.toFixed(2)}`
-        ]);
-
-        autoTable(doc, {
-            startY: 130,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'striped',
-            headStyles: { fillColor: [0, 114, 66], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 9 },
-            columnStyles: {
-                0: { halign: 'center' },
-                2: { halign: 'center' },
-                3: { halign: 'right' },
-                4: { halign: 'right' },
-            },
-            margin: { left: 14, right: 14 },
-        });
-
-        // Summary Area
-        const finalY = doc.lastAutoTable.finalY + 15;
-        
-        // Note
-        doc.setFontSize(9);
-        doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Note:', 14, finalY);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100);
-        const noteText = "This is a computer generated invoice.";
-        const splitNote = doc.splitTextToSize(noteText, 80);
-        doc.text(splitNote, 14, finalY + 5);
-
-        // Calculation
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Subtotal`, pageWidth - 60, finalY);
-        doc.setTextColor(0);
-        doc.text(`Rs. ${invoice.subtotal.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
-        
-        doc.setTextColor(100);
-        doc.text(`Discount`, pageWidth - 60, finalY + 8);
-        doc.setTextColor(239, 68, 68);
-        doc.text(`-Rs. ${invoice.discountAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
-        
-        doc.setTextColor(100);
-        doc.text(`Tax`, pageWidth - 60, finalY + 16);
-        doc.setTextColor(0);
-        doc.text(`Rs. ${invoice.taxAmount.toFixed(2)}`, pageWidth - 14, finalY + 16, { align: 'right' });
-
-        doc.setDrawColor(230);
-        doc.line(pageWidth - 70, finalY + 22, pageWidth - 14, finalY + 22);
-
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'black');
-        doc.text(`GRAND TOTAL`, pageWidth - 70, finalY + 32);
-        doc.setTextColor(0, 114, 66);
-        doc.text(`Rs. ${invoice.grandTotal.toFixed(2)}`, pageWidth - 14, finalY + 32, { align: 'right' });
-
-        doc.save(`${invoice.id}_purchase_invoice.pdf`);
-        }; // End qrImg.onload
-    }; // End img.onload
-    
-    // Fallback if image fails to load
-    img.onerror = () => {
-        doc.setFontSize(22);
-        doc.setTextColor(0, 114, 66);
-        doc.text('KS PHARMA NET', 14, 22);
-        doc.save(`${invoice.id}_purchase_invoice.pdf`);
-    }
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`purchase_invoice_${invoice.id}.pdf`);
+      } catch (err) {
+          console.error("PDF generation failed:", err);
+      }
   };
 
-
-  if (loading) return (
+  if (loading) {
+    return (
       <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
-  );
+    );
+  }
 
-  if (error) return (
-       <div className="flex items-center justify-center min-h-screen text-red-500 font-bold">
-          {error}
-       </div>
-  );
+  if (error || !invoice) {
+      return <div className="p-10 text-center text-red-500 font-bold">{error || "Invoice not found"}</div>;
+  }
+
+  // --- GST Logic ---
+  const gstBreakdown = {};
+  let totalTaxable = 0;
+  let totalGst = 0;
+
+  invoice.items.forEach(item => {
+      const rate = item.gstRate || 0;
+      if (!gstBreakdown[rate]) gstBreakdown[rate] = { taxable: 0, gst: 0 };
+      const taxVal = parseFloat(item.taxable);
+      const gstVal = parseFloat(item.gstAmt);
+      gstBreakdown[rate].taxable += taxVal;
+      gstBreakdown[rate].gst += gstVal;
+      totalTaxable += taxVal;
+      totalGst += gstVal;
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 animate-fade-in print:p-0 print:bg-white">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans print:p-0 print:bg-white text-black">
       
       {/* Action Header - Hidden on Print */}
-      <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 print:hidden">
-        <button 
-            onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/purchase/invoices');
-              }
-            }}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 dark:text-gray-300 hover:text-primary transition-colors bg-white dark:bg-gray-800 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md font-bold active:scale-95"
-        >
-            <ArrowLeft size={18} strokeWidth={2.5} /> 
-            <span className="uppercase text-xs tracking-widest">Back to List</span>
+      <div className="max-w-[210mm] mx-auto mb-6 flex justify-between items-center print:hidden">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-black font-semibold">
+            <ArrowLeft size={18} /> Back
         </button>
-        
-        <div className="flex flex-col sm:flex-row gap-3">
-            <button 
-                onClick={handleDownloadPDF}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 shadow-sm transition-all active:scale-95 text-sm font-black uppercase tracking-wider"
-            >
-                <Download size={18} strokeWidth={2.5} /> PDF
+        <div className="flex gap-2">
+            <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 font-semibold shadow-sm">
+                <Download size={16} /> PDF
             </button>
-            <button 
-                onClick={() => window.print()} 
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:bg-secondary transition-all active:scale-95 text-sm font-black uppercase tracking-wider"
-            >
-                <Printer size={18} strokeWidth={2.5} /> Print Invoice
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-[#007242] text-white rounded hover:bg-[#005a34] font-semibold shadow-sm">
+                <Printer size={16} /> Print
             </button>
         </div>
       </div>
 
-      {/* Invoice Card */}
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden print:shadow-none print:border-none print:rounded-none print:max-w-none print:w-full">
-        
-        {/* Top Branding Section */}
-        <div className="bg-gradient-to-br from-gray-50 to-white border-b border-gray-100 p-6 sm:p-8 md:p-12">
-            <div className="flex flex-col lg:flex-row justify-between items-start gap-10">
-                <div className="flex flex-col gap-6 w-full lg:w-auto">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
-                            <img src="/KS2-Logo.png" alt="Logo" className="h-16 w-auto object-contain" />
-                        </div>
-                        <div>
-                           <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">KS Pharma Net</h2>
-                           <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Medical Excellence</p>
-                        </div>
+      <div className="flex justify-center">
+            {/* --- INVOICE VIEW --- */}
+            <div id="invoice-content" className="w-[210mm] min-h-[297mm] bg-white shadow-lg print:shadow-none print:w-full text-[10px] leading-tight text-black border border-black print:border-none p-2 box-border">
+                {/* Header Title */}
+                <div className="border border-black border-collapse">
+                    <div className="border-b border-black text-center font-bold py-1 bg-white uppercase">
+                        Purchase Invoice / GRN <span className="float-right mr-2 font-normal capitalize">(Original for Recipient)</span>
                     </div>
-                    <div className="space-y-2.5 text-sm text-gray-500 font-medium">
-                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><MapPin size={16}/></div> 123, Health Avenue, Medical District</div>
-                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><Phone size={16}/></div> +91 98765 43210</div>
-                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary"><Mail size={16}/></div> support@kspharma.com</div>
-                    </div>
-                </div>
 
-                <div className="text-left lg:text-right w-full lg:w-auto flex flex-col lg:items-end">
-                    <h1 className="text-5xl sm:text-7xl font-black text-gray-900/5 uppercase tracking-tighter leading-none mb-1 select-none">Purchase</h1>
-                    <div className="text-3xl font-black text-gray-800 tracking-tight">#{invoice.id}</div>
-                    
-                    <div className="mt-8 flex flex-col items-start lg:items-end gap-5">
-                        <div className="flex items-center gap-4">
-                            <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm
-                                 ${invoice.status === 'Received' ? 'bg-green-50 text-green-700 border-green-200/50' : 'bg-orange-50 text-orange-700 border-orange-200/50'}
-                            `}>
-                                 {invoice.status}
-                            </div>
-                            <div className="h-10 w-10 bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm group hover:scale-110 transition-transform">
-                                <img src={qrCodeUrl} alt="Purchase QR" className="w-full h-full" />
+                    {/* Top Section */}
+                    <div className="flex border-b border-black">
+                        {/* Sold By (Supplier) */}
+                        <div className="w-[40%] border-r border-black p-2 flex flex-col justify-between">
+                            <div>
+                                <div className="font-bold mb-1 uppercase underline">Sold By (Supplier)</div>
+                                <div className="flex items-start gap-2 mb-2">
+                                    <div className="font-bold text-sm uppercase">{invoice.supplierName}</div>
+                                </div>
+                                <div><span className="font-bold">Address:</span> {invoice.supplierAddress}</div>
+                                <div><span className="font-bold">GSTIN:</span> {invoice.supplierGst}</div>
+                                <div><span className="font-bold">Phone:</span> {invoice.supplierPhone}</div>
+                                <div><span className="font-bold">DL No:</span> {invoice.supplierDL}</div>
                             </div>
                         </div>
-                        <div className="text-xs text-gray-500 font-black uppercase tracking-widest bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200/50">
-                            Date: <span className="text-gray-900 ml-1">{invoice.date}</span>
+
+                        {/* Sold To (Company - US) */}
+                        <div className="w-[35%] border-r border-black p-2 flex flex-col justify-between">
+                            <div>
+                                <div className="font-bold mb-1 uppercase underline">Sold To (Buyer)</div>
+                                <div className="flex items-start gap-2 mb-2">
+                                    <img src="/KS2-Logo.png" alt="Logo" className="h-6 object-contain" />
+                                    <div className="font-bold text-sm">KS Pharma Net Solutions Pvt. Ltd.</div>
+                                </div>
+                                <div><span className="font-bold">Address:</span> 123, Health Avenue, Okhla Industrial Area, Phase-I, New Delhi-110020</div>
+                                <div><span className="font-bold">GSTIN:</span> 09AAAFCD7691C1ZH</div>
+                                <div><span className="font-bold">Phone:</span> 011-41666666</div>
+                            </div>
+                        </div>
+
+                        {/* Invoice Details */}
+                        <div className="w-[25%] p-2 flex flex-col justify-start">
+                            <div>
+                                <div className="font-bold">Invoice No.: {invoice.externalInvoice !== 'N/A' ? invoice.externalInvoice : invoice.id}</div>
+                                <div className="font-bold">GRN ID: {invoice.grnId.substr(-8).toUpperCase()}</div>
+                                <div className="font-bold">Date: {invoice.displayDate}</div>
+                                <div className="mt-4 flex flex-col items-center">
+                                    <div className="w-20 h-20 bg-white p-1 border">
+                                        <QRCodeCanvas value={`PurchInv:${invoice.id}|Amt:${invoice.grandTotal}`} size={70} style={{ height: "auto", maxWidth: "100%", width: "100%" }} />
+                                    </div>
+                                    <div className="text-[8px] text-center mt-1 font-bold">GRN Tracking QR</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        {/* Billing Details */}
-        <div className="p-6 sm:p-8 md:p-12 grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="bg-gray-50/50 dark:bg-gray-900/10 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
-                <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                    <Truck size={14} strokeWidth={3} className="text-primary" /> Supplier
-                </h3>
-                <div className="text-xl font-black text-gray-900 mb-3 tracking-tight">{invoice.supplier}</div>
-                <div className="text-sm text-gray-500 leading-relaxed font-medium mb-4">{invoice.address}</div>
-                <div className="flex flex-col gap-2">
-                    <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div> Tel: <span className="text-gray-700 ml-auto">{invoice.contact}</span></div>
-                    <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div> GST: <span className="text-gray-700 ml-auto">{invoice.gst}</span></div>
-                </div>
-            </div>
-            
-            <div className="md:text-right flex flex-col justify-center">
-                 <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">Payment Info</h3>
-                 <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10">
-                    <div className="flex md:justify-end justify-between items-center gap-8">
-                        <span className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Payment Status</span>
-                        <span className={`px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm
-                            ${invoice.payment === 'Paid' ? 'bg-white text-green-600 border-green-100' : 'bg-white text-red-500 border-red-100'}`}>
-                            {invoice.payment}
-                        </span>
-                    </div>
-                 </div>
-            </div>
-        </div>
-
-        {/* Items Table */}
-        <div className="px-6 sm:px-8 md:px-12 pb-8">
-            <div className="relative group">
-                <div className="md:hidden flex items-center justify-center gap-2 text-[10px] font-black text-primary/40 uppercase tracking-widest mb-3 animate-pulse">
-                   Swipe to see details <Share2 size={12} className="rotate-90" />
-                </div>
-                <div className="border rounded-2xl overflow-x-auto border-gray-100 shadow-inner scrollbar-hide">
-                    <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead>
-                            <tr className="bg-gray-900 text-white font-black uppercase text-[10px] tracking-[0.2em]">
-                                <th className="py-5 px-6 w-16 text-center">#</th>
-                                <th className="py-5 px-6">Item Name</th>
-                                <th className="py-5 px-6 text-center">Qty</th>
-                                <th className="py-5 px-6 text-right">Rate</th>
-                                <th className="py-5 px-6 text-right rounded-tr-2xl">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {invoice.items.map((item, index) => (
-                                <tr key={index} className="hover:bg-gray-50 transition-colors group">
-                                    <td className="py-5 px-6 text-center text-gray-400 font-black text-[11px]">{index + 1}</td>
-                                    <td className="py-5 px-6 font-black text-gray-800 uppercase tracking-tight">{item.name}</td>
-                                    <td className="py-5 px-6 text-center text-gray-600 font-bold bg-gray-50/50">{item.qty}</td>
-                                    <td className="py-5 px-6 text-right text-gray-500 font-medium whitespace-nowrap">₹{item.rate.toFixed(2)}</td>
-                                    <td className="py-5 px-6 text-right font-black text-gray-900 whitespace-nowrap group-hover:text-primary transition-colors">₹{item.amount.toFixed(2)}</td>
+                    {/* Items Table */}
+                    <div className="border-b border-black">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-black bg-gray-50 text-[8px] uppercase tracking-tighter">
+                                    <th className="border-r border-black px-1 py-1 w-[3%]">SR</th>
+                                    <th className="border-r border-black px-1 py-1 w-[20%]">PRODUCT NAME</th>
+                                    <th className="border-r border-black px-1 py-1 w-[10%]">BATCH</th>
+                                    <th className="border-r border-black px-1 py-1 w-[8%]">EXPIRY</th>
+                                    <th className="border-r border-black px-1 py-1 w-[6%]">HSN</th>
+                                    <th className="border-r border-black px-1 py-1 w-[6%] text-center">QTY</th>
+                                    <th className="border-r border-black px-1 py-1 w-[8%] text-right">RATE</th>
+                                    <th className="border-r border-black px-1 py-1 w-[10%] text-right">TAXABLE</th>
+                                    <th className="border-r border-black px-1 py-1 w-[5%] text-center">GST%</th>
+                                    <th className="border-r border-black px-1 py-1 w-[8%] text-right">GST AMT</th>
+                                    <th className="px-1 py-1 w-[10%] text-right">TOTAL</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="text-[9px]">
+                                {invoice.items.map((item, idx) => (
+                                    <tr key={idx} className="border-b border-gray-300 last:border-0 hover:bg-gray-50">
+                                        <td className="border-r border-black px-1 py-1 text-center">{idx + 1}</td>
+                                        <td className="border-r border-black px-1 py-1 font-semibold">{item.name}</td>
+                                        <td className="border-r border-black px-1 py-1 font-mono uppercase">{item.batch}</td>
+                                        <td className="border-r border-black px-1 py-1">{item.exp}</td>
+                                        <td className="border-r border-black px-1 py-1">{item.hsn}</td>
+                                        <td className="border-r border-black px-1 py-1 text-center font-bold">{item.qty}</td>
+                                        <td className="border-r border-black px-1 py-1 text-right">{parseFloat(item.rate).toFixed(2)}</td>
+                                        <td className="border-r border-black px-1 py-1 text-right">{item.taxable}</td>
+                                        <td className="border-r border-black px-1 py-1 text-center">{item.gstRate}</td>
+                                        <td className="border-r border-black px-1 py-1 text-right">{item.gstAmt}</td>
+                                        <td className="px-1 py-1 text-right font-bold">{item.total.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                                {/* Padding Rows */}
+                                {Array.from({ length: Math.max(0, 10 - invoice.items.length) }).map((_, i) => (
+                                <tr key={`pad-${i}`} className="border-b border-gray-100 last:border-b-0 h-6">
+                                    <td colSpan="11" className="border-r border-black"></td>
+                                </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Footer Section */}
+                    <div className="flex border-b border-black">
+                        <div className="w-[65%] border-r border-black flex flex-col">
+                            {/* GST Breakdown */}
+                            <div className="border-b border-black">
+                                <table className="w-full text-center text-[8px] border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-black bg-gray-50">
+                                            <th className="border-r border-black px-1">GST %</th>
+                                            <th className="border-r border-black px-1">Taxable Amt</th>
+                                            <th className="border-r border-black px-1">CGST</th>
+                                            <th className="border-r border-black px-1">SGST</th>
+                                            <th className="px-1">IGST</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Object.entries(gstBreakdown).map(([rate, data]) => (
+                                            <tr key={rate} className="border-b border-gray-100">
+                                                <td className="border-r border-black px-1">{rate}%</td>
+                                                <td className="border-r border-black px-1">{data.taxable.toFixed(2)}</td>
+                                                <td className="border-r border-black px-1">{(data.gst / 2).toFixed(2)}</td>
+                                                <td className="border-r border-black px-1">{(data.gst / 2).toFixed(2)}</td>
+                                                <td className="px-1">0.00</td>
+                                            </tr>
+                                        ))}
+                                        <tr className="font-bold bg-gray-50 border-t border-black">
+                                            <td className="border-r border-black px-1">Total</td>
+                                            <td className="border-r border-black px-1">{totalTaxable.toFixed(2)}</td>
+                                            <td className="border-r border-black px-1">{(totalGst / 2).toFixed(2)}</td>
+                                            <td className="border-r border-black px-1">{(totalGst / 2).toFixed(2)}</td>
+                                            <td className="px-1">0.00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="p-2 text-[9px] flex-1 flex flex-col justify-between">
+                                <div>
+                                    <div className="font-bold mb-1">*All Values in (Rs)</div>
+                                    <div className="mb-1">Amount in Words:</div>
+                                    <div className="italic mb-2 capitalize font-bold">{numberToWords(invoice.grandTotal)}</div>
+                                </div>
+                                {invoice.notes && (
+                                    <div className="mt-2 text-[8px] italic border-t pt-1">
+                                        <strong>Notes:</strong> {invoice.notes}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="w-[35%] flex flex-col">
+                            <div className="flex-1">
+                                <div className="flex justify-between px-2 py-1 border-b border-gray-200">
+                                    <span>TOTAL QTY:</span>
+                                    <span className="font-bold">{invoice.items.reduce((s,i) => s+i.qty, 0)}</span>
+                                </div>
+                                <div className="flex justify-between px-2 py-1 border-b border-gray-200">
+                                    <span>TAXABLE AMOUNT:</span>
+                                    <span className="font-bold">₹{totalTaxable.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between px-2 py-1 border-b border-black">
+                                    <span>TOTAL GST:</span>
+                                    <span className="font-bold">₹{totalGst.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between px-2 py-3 bg-gray-100 font-bold text-lg">
+                                    <span>GRAND TOTAL:</span>
+                                    <span>₹{invoice.grandTotal.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Footer */}
+                    <div className="flex items-end p-2 border-t border-black">
+                        <div className="w-[50%]">
+                            <div className="text-[8px] text-gray-500 mb-2">
+                                Declaration:<br/>
+                                We declare that this purchase invoice shows the actual price of the goods described and that all particulars are true and correct.
+                            </div>
+                        </div>
+                        <div className="w-[50%] flex flex-col items-end text-center">
+                            <div className="font-bold text-[10px] mb-8">For KS Pharma Net Solutions Pvt. Ltd</div>
+                            <div className="border-t border-black w-32"></div>
+                            <div className="text-[8px] font-bold mt-1">Authorized Signatory</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        {/* Footer Summary */}
-        <div className="bg-gray-900 text-white p-6 sm:p-8 md:p-12 flex flex-col lg:flex-row justify-between items-start gap-12 print:break-inside-avoid">
-             <div className="flex-1 space-y-4 max-w-sm">
-                <div>
-                   <p className="font-black text-primary uppercase text-[10px] tracking-[0.2em] mb-2">Note & Declaration:</p>
-                   <p className="text-xs text-gray-400 leading-relaxed font-medium">Goods once sold will not be taken back or exchanged. This is a computer generated invoice and does not require a physical signature.</p>
-                </div>
-                <div className="flex items-center gap-4 py-4 border-y border-white/5">
-                    <div className="flex items-center gap-2">
-                        <FileText size={16} className="text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">System Document</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.date}</span>
-                    </div>
-                </div>
-             </div>
-
-             <div className="w-full lg:w-96 space-y-4 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
-                <div className="flex justify-between items-center text-sm">
-                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Subtotal</span>
-                    <span className="font-bold">₹{invoice.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Discount</span>
-                    <span className="font-bold text-red-500">-₹{invoice.discountAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="font-black uppercase tracking-widest text-gray-500 text-[10px]">Tax reversable</span>
-                    <span className="font-bold whitespace-nowrap">₹{invoice.taxAmount.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center border-t border-white/10 pt-6 mt-2 relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-primary/5 -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
-                    <div className="flex flex-col relative z-10">
-                        <span className="font-black text-primary uppercase text-[10px] tracking-[0.2em] mb-1">Grand Total</span>
-                        <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Digital Verified Amount</span>
-                    </div>
-                    <span className="font-black text-white text-3xl sm:text-4xl tracking-tighter relative z-10">
-                       ₹{invoice.grandTotal.toFixed(2)}
-                    </span>
-                </div>
-             </div>
-        </div>
-        
-        {/* Print Only Footer - Signatures */}
-        <div className="hidden print:flex justify-between items-end px-12 pb-12 mt-12">
-            <div className="text-center">
-                <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
-                <p className="text-xs font-bold uppercase text-gray-600">Supplier Signature</p>
-            </div>
-            <div className="text-center">
-                 <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
-                <p className="text-xs font-bold uppercase text-gray-600">Authorized Signatory</p>
-            </div>
-        </div>
-
       </div>
+
       <style>{`
           @media print {
-              @page { margin: 0; size: auto; }
+              @page { margin: 0; }
               body { 
-                background: white; 
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                  margin: 0; 
+                  padding: 0; 
+                  background: white; 
+                  -webkit-print-color-adjust: exact; 
               }
-              body > *:not(#root) { display: none; }
-              
-              .max-w-4xl {
-                  max-width: none !important;
-                  width: 100% !important;
-                  margin: 0 !important;
-                  box-shadow: none !important;
+              #invoice-content { 
+                  margin: 0 auto; 
+                  box-shadow: none;
                   border: none !important;
+                  width: 100% !important;
+                  height: auto !important;
               }
-              
-              * {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-              }
-              
-              p, div, span, h1, h2, h3, h4, th, td {
-                  color: #000 !important;
-              }
-              .text-primary {
-                  color: #007242 !important;
-              }
-              .text-red-500 {
-                  color: #ef4444 !important;
-              }
-              
-              .overflow-hidden {
-                  overflow: visible !important;
-              }
-              
-              .p-8, .md:p-12 {
-                  padding: 20px !important;
-              }
+              .border { border-color: black !important; }
+              .bg-gray-100 { background-color: #f3f4f6 !important; }
           }
       `}</style>
     </div>

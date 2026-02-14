@@ -46,14 +46,25 @@ export const AdjustStockModal = ({ isOpen, onClose }) => {
     const result = await adjustStock(selectedItem.id, type, qtyNum, reason, note);
 
     if (result.success) {
-        Swal.fire({
-            icon: 'success',
-            title: 'Stock Updated',
-            text: `${selectedItem.name} stock ${type === 'add' ? 'increased' : 'decreased'} by ${qtyNum}`,
-            timer: 2000,
-            showConfirmButton: false,
-            confirmButtonColor: '#007242'
-        });
+        if (type === 'add') {
+             Swal.fire({
+                icon: 'info',
+                title: 'Sent to Put Away',
+                text: result.message,
+                timer: 3000,
+                showConfirmButton: false,
+                confirmButtonColor: '#3b82f6'
+            });
+        } else {
+            Swal.fire({
+                icon: 'success',
+                title: 'Stock Updated',
+                text: `${selectedItem.name} stock decreased by ${qtyNum}`,
+                timer: 2000,
+                showConfirmButton: false,
+                confirmButtonColor: '#007242'
+            });
+        }
         onClose();
     } else {
         Swal.fire({ icon: 'error', title: 'Failed', text: result.message });

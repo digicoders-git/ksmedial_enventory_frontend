@@ -3,10 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
     Save, X, Plus, Trash2, Calendar, 
     FileText, Search, Package, 
-    ArrowLeft, ShoppingCart, AlertCircle, Clock
+    ArrowLeft, ShoppingCart, AlertCircle, Clock, Truck,
+    Download, Upload
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
+import Papa from 'papaparse';
 
 const CreatePurchaseOrder = () => {
     const navigate = useNavigate();
@@ -21,7 +23,6 @@ const CreatePurchaseOrder = () => {
     
     // Form State
     const [formData, setFormData] = useState({
-        supplierId: '',
         poDate: new Date().toISOString().split('T')[0],
         expectedDeliveryDate: '',
         notes: ''
@@ -33,13 +34,9 @@ const CreatePurchaseOrder = () => {
     const [productSearch, setProductSearch] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [showResults, setShowResults] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-    // Totals
-    const [totals, setTotals] = useState({
-        subTotal: 0,
-        taxAmount: 0,
-        grandTotal: 0
-    });
+{/* Totals State Removed */}
 
     useEffect(() => {
         fetchSuppliers();
@@ -55,22 +52,19 @@ const CreatePurchaseOrder = () => {
         try {
             setLoading(true);
             const { data } = await api.get(`/purchase-orders/${id}`);
-            // Data structure depends on API: { success: true, order: {...} } or just {...}
-            // Based on orderController, it returns { order: ... }?
-            // Wait, purchaseOrderController: res.status(200).json(order); - It returns the order object directly!
             const order = data; 
             
             setFormData({
-                supplierId: order.supplierId,
-                poDate: new Date(order.createdAt).toISOString().split('T')[0], // or order.poDate if exists
+                poDate: new Date(order.createdAt).toISOString().split('T')[0], 
                 expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate).toISOString().split('T')[0] : '',
                 notes: order.notes || ''
             });
 
             // Map items
             const mappedItems = order.items.map(item => ({
-                product: item.product._id || item.product, // Handle populated or not
-                medicineName: item.product.name || item.medicineName || 'Unknown Product', // Fallback
+                product: item.product._id || item.product, 
+                medicineName: item.product.name || item.medicineName || 'Unknown Product', 
+                supplierId: order.supplierId, // Existing orders are single supplier
                 quantity: item.quantity,
                 purchaseRate: item.purchaseRate,
                 gst: item.gst || 0,
@@ -87,9 +81,7 @@ const CreatePurchaseOrder = () => {
         }
     };
 
-    useEffect(() => {
-        calculateTotals();
-    }, [items]);
+{/* Totals Effect Removed */}
 
     const fetchSuppliers = async () => {
         try {
@@ -120,39 +112,68 @@ const CreatePurchaseOrder = () => {
 
     const handleProductSearch = (value) => {
         setProductSearch(value);
-        if (value.length > 1) {
+        if (value.length > 0) {
             const results = products.filter(p => 
                 p.name.toLowerCase().includes(value.toLowerCase()) ||
                 p.sku?.toLowerCase().includes(value.toLowerCase())
             );
             setSearchResults(results);
             setShowResults(true);
+            setHighlightedIndex(0);
         } else {
             setShowResults(false);
         }
     };
 
+    const handleSearchKeyDown = (e) => {
+        if (!showResults || searchResults.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev + 1) % searchResults.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            addItem(searchResults[highlightedIndex]);
+        }
+    };
+
+    // Auto-select supplier logic: 
+    // 1. Try to find last used supplier for this product? (Not implemented)
+    // 2. Default to first available supplier.
     const addItem = (product, quantity = 1, rate = 0) => {
         const existingIndex = items.findIndex(item => item.product === product._id);
+        const purchaseRate = rate || product.purchasePrice || 0;
+        const gst = product.tax || 0;
+
         if (existingIndex >= 0) {
-            Swal.fire({
-                title: 'Already Added',
-                text: 'This product is already in the order. Updating quantity.',
-                icon: 'info',
-                timer: 1500,
-                showConfirmButton: false
-            });
             const updatedItems = [...items];
-            updatedItems[existingIndex].quantity += quantity;
+            const item = updatedItems[existingIndex];
+            item.quantity += quantity;
+            item.totalAmount = (item.quantity * item.purchaseRate) * (1 + item.gst/100);
+            
             setItems(updatedItems);
+            
+            Swal.fire({
+                icon: 'info',
+                title: 'Updated Quantity',
+                text: `${product.name} quantity increased.`,
+                timer: 1000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'bottom-end'
+            });
         } else {
             const newItem = {
                 product: product._id,
                 medicineName: product.name,
+                supplierId: suppliers.length > 0 ? suppliers[0]._id : '', 
                 quantity: quantity,
-                purchaseRate: rate || product.purchasePrice || 0,
-                gst: product.tax || 0,
-                totalAmount: 0 // Calculated in effect
+                purchaseRate: purchaseRate,
+                gst: gst,
+                totalAmount: (quantity * purchaseRate) * (1 + gst/100) 
             };
             setItems([...items, newItem]);
         }
@@ -163,6 +184,12 @@ const CreatePurchaseOrder = () => {
     const updateItem = (index, field, value) => {
         const updatedItems = [...items];
         updatedItems[index][field] = value;
+        
+        if (field === 'quantity' || field === 'purchaseRate' || field === 'gst') {
+             const item = updatedItems[index];
+             item.totalAmount = (item.quantity * item.purchaseRate) * (1 + item.gst/100);
+        }
+        
         setItems(updatedItems);
     };
 
@@ -170,65 +197,91 @@ const CreatePurchaseOrder = () => {
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const calculateTotals = () => {
-        let sub = 0;
-        let tax = 0;
-        
-        items.forEach(item => {
-            const lineTotal = item.quantity * item.purchaseRate;
-            const lineTax = lineTotal * (item.gst / 100);
-            
-            sub += lineTotal;
-            tax += lineTax;
-            
-            // Update item total for display if needed, but we rely on state for rendering input
-            // Actually, let's update the item's totalAmount just in case we save it
-            item.totalAmount = lineTotal + lineTax;
-        });
-
-        setTotals({
-            subTotal: sub,
-            taxAmount: tax,
-            grandTotal: sub + tax
-        });
-    };
+{/* calculateTotals Function Removed */}
 
     const handleSubmit = async (status = 'Draft') => {
-        if (!formData.supplierId) {
-            Swal.fire('Error', 'Please select a supplier', 'error');
-            return;
-        }
         if (items.length === 0) {
             Swal.fire('Error', 'Please add items to the order', 'error');
             return;
         }
 
+        // Validate Suppliers
+        const missingSupplier = items.some(i => !i.supplierId);
+        if (missingSupplier) {
+            Swal.fire('Error', 'Please select a supplier for all items', 'error');
+            return;
+        }
+
         try {
             setLoading(true);
-            const selectedSupplier = suppliers.find(s => s._id === formData.supplierId);
-            
+
+            // Determine Header Supplier Info
+            // If all items have same supplier, use that. Otherwise 'Multiple Suppliers'.
+            const uniqueSupplierIds = [...new Set(items.map(i => i.supplierId).filter(id => id))];
+            let headerSupplierId = null;
+            let headerSupplierName = 'Multiple Suppliers';
+
+            if (uniqueSupplierIds.length === 1) {
+                headerSupplierId = uniqueSupplierIds[0];
+                const supplier = suppliers.find(s => s._id === headerSupplierId);
+                headerSupplierName = supplier?.name || 'Unknown Supplier';
+            }
+
+            // Calculate total (just for backend validation)
+            const totalAmount = items.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+
+            // Prepare Items with Supplier Info
+            const payloadItems = items.map(item => ({
+                product: item.product,
+                medicineName: item.medicineName,
+                quantity: item.quantity,
+                purchaseRate: item.purchaseRate,
+                gst: item.gst,
+                totalAmount: item.totalAmount,
+                supplier: item.supplierId // sending supplier ID per item
+            }));
+
             const payload = {
-                ...formData,
-                supplierName: selectedSupplier?.name || 'Unknown',
-                items,
-                totalAmount: totals.grandTotal,
-                status,
-                expectedDeliveryDate: formData.expectedDeliveryDate || null // Handle empty date string
+                supplierId: headerSupplierId, // Can be null if multiple
+                supplierName: headerSupplierName,
+                items: payloadItems,
+                totalAmount: totalAmount,
+                gstAmount: 0,
+                subTotal: 0,
+                poDate: formData.poDate,
+                expectedDeliveryDate: formData.expectedDeliveryDate || null,
+                notes: formData.notes,
+                status
             };
 
-            const { data } = await api.post('/purchase-orders/create', payload);
+            const response = await api.post('/purchase-orders/create', payload);
+            const data = response.data;
             
-            Swal.fire({
-                title: 'Success!',
-                text: `Purchase Order ${data.poNumber} created successfully.`,
-                icon: 'success'
-            }).then(() => {
-                navigate('/purchase/orders');
-            });
+            // Flexible Success Check
+            if (data.success || data.poNumber || data._id || data.order) {
+                const poNumber = data.poNumber || data.order?.poNumber || "New Order";
+                const orderId = data._id || data.order?._id;
+                
+                Swal.fire({
+                    title: 'Success!',
+                    text: `Purchase Order Created: ${poNumber}`,
+                    icon: 'success',
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(() => {
+                    if (orderId) {
+                        navigate(`/purchase/orders/view/${orderId}`);
+                    } else {
+                        navigate('/purchase/orders');
+                    }
+                });
+            } else {
+                 throw new Error("Invalid response from server");
+            }
             
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data?.error || error.response?.data?.message || 'Failed to create Purchase Order';
+            const errMsg = error.response?.data?.error || error.response?.data?.message || 'Failed to create Purchase Orders';
             Swal.fire({
                 title: 'Error',
                 text: errMsg,
@@ -239,8 +292,92 @@ const CreatePurchaseOrder = () => {
         }
     };
 
+    // CSV Functions
+    const handleDownloadSample = () => {
+        const csvContent = "data:text/csv;charset=utf-8," + "Product Name,SKU,Quantity,Supplier Name\nParacetamol,PARA123,100,Sun Pharma\nCrocin,CROC456,50,";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "purchase_order_sample.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleCSVUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                const importedItems = [];
+                let matchCount = 0;
+                let noMatchCount = 0;
+
+                results.data.forEach(row => {
+                    const name = row['Product Name'] || row['Item Name'];
+                    const sku = row['SKU'];
+                    const qty = parseInt(row['Quantity']) || 1;
+                    const supplierName = row['Supplier Name'] || '';
+
+                    // Find Product Match
+                    const product = products.find(p => 
+                        (name && p.name.toLowerCase() === name.toLowerCase()) || 
+                        (sku && p.sku && p.sku.toLowerCase() === sku.toLowerCase())
+                    );
+
+                    if (product) {
+                        // Find Supplier Match (by exact name)
+                        const supplier = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+                        
+                        // Check if already in items
+                        const existing = items.find(i => i.product === product._id);
+                        if (!existing) {
+                            importedItems.push({
+                                product: product._id,
+                                medicineName: product.name,
+                                supplierId: supplier ? supplier._id : '', // Pre-fill if matched
+                                quantity: qty,
+                                purchaseRate: product.purchasePrice || 0,
+                                gst: product.tax || 0,
+                                totalAmount: (qty * (product.purchasePrice || 0)) * (1 + (product.tax || 0)/100)
+                            });
+                            matchCount++;
+                        }
+                    } else {
+                        noMatchCount++;
+                    }
+                });
+
+                if (importedItems.length > 0) {
+                    setItems(prev => [...prev, ...importedItems]);
+                    Swal.fire({
+                        title: 'Import Successful',
+                        text: `Imported ${matchCount} items. ${noMatchCount > 0 ? `${noMatchCount} items skipped (not found).` : ''}`,
+                        icon: 'success'
+                    });
+                } else {
+                     Swal.fire({
+                        title: 'No Items Imported',
+                        text: 'No matching products found in CSV.',
+                        icon: 'warning'
+                    });
+                }
+                
+                // Reset file input
+                e.target.value = '';
+            },
+            error: (err) => {
+                Swal.fire('Error', 'Failed to parse CSV file', 'error');
+            }
+        });
+    };
+
+    // Quick Add Supplier Helper (Same as before)
     const handleQuickAddSupplier = async () => {
-        const { value: formValues } = await Swal.fire({
+         const { value: formValues } = await Swal.fire({
             title: 'Add New Supplier',
             html: `
                 <input id="swal-name" class="swal2-input" placeholder="Name *" style="margin-bottom: 10px;">
@@ -267,26 +404,13 @@ const CreatePurchaseOrder = () => {
             try {
                 Swal.fire({ title: 'Saving...', didOpen: () => Swal.showLoading() });
                 const { data } = await api.post('/suppliers', formValues);
-                
                 if (data.success) {
-                    // Assuming API returns the created supplier in data.supplier
-                    // If not, we might need to re-fetch suppliers, but let's try pushing first for speed
                     const newSupplier = data.supplier || { ...formValues, _id: data.supplierId }; 
-                    
                     setSuppliers(prev => [...prev, newSupplier]);
-                    setFormData(prev => ({ ...prev, supplierId: newSupplier._id || newSupplier.id }));
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Supplier Added',
-                        text: `${newSupplier.name} has been selected.`,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    Swal.fire({ icon: 'success', title: 'Supplier Added', timer: 1500, showConfirmButton: false });
                 }
             } catch (error) {
-                console.error("Error adding supplier:", error);
-                Swal.fire('Error', error.response?.data?.message || 'Failed to add supplier', 'error');
+                Swal.fire('Error', error.response?.data?.message || 'Failed', 'error');
             }
         }
     };
@@ -300,19 +424,32 @@ const CreatePurchaseOrder = () => {
                         <ShoppingCart className="text-primary" size={32} />
                         {orderId ? 'View / Edit Purchase Order' : 'Create Purchase Order'}
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">{orderId ? 'View or modify existing purchase order details.' : 'Create new purchase orders for suppliers.'}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">{orderId ? 'View or modify existing details.' : 'Multi-supplier ordering system.'}</p>
                 </div>
-                <button
-                    onClick={() => navigate('/purchase/orders')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 font-bold shadow-sm"
-                >
-                    <ArrowLeft size={18} /> Back to List
-                </button>
+                <div className="flex gap-2 flex-wrap">
+                    <button 
+                         onClick={handleDownloadSample}
+                         className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-bold transition-all shadow-sm"
+                         title="Download CSV Template"
+                    >
+                        <Download size={18} /> Sample CSV
+                    </button>
+                    <label className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold cursor-pointer transition-all shadow-sm">
+                        <Upload size={18} /> Import CSV
+                        <input type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+                    </label>
+                    <button
+                        onClick={() => navigate('/purchase/orders')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 font-bold shadow-sm"
+                    >
+                        <ArrowLeft size={18} /> Back
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 
-                {/* Left Column: Requisitions & Search (1/4 width on large screens) */}
+                {/* Left Column: Requisitions & Search */}
                 <div className="xl:col-span-1 space-y-6">
                     {/* Search Product */}
                     <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -323,16 +460,17 @@ const CreatePurchaseOrder = () => {
                                 type="text"
                                 value={productSearch}
                                 onChange={(e) => handleProductSearch(e.target.value)}
-                                placeholder="Search products..."
+                                onKeyDown={handleSearchKeyDown}
+                                placeholder="Search products (Enter to Select)..."
                                 className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-medium transition-all"
                             />
                              {showResults && searchResults.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-80 overflow-y-auto z-50">
-                                    {searchResults.map(p => (
+                                    {searchResults.map((p, idx) => (
                                         <div
                                             key={p._id}
                                             onClick={() => addItem(p)}
-                                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors"
+                                            className={`p-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors ${idx === highlightedIndex ? 'bg-primary/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                         >
                                             <p className="text-sm font-bold text-gray-800 dark:text-white">{p.name}</p>
                                             <div className="flex justify-between mt-1">
@@ -379,31 +517,7 @@ const CreatePurchaseOrder = () => {
                                                 </button>
                                             </div>
                                             <div className="mt-2 text-xs font-medium text-emerald-600 flex items-center gap-1">
-                                                <span>Suggested Order: {p.suggestedOrder}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {requisitions.expiryNear.length > 0 && (
-                            <div>
-                                <h4 className="text-xs font-bold text-orange-500 mb-3 bg-orange-50 dark:bg-orange-900/20 px-3 py-1.5 rounded-lg inline-block">Near Expiry ({requisitions.expiryNear.length})</h4>
-                                <div className="space-y-3">
-                                    {requisitions.expiryNear.map(p => (
-                                        <div key={p._id} className="p-3 border border-orange-100 dark:border-gray-700 bg-orange-50/30 dark:bg-gray-800 rounded-xl hover:shadow-md transition-all">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{p.name}</p>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5">Exp: {p.expiryDate}</p>
-                                                </div>
-                                                <button 
-                                                    onClick={() => addItem(p)}
-                                                    className="p-1.5 bg-white dark:bg-gray-700 text-emerald-600 rounded-lg shadow-sm hover:bg-emerald-50 dark:hover:bg-gray-600 transition-colors"
-                                                >
-                                                    <Plus size={16} />
-                                                </button>
+                                                <span>Suggested: {p.suggestedOrder}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -413,33 +527,12 @@ const CreatePurchaseOrder = () => {
                     </div>
                 </div>
 
-                {/* Right Column: PO Form & Items (3/4 width) */}
+                {/* Right Column: PO Form & Items */}
                 <div className="xl:col-span-3 space-y-6">
                     {/* Step 2 Details Form */}
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supplier</label>
-                                <div className="flex gap-2">
-                                    <select 
-                                        value={formData.supplierId}
-                                        onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-bold"
-                                    >
-                                        <option value="">Select Supplier</option>
-                                        {suppliers.map(s => (
-                                            <option key={s._id} value={s._id}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                    <button 
-                                        onClick={handleQuickAddSupplier}
-                                        className="px-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors border border-primary/20"
-                                        title="Add New Supplier"
-                                    >
-                                        <Plus size={20} />
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Supplier Removal - Now global fields only */}
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">PO Date</label>
                                 <input 
@@ -462,7 +555,7 @@ const CreatePurchaseOrder = () => {
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">PO Number</label>
                                 <input 
                                     type="text"
-                                    value={orderId ? "Loaded from ID" : "Auto Generated"}
+                                    value={orderId ? "Loaded from ID" : "Auto Generated (Per Supplier)"}
                                     disabled
                                     className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border-none rounded-xl text-sm font-bold text-gray-400 cursor-not-allowed"
                                 />
@@ -479,22 +572,20 @@ const CreatePurchaseOrder = () => {
                             </h3>
                             <span className="text-xs font-bold bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300">{items.length} Items</span>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible min-h-[300px]">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs font-black text-gray-500 uppercase tracking-widest">
                                     <tr>
                                         <th className="px-6 py-4">Medicine Name</th>
-                                        <th className="px-6 py-4 w-32">Qty</th>
-                                        <th className="px-6 py-4 w-40">Rate (₹)</th>
-                                        <th className="px-6 py-4 w-24">GST (%)</th>
-                                        <th className="px-6 py-4 text-right">Total</th>
+                                        <th className="px-6 py-4 w-64">Supplier</th>
+                                        <th className="px-6 py-4 w-32 text-center">Qty</th>
                                         <th className="px-6 py-4 text-center w-20">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                     {items.length === 0 ? (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
+                                            <td colSpan="4" className="px-6 py-12 text-center text-gray-400">
                                                 <div className="flex flex-col items-center gap-3">
                                                     <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
                                                         <Package size={24} className="opacity-50" />
@@ -510,34 +601,34 @@ const CreatePurchaseOrder = () => {
                                                     {item.medicineName}
                                                 </td>
                                                 <td className="px-6 py-4">
+                                                     <div className="flex gap-2">
+                                                        <select 
+                                                            value={item.supplierId}
+                                                            onChange={(e) => updateItem(index, 'supplierId', e.target.value)}
+                                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-sm font-medium"
+                                                        >
+                                                            <option value="">Select Supplier</option>
+                                                            {suppliers.map(s => (
+                                                                <option key={s._id} value={s._id}>{s.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button 
+                                                            onClick={handleQuickAddSupplier}
+                                                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+                                                            title="Add Supplier"
+                                                        >
+                                                            <Plus size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
                                                     <input 
                                                         type="number" 
                                                         min="1"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-center font-bold"
+                                                        className="w-24 px-3 py-2 mx-auto bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-center font-bold"
                                                     />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={item.purchaseRate}
-                                                        onChange={(e) => updateItem(index, 'purchaseRate', parseFloat(e.target.value) || 0)}
-                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-right"
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={item.gst}
-                                                        onChange={(e) => updateItem(index, 'gst', parseFloat(e.target.value) || 0)}
-                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-right"
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-black text-gray-800 dark:text-white">
-                                                    ₹{((item.quantity * item.purchaseRate) * (1 + item.gst/100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <button 
@@ -558,22 +649,8 @@ const CreatePurchaseOrder = () => {
                     {/* Footer / Summary */}
                     <div className="flex flex-col lg:flex-row gap-6 justify-end items-end">
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-full lg:w-96">
-                             <div className="space-y-3 text-sm">
-                                <div className="flex justify-between text-gray-500">
-                                    <span>Subtotal</span>
-                                    <span>₹{totals.subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between text-gray-500">
-                                    <span>Total Tax (GST)</span>
-                                    <span>₹{totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                                    <span className="font-black text-lg text-gray-800 dark:text-white">Total Amount</span>
-                                    <span className="font-black text-xl text-primary">₹{totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex flex-col gap-3">
+                             
+                             <div className="flex flex-col gap-3">
                                 <button 
                                     onClick={() => handleSubmit('Draft')}
                                     disabled={loading}
@@ -588,7 +665,7 @@ const CreatePurchaseOrder = () => {
                                 >
                                     {loading ? 'Processing...' : (
                                         <>
-                                            <Save size={20} /> Send to Supplier
+                                            <Truck size={20} /> Process Items
                                         </>
                                     )}
                                 </button>

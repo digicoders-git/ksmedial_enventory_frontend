@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, AlertCircle, UploadCloud, FileText, Activity, Layers, Tag, DollarSign, Package, Check, ScanLine, RefreshCw, Plus } from 'lucide-react';
+import { Save, X, AlertCircle, UploadCloud, FileText, Activity, Layers, Tag, DollarSign, Package, Check, ScanLine, RefreshCw, Plus, Download } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { useInventory } from '../../context/InventoryContext';
@@ -125,6 +125,41 @@ const MedicineMaster = () => {
     }
   };
 
+  const downloadSampleCSV = () => {
+    const headers = [
+      'Name',
+      'SKU',
+      'Generic Name',
+      'Category',
+      'Manufacturer',
+      'HSN',
+      'Tax %',
+      'Unit',
+      'Rack Location',
+      'Purchase Price',
+      'Selling Price',
+      'Min Level',
+      'Prescription Required (Yes/No)'
+    ];
+
+    const sampleData = [
+      'Dolo 650,SKU-DOLO650,Paracetamol,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,No',
+      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,Antibiotic,GSK,3004,12,Strip,R-02,150.00,200.00,20,Yes'
+    ];
+
+    const csvContent = [headers.join(','), ...sampleData].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'medicine_import_sample.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleCSVUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -144,7 +179,14 @@ const MedicineMaster = () => {
 
                 // Flexible mapping
                 const name = normalizedRow.name || normalizedRow.medicinename || normalizedRow.productname || normalizedRow.product || '';
-                const sku = normalizedRow.barcode || normalizedRow.sku || normalizedRow.code || normalizedRow.itemcode || (generateSKU ? generateSKU() : 'SKU-' + Date.now()) + '-' + index;
+                
+                let sku = normalizedRow.barcode || normalizedRow.sku || normalizedRow.code || normalizedRow.itemcode;
+                if (!sku) {
+                    // Auto-generate robust unique SKU if missing in CSV
+                    const timestamp = Date.now().toString().slice(-6); // Last 6 digits for compactness
+                    const random = Math.floor(1000 + Math.random() * 9000); // 4 random digits
+                    sku = `SKU-${timestamp}${random}-${index + 1}`;
+                }
                 const generic = normalizedRow.genericname || normalizedRow.generic || normalizedRow.composition || '';
                 const packing = normalizedRow.packing || normalizedRow.size || '';
                 const category = normalizedRow.type || normalizedRow.category || normalizedRow.group || 'Tablet';
@@ -401,22 +443,31 @@ const MedicineMaster = () => {
         
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {!isEditMode && !isViewMode && (
-                <div className="relative flex-1 sm:flex-none">
-                    <input 
-                        type="file" 
-                        accept=".csv" 
-                        id="csv-upload" 
-                        className="hidden" 
-                        onChange={handleCSVUpload}
-                        disabled={uploading}
-                    />
-                    <label 
-                        htmlFor="csv-upload"
-                        className="w-full sm:w-auto px-5 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-black hover:bg-primary/5 cursor-pointer transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap"
+                <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    <div className="relative flex-1 sm:flex-none">
+                        <input 
+                            type="file" 
+                            accept=".csv" 
+                            id="csv-upload" 
+                            className="hidden" 
+                            onChange={handleCSVUpload}
+                            disabled={uploading}
+                        />
+                        <label 
+                            htmlFor="csv-upload"
+                            className="w-full sm:w-auto px-5 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary dark:text-primary-400 font-black hover:bg-primary/5 cursor-pointer transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap"
+                        >
+                            {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} strokeWidth={3} />}
+                            <span>Bulk Upload (CSV)</span>
+                        </label>
+                    </div>
+                    <button
+                        onClick={downloadSampleCSV}
+                        className="h-[46px] w-[46px] flex items-center justify-center bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all active:scale-95"
+                        title="Download Sample CSV"
                     >
-                        {uploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} strokeWidth={3} />}
-                        <span>Bulk Upload (CSV)</span>
-                    </label>
+                        <Download size={20} strokeWidth={2.5} />
+                    </button>
                 </div>
             )}
             

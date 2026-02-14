@@ -4,6 +4,8 @@ import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 
 import { useInventory } from '../../context/InventoryContext';
+import { saveAs } from 'file-saver';
+import Papa from 'papaparse';
 
 const ExpiryManagement = () => {
     const navigate = useNavigate();
@@ -176,9 +178,71 @@ const ExpiryManagement = () => {
     const totalNearExpiryValue = batches.filter(b => b.status === 'Near Expiry').reduce((acc, curr) => acc + curr.cost, 0);
     const totalSafeValue = batches.filter(b => b.status === 'Safe').reduce((acc, curr) => acc + curr.cost, 0);
 
+    const handleDownloadReport = (type) => {
+        const reportData = batches.filter(batch => batch.status === type);
+        
+        if (reportData.length === 0) {
+            Swal.fire('Info', `No ${type} items found.`, 'info');
+            return;
+        }
+
+        const csvData = reportData.map(item => ({
+            'Medicine Name': item.name,
+            'Batch Number': item.batch,
+            'SKU': item.sku || 'N/A',
+            'Expiry Date': item.exp,
+            'Current Stock': item.stock,
+            'Stock Value': item.cost,
+            'Status': item.status
+        }));
+
+        const csvString = Papa.unparse(csvData);
+        const fileName = `Expiry_Report_${type.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, fileName);
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Report Downloaded',
+            text: `${type} report has been generated.`,
+            timer: 1500,
+            showConfirmButton: false
+        });
+    };
+
     return (
         <div className="animate-fade-in-up space-y-6 pb-10">
-            {/* ... (Header code remains - no changes needed here, skipping for brevity but assuming replacement chunks handle context) ... */}
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <AlertOctagon className="text-red-500" size={32} />
+                        Expiry Management
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium pl-1">Monitor stock expiry status and reduce wastage.</p>
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                    <button 
+                        onClick={() => handleDownloadReport('Near Expiry')}
+                        className="px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors active:scale-95 border border-orange-200 shadow-sm"
+                    >
+                        <Download size={18} /> Near Expiry Report
+                    </button>
+                    <button 
+                        onClick={() => handleDownloadReport('Expired')}
+                        className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors active:scale-95 border border-red-200 shadow-sm"
+                    >
+                        <Download size={18} /> Expired Items Report
+                    </button>
+                    <button 
+                        onClick={handleCheckUpdates}
+                        className={`p-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 ${isScanning ? 'animate-spin text-primary' : ''}`}
+                        title="Sync Inventory"
+                    >
+                        <RefreshCw size={20} />
+                    </button>
+                </div>
+            </div>
             
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

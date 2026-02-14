@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Search, Filter, Map, Package, Truck, 
-    FileText, Download, Edit2, QrCode, 
+    FileText, Download, Edit2, History, 
     ChevronLeft, ChevronRight, RefreshCw,
-    Plus, AlertTriangle, ArrowRightLeft
+    Plus, AlertTriangle, ArrowRightLeft,
+    X, User, Shield, ArrowDownCircle, ArrowUpCircle, Save
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import Papa from 'papaparse';
+import { useAuth } from '../../context/AuthContext';
+import { createPortal } from 'react-dom';
 
 const InventoryMaster = () => {
     const navigate = useNavigate();
+    const { shop } = useAuth();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(0);
@@ -30,6 +34,19 @@ const InventoryMaster = () => {
         lowStock: false
     });
     const [selectedItems, setSelectedItems] = useState([]);
+
+    // Stock Adjustment State
+    const [showAdjustModal, setShowAdjustModal] = useState(false);
+    const [selectedStock, setSelectedStock] = useState(null);
+    const [adjustmentData, setAdjustmentData] = useState({
+        type: 'deduct',
+        quantity: '',
+        reason: 'Damage',
+        note: '',
+        adjusterName: '',
+        adjusterEmail: '',
+        adjusterMobile: ''
+    });
 
     const fetchProducts = async () => {
         setLoading(true);
@@ -54,9 +71,6 @@ const InventoryMaster = () => {
     };
 
     useEffect(() => {
-        // Debounce or just fetch on mount and page change? 
-        // User asked for "Fetch Record" button, so maybe manual fetch primarily, 
-        // but fetching on mount is good UX.
         fetchProducts();
     }, [page, limit]);
 
@@ -129,11 +143,7 @@ const InventoryMaster = () => {
         });
 
         if (location) {
-            // In a real app, call API to update location. 
-            // For now, we'll simulate.
             Swal.fire('Success', `Transferred ${selectedItems.length} items to ${location}`, 'success');
-            // Optimistic update or refetch
-            // await api.post('/products/transfer', { ids: selectedItems, location });
             fetchProducts();
         }
     };
@@ -143,7 +153,6 @@ const InventoryMaster = () => {
             Swal.fire('Selection Required', 'Select items to generate picking list.', 'warning');
             return;
         }
-        // Generate a simple view
         const items = products.filter(p => selectedItems.includes(p._id));
         const listHtml = items.map(i => `<li><b>${i.runLocation || 'N/A'}</b> - ${i.name} (${i.quantity})</li>`).join('');
         Swal.fire({
@@ -207,8 +216,92 @@ const InventoryMaster = () => {
 
         if (location && location !== product.rackLocation) {
             Swal.fire('Success', `Transferred ${product.name} to ${location}`, 'success');
-            // Optimistic update
             setProducts(prev => prev.map(p => p._id === product._id ? { ...p, rackLocation: location } : p));
+        }
+    };
+
+    // --- Stock Adjustment Logic ---
+    const openAdjustModal = (product) => {
+        setSelectedStock(product);
+        setAdjustmentData({ 
+            type: 'deduct', 
+            quantity: '', 
+            reason: 'Damage',
+            note: '',
+            adjusterName: shop?.ownerName || '',
+            adjusterEmail: shop?.email || '',
+            adjusterMobile: shop?.contactNumber || ''
+        });
+        setShowAdjustModal(true);
+    };
+
+    const handleAdjustmentChange = (e) => {
+        const { name, value } = e.target;
+        setAdjustmentData(prev => {
+            if (name === 'type') {
+                return { 
+                    ...prev, 
+                    [name]: value,
+                    reason: value === 'add' ? 'Found' : 'Damage'
+                };
+            }
+            return { ...prev, [name]: value };
+        });
+    };
+
+    const handleAdjustSubmit = async (e) => {
+        e.preventDefault();
+        if (!adjustmentData.quantity || parseInt(adjustmentData.quantity) <= 0) {
+            Swal.fire('Error', 'Please enter a valid quantity', 'error');
+            return;
+        }
+
+        const qtyChange = parseInt(adjustmentData.quantity);
+        try {
+            const { data } = await api.put(`/products/${selectedStock._id}/adjust`, {
+                type: adjustmentData.type,
+                quantity: qtyChange,
+                reason: adjustmentData.reason,
+                note: adjustmentData.note,
+                adjusterName: adjustmentData.adjusterName,
+                adjusterEmail: adjustmentData.adjusterEmail,
+                adjusterMobile: adjustmentData.adjusterMobile
+            });
+
+            if (data.success) {
+                setShowAdjustModal(false);
+                const actionText = adjustmentData.type === 'add' ? 'Added' : 'Removed';
+                
+                if (data.message && data.message.includes('Put Away')) {
+                     Swal.fire({
+                        icon: 'info',
+                        title: 'Sent to Put Away',
+                        text: data.message,
+                        confirmButtonText: 'Go to Put Away Bucket',
+                        showCancelButton: true,
+                        cancelButtonText: 'Stay Here'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            navigate('/inventory/putaway');
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Stock Updated',
+                        text: `Successfully ${actionText} ${qtyChange} units.`,
+                        confirmButtonColor: '#007242',
+                        timer: 2000
+                    });
+                }
+                // Update local state by refetching or manual update
+                // Refetch is safer to get latest
+                fetchProducts();
+            } else {
+                Swal.fire('Error', data.message, 'error');
+            }
+        } catch (error) {
+            Swal.fire('Error', error.response?.data?.message || 'Adjustment failed', 'error');
         }
     };
 
@@ -216,22 +309,9 @@ const InventoryMaster = () => {
         if (!expiryDate || expiryDate === 'N/A') return 'N/A';
         const exp = new Date(expiryDate);
         const now = new Date();
-        const mfg = new Date(); // Assuming MFG is 2 years back if not present, or use logic
-        mfg.setFullYear(mfg.getFullYear() - 2); 
-        
-        // This is a rough estimation as MFG date is often not stored. 
-        // If we added mfgDate schema, we can use it.
-        // For now, let's just return relative time or a placeholder
         if (isNaN(exp.getTime())) return 'Invalid';
-        
-        const totalLife = exp.getTime() - mfg.getTime();
         const remaining = exp.getTime() - now.getTime();
-        
-        // If expired
         if (remaining < 0) return '0%';
-
-        // This % is actually meaningless without MFG date. 
-        // Let's just show Days Remaining for better utility or "N/A" if logic isn't solid.
         const daysRemaining = Math.ceil(remaining / (1000 * 60 * 60 * 24));
         return `${daysRemaining} Days`;
     };
@@ -417,11 +497,11 @@ const InventoryMaster = () => {
                                                 <button onClick={() => handleSingleTransfer(product)} className="p-1 hover:bg-violet-50 rounded text-violet-500 hover:text-violet-600 transition-colors" title="Transfer Stock">
                                                     <ArrowRightLeft size={14} />
                                                 </button>
-                                                <button onClick={() => navigate('/inventory/stock', { state: { filter: product.name } })} className="p-1 hover:bg-amber-50 rounded text-amber-500 hover:text-amber-600 transition-colors" title="Stock Adjustment">
+                                                <button onClick={() => openAdjustModal(product)} className="p-1 hover:bg-amber-50 rounded text-amber-500 hover:text-amber-600 transition-colors" title="Stock Adjustment">
                                                     <RefreshCw size={14} />
                                                 </button>
-                                                <button onClick={() => navigate('/inventory/stock', { state: { filter: product.sku } })} className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-600 transition-colors" title="Move to QR">
-                                                    <QrCode size={14} />
+                                                <button onClick={() => navigate('/inventory/history', { state: { filter: product.sku } })} className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-600 transition-colors" title="View History">
+                                                    <History size={14} />
                                                 </button>
                                             </div>
                                         </td>
@@ -451,6 +531,196 @@ const InventoryMaster = () => {
                      </button>
                 </div>
             </div>
+
+            {/* Adjust Stock Modal */}
+            {showAdjustModal && selectedStock && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 flex flex-col max-h-[85vh]">
+                        
+                        {/* Modal Header */}
+                        <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-700/50 shrink-0 rounded-t-2xl">
+                            <div>
+                                <h3 className="font-bold text-gray-800 dark:text-white text-lg">Adjust Stock</h3>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs">Update quantity for <span className="font-mono font-semibold">{selectedStock.batchNumber}</span></p>
+                            </div>
+                            <button 
+                                onClick={() => setShowAdjustModal(false)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors bg-white dark:bg-gray-700 p-2 rounded-full shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-600"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAdjustSubmit} className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="p-6 space-y-6">
+                                
+                                {/* Current Info */}
+                                <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
+                                            <Package size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase">Current Stock</p>
+                                            <h4 className="text-lg font-bold text-gray-800 dark:text-gray-100">{selectedStock.quantity} Units</h4>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Adjuster Info */}
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-xl relative overflow-hidden group">
+                                    <div className="flex items-center gap-3 relative z-10 w-full">
+                                        <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center text-primary shadow-sm border border-gray-100 dark:border-gray-600 shrink-0">
+                                            <User size={20} />
+                                        </div>
+                                        <div className="flex-1 min-w-0 space-y-3">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">Adjuster Name</p>
+                                                <input 
+                                                    type="text"
+                                                    name="adjusterName"
+                                                    value={adjustmentData.adjusterName}
+                                                    onChange={handleAdjustmentChange}
+                                                    placeholder="Enter adjuster name"
+                                                    className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm placeholder:text-gray-400 shadow-sm"
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-none">Email Address</p>
+                                                    <input 
+                                                        type="email"
+                                                        name="adjusterEmail"
+                                                        value={adjustmentData.adjusterEmail}
+                                                        onChange={handleAdjustmentChange}
+                                                        placeholder="email@example.com"
+                                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-[11px] placeholder:text-gray-400 shadow-sm"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-none">Mobile No.</p>
+                                                    <input 
+                                                        type="text"
+                                                        name="adjusterMobile"
+                                                        value={adjustmentData.adjusterMobile}
+                                                        onChange={handleAdjustmentChange}
+                                                        placeholder="Enter mobile"
+                                                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-2 py-1.5 rounded-lg font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-[11px] placeholder:text-gray-400 shadow-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
+                                        <Shield size={80} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block">Adjustment Type</label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAdjustmentChange({ target: { name: 'type', value: 'deduct' } })}
+                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                                                adjustmentData.type === 'deduct' 
+                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' 
+                                                : 'border-gray-100 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            <ArrowDownCircle size={24} />
+                                            <span className="font-bold text-sm">Deduct Stock</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAdjustmentChange({ target: { name: 'type', value: 'add' } })}
+                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                                                adjustmentData.type === 'add' 
+                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+                                                : 'border-gray-100 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            <ArrowUpCircle size={24} />
+                                            <span className="font-bold text-sm">Add Stock</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Reason</label>
+                                        <select 
+                                            name="reason"
+                                            value={adjustmentData.reason}
+                                            onChange={handleAdjustmentChange}
+                                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none text-sm text-gray-800 dark:text-white"
+                                        >
+                                            {adjustmentData.type === 'deduct' ? (
+                                                <>
+                                                    <option value="Damage">Damaged / Broken</option>
+                                                    <option value="Expired">Expired</option>
+                                                    <option value="Theft">Theft / Lost</option>
+                                                    <option value="Correction">Counting Correction</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="Found">Stock Found</option>
+                                                    <option value="Correction">Counting Correction</option>
+                                                    <option value="Return">Customer Return</option>
+                                                </>
+                                            )}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Quantity</label>
+                                        <input 
+                                            type="number"
+                                            name="quantity"
+                                            value={adjustmentData.quantity}
+                                            onChange={handleAdjustmentChange}
+                                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold text-gray-800 dark:text-white"
+                                            placeholder="0"
+                                            min="1"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Note</label>
+                                    <textarea 
+                                        name="note"
+                                        value={adjustmentData.note}
+                                        onChange={handleAdjustmentChange}
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none h-24"
+                                        placeholder="Add any additional details about this adjustment..."
+                                    ></textarea>
+                                </div>
+                            </div>
+                            
+                            <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/50 flex justify-end gap-3 rounded-b-2xl">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowAdjustModal(false)}
+                                    className="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit"
+                                    className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:bg-secondary transition-all text-sm active:scale-95 flex items-center gap-2"
+                                >
+                                    <Save size={18} /> Confirm Adjustment
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>, 
+                document.body
+            )}
         </div>
     );
 };

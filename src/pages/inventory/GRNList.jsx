@@ -183,7 +183,7 @@ Status: ${grn.status}
     };
 
     const handlePrintReceipt = (grn) => {
-        navigate(`/inventory/grn/view/${grn._id}`);
+        navigate(`/purchase/grn/view/${grn._id}`);
     };
 
     const handleSelectAll = (e) => {
@@ -228,7 +228,7 @@ Status: ${grn.status}
                     <p className="text-sm text-gray-500 font-medium mt-1">Manage and track incoming stock deliveries</p>
                 </div>
                 <button 
-                    onClick={() => navigate('/inventory/grn/add')}
+                    onClick={() => navigate('/purchase/grn/add')}
                     className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold uppercase text-sm shadow-sm transition-all"
                 >
                     <Plus size={18} />
@@ -429,7 +429,7 @@ Status: ${grn.status}
                                         </td>
                                         <td className="p-3">
                                             <span 
-                                                onClick={() => navigate(`/inventory/grn/view/${grn._id}`)} 
+                                                onClick={() => navigate(`/purchase/grn/view/${grn._id}`)} 
                                                 className="text-cyan-600 cursor-pointer hover:underline font-mono font-bold"
                                             >
                                                 #{grn._id.substr(-8).toUpperCase()}
@@ -438,7 +438,7 @@ Status: ${grn.status}
                                         <td className="p-3">
                                             <span 
                                                 className="font-bold text-cyan-600 cursor-pointer hover:underline" 
-                                                onClick={() => navigate(`/inventory/grn/view/${grn._id}`)}
+                                                onClick={() => navigate(`/purchase/grn/view/${grn._id}`)}
                                             >
                                                 {grn.invoiceNumber}
                                             </span>
@@ -477,12 +477,23 @@ Status: ${grn.status}
                                         <td className="p-3">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button 
-                                                    onClick={() => navigate(`/inventory/grn/view/${grn._id}`)} 
+                                                    onClick={() => navigate(`/purchase/grn/view/${grn._id}`)} 
                                                     className="p-1.5 hover:bg-cyan-100 dark:hover:bg-cyan-900/30 rounded text-cyan-600 transition-all" 
                                                     title="View/Edit"
                                                 >
                                                     <Eye size={16} />
                                                 </button>
+                                                {grn.invoiceFile && (
+                                                    <a 
+                                                        href={`${(import.meta.env.VITE_API_URL || 'http://localhost:5001/api').replace('/api', '')}${grn.invoiceFile}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded text-emerald-600 transition-all"
+                                                        title="View Invoice"
+                                                    >
+                                                        <FileText size={16} />
+                                                    </a>
+                                                )}
                                                 <button 
                                                     onClick={() => handlePrintReceipt(grn)} 
                                                     className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded text-blue-600 transition-all" 

@@ -13,7 +13,8 @@ import {
   Upload,
   RefreshCcw,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Download
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
@@ -78,6 +79,37 @@ const GRNWaitlist = () => {
 
     const handleBulkUploadClick = () => {
         fileInputRef.current.click();
+    };
+
+    const handleDownloadPendingReport = () => {
+        if (entries.length === 0) {
+            Swal.fire('Info', 'No entries to download.', 'info');
+            return;
+        }
+
+        const csvHeaders = ['Waitlist ID', 'Creation Date', 'Creation Time', 'Supplier', 'Invoice No', 'Invoice Value', 'Validated By', 'Validation Date', 'PO Number'];
+        
+        const csvRows = entries.map(e => [
+            e.physicalReceivingId,
+            new Date(e.createdAt).toLocaleDateString(),
+            new Date(e.createdAt).toLocaleTimeString(),
+            `"${e.supplierName.replace(/"/g, '""')}"`,
+            `"${e.invoiceNumber.replace(/"/g, '""')}"`,
+            e.invoiceValue,
+            `"${(e.validatedBy || '').replace(/"/g, '""')}"`,
+            e.validationDate ? new Date(e.validationDate).toLocaleDateString() : '',
+            `"${(e.poIds || '').replace(/"/g, '""')}"`
+        ]);
+
+        const csvContent = [csvHeaders.join(','), ...csvRows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Pending_GRN_Report_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleFileUpload = (e) => {
@@ -152,7 +184,7 @@ const GRNWaitlist = () => {
     };
   
     const handleCreateGRN = (entry) => {
-      navigate('/inventory/grn/add', { 
+      navigate('/purchase/grn/add', {  
         state: { 
           prefill: {
             physicalId: entry.physicalReceivingId,
@@ -231,6 +263,12 @@ const GRNWaitlist = () => {
                           className="flex-1 xl:flex-none px-8 py-3 bg-amber-400 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-amber-300 hover:shadow-lg hover:shadow-amber-500/30 transition-all active:scale-95 text-center"
                      >
                          Reset
+                     </button>
+                     <button 
+                          onClick={handleDownloadPendingReport}
+                          className="flex-1 xl:flex-none px-8 py-3 bg-indigo-500 text-white font-black uppercase tracking-wider text-sm rounded-xl hover:bg-indigo-400 hover:shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 text-center flex items-center justify-center gap-2"
+                     >
+                         Report <Download size={18} />
                      </button>
                      <input 
                         type="file" 

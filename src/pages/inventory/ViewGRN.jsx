@@ -53,7 +53,7 @@ Status: ${purchase.status}
             {/* Header / Actions - Hidden in Print */}
             <div className="flex justify-between items-center print:hidden">
                 <button 
-                    onClick={() => navigate('/inventory/grn')}
+                    onClick={() => navigate('/purchase/grn-list')}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all font-medium"
                 >
                     <ArrowLeft size={18} />

@@ -293,7 +293,7 @@ export const InventoryProvider = ({ children }) => {
                      setTransactions(prev => [newLog, ...prev]);
                  }
 
-                 return { success: true, message: "Stock adjusted successfully" };
+                 return { success: true, message: data.message || "Stock adjusted successfully" };
              }
              return { success: false, message: data.message };
 

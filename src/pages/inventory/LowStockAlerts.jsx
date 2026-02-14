@@ -290,7 +290,7 @@ const LowStockAlerts = () => {
                                 <th className="px-6 py-4 whitespace-nowrap text-left">Stock Status</th>
                                 <th className="px-6 py-4 whitespace-nowrap text-left">Threshold</th>
                                 {/* Supplier Column Removed */}
-                                <th className="px-6 py-4 text-center whitespace-nowrap">Action</th>
+                                {/* Action Column Removed */}
                             </tr>
                         </thead>
                          <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -326,9 +326,7 @@ const LowStockAlerts = () => {
                                         </div>
                                     </td>
                                     {/* Supplier Cell Removed */}
-                                    <td className="px-6 py-4 text-center">
-                                        <button onClick={() => handleReorder(item)} className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg text-xs font-bold transition-all">Order Now</button>
-                                    </td>
+                                    {/* Action Removed */}
                                 </tr>
                             ))
                             ) : (

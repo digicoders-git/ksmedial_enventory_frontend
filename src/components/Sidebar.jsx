@@ -65,14 +65,31 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navItems = [
     { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
 
+
+  // 4. Sales & Billing
+   { 
+     label: 'Sales & Billing', 
+     icon: <ShoppingCart size={20} />, 
+     path: '/sales',
+     subItems: [
+       { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
+       { label: 'Invoices', path: '/sales/invoices' },
+       { label: 'Sales Return', path: '/sales/return' }
+     ]
+   },
+   
+   
     // 5. Purchase & Suppliers
     {
       label: 'Purchase',
       icon: <Truck size={20} />,
       path: '/purchase',
       subItems: [
-        // { label: 'Create Purchase Order', path: '/purchase/create-order' },
         { label: 'Purchase Orders', path: '/purchase/orders' },
+        { label: 'Physical Validation', path: '/purchase/physical-validation' }, // Moved
+        { label: 'Add GRN', path: '/purchase/grn/add' }, // Moved
+        { label: 'Put Away Bucket', path: '/purchase/putaway' }, // Moved
+        { label: 'GRN List', path: '/purchase/grn-list' }, // Moved
         { label: 'Supplier List', path: '/purchase/suppliers' },
         { label: 'Purchase Invoices', path: '/purchase/invoices' },
         { label: 'Purchase Return', path: '/purchase/return' }
@@ -88,11 +105,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { label: 'Inventory Dashboard', path: '/inventory/dashboard' },
         { label: 'Inventory Master', path: '/inventory/master' },
         { label: 'Location Master', path: '/inventory/locations' },
-        { label: 'GRN Waitlist', path: '/inventory/physical-validation' },
-        { label: 'Add GRN', path: '/inventory/grn/add' },
-        { label: 'GRN List', path: '/inventory/grn' },
-        { label: 'Put Away Bucket', path: '/inventory/putaway' },
-        { label: 'Stock List', path: '/inventory/stock' },
+        { label: 'Stock History', path: '/inventory/history' },
+        { label: 'Non-Moving Stock', path: '/inventory/non-moving' },
 
 
         { label: 'Packing Materials', path: '/inventory/packing-materials' },
@@ -102,17 +116,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       ]
     },
 
-    // 4. Sales & Billing
-   { 
-     label: 'Sales & Billing', 
-     icon: <ShoppingCart size={20} />, 
-     path: '/sales',
-     subItems: [
-       { label: 'POS / Billing', path: '/sales/pos' }, // Was sales/new
-       { label: 'Invoices', path: '/sales/invoices' },
-       { label: 'Sales Return', path: '/sales/return' }
-     ]
-   },
+    
 
      // 3. Medicines (Product Master)
     { 

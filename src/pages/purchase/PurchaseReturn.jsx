@@ -29,6 +29,7 @@ const PurchaseReturn = () => {
     // --- CREATE RETURN STATE ---
     const [invoiceSearch, setInvoiceSearch] = useState('');
     const [invoiceData, setInvoiceData] = useState(null);
+    const [searchResults, setSearchResults] = useState([]); // Store multiple search matches
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
 
@@ -146,8 +147,26 @@ const PurchaseReturn = () => {
                 });
 
                 if (data.success && data.purchases && data.purchases.length > 0) {
-                    // Try exact invoice match first, otherwise take first
-                    purchaseToUse = data.purchases.find(p => p.invoiceNumber.toLowerCase() === trimmedSearch.toLowerCase()) || data.purchases[0];
+                    const exactMatch = data.purchases.find(p => p.invoiceNumber.toLowerCase() === trimmedSearch.toLowerCase());
+                    
+                    if (exactMatch) {
+                        purchaseToUse = exactMatch;
+                    } else if (data.purchases.length === 1) {
+                         purchaseToUse = data.purchases[0];
+                    } else {
+                        // Multiple matches found - show selection list
+                        setSearchResults(data.purchases);
+                        setInvoiceData(null);
+                        setReturnItems([]);
+                        Swal.fire({
+                            title: 'Multiple Matches Found',
+                            text: `Found ${data.purchases.length} invoices matching "${trimmedSearch}". Please select one below.`,
+                            icon: 'info',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        return; // Stop here, let user select from list
+                    }
                 }
             }
 
@@ -210,8 +229,22 @@ const PurchaseReturn = () => {
     };
 
     const updateReturnQty = (productId, newQty, maxQty) => {
-        if (newQty < 1 || newQty > maxQty) return;
-        setReturnItems(returnItems.map(item => item.productId === productId ? { ...item, returnQuantity: newQty } : item));
+        let qty = newQty === '' ? '' : parseInt(newQty);
+        
+        if (qty !== '') {
+            if (qty < 0) qty = 0;
+            if (qty > maxQty) {
+                Swal.fire('Limit Exceeded', `Maximum returnable quantity is ${maxQty}`, 'warning');
+                qty = maxQty;
+            }
+        }
+        
+        setReturnItems(returnItems.map(item => item.productId === productId ? { ...item, returnQuantity: qty } : item));
+    };
+
+    const handleSelectSearchResult = (purchase) => {
+        setSearchResults([]); // Clear results
+        handleInvoiceSearch(null, purchase); // Load selected purchase
     };
 
     const calculateRefund = () => {
@@ -224,6 +257,13 @@ const PurchaseReturn = () => {
         
         if (!finalSupplierId) {
              Swal.fire('Error', 'Missing Supplier Information. Please select a supplier to continue.', 'error');
+             return;
+        }
+
+        // Validate items
+        const invalidItems = returnItems.filter(i => !i.returnQuantity || i.returnQuantity <= 0);
+        if (invalidItems.length > 0) {
+             Swal.fire('Invalid Quantity', 'Please ensure all selected items have a valid return quantity greater than 0.', 'error');
              return;
         }
 
@@ -660,6 +700,58 @@ const PurchaseReturn = () => {
                             </form>
                         </div>
 
+                        {/* Search Results List (Multiple Matches) */}
+                        {!invoiceData && searchResults.length > 0 && (
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fade-in mb-8">
+                                <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750/50 flex justify-between items-center">
+                                    <h3 className="font-black text-gray-900 dark:text-white text-lg flex items-center gap-2">
+                                        <Search size={20} className="text-primary" /> 
+                                        Found {searchResults.length} Matching Invoices
+                                    </h3>
+                                    <button onClick={() => setSearchResults([])} className="text-gray-400 hover:text-red-500">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[500px] overflow-y-auto">
+                                    {searchResults.map(p => (
+                                        <div key={p._id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors flex flex-col sm:flex-row justify-between items-center gap-4">
+                                            <div className="flex-1 text-left">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <span className="font-black text-lg text-gray-800 dark:text-white">#{p.invoiceNumber}</span>
+                                                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 text-[10px] font-bold rounded uppercase">
+                                                        {new Date(p.purchaseDate).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 font-medium">
+                                                    <User size={14} className="text-primary" /> {p.supplierId?.name || 'Unknown Supplier'}
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {p.items.filter(i => 
+                                                        i.productName?.toLowerCase().includes(invoiceSearch.toLowerCase()) || 
+                                                        i.skuId?.toLowerCase().includes(invoiceSearch.toLowerCase())
+                                                    ).map((it, idx) => (
+                                                        <span key={idx} className="px-2 py-1 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border border-yellow-100 dark:border-yellow-900/30 text-[10px] font-bold rounded uppercase">
+                                                            {it.productName} (Qty: {it.receivedQty})
+                                                        </span>
+                                                    ))}
+                                                    {p.items.length > 5 && <span className="text-[10px] text-gray-400 flex items-center">+{p.items.length - 5} more</span>}
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end gap-3">
+                                                <div className="font-black text-xl text-primary">₹{p.grandTotal.toLocaleString()}</div>
+                                                <button 
+                                                    onClick={() => handleSelectSearchResult(p)}
+                                                    className="px-6 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs font-bold uppercase rounded-xl hover:bg-primary transition-colors flex items-center gap-2"
+                                                >
+                                                    Select <ArrowRight size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Result Section */}
                         {invoiceData && (
                             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-scale-up text-left">
@@ -736,10 +828,27 @@ const PurchaseReturn = () => {
 
                                                     {isSelected && (
                                                         <div className="flex items-center gap-6 animate-fade-in pl-6 border-l border-primary/20">
-                                                            <div className="flex items-center bg-white dark:bg-gray-800 border border-primary/20 p-1 rounded-xl h-11">
-                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity - 1, item.receivedQty || item.quantity || 0)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">-</button>
-                                                                <span className="w-10 text-center text-sm font-black text-gray-900 dark:text-white leading-none">{isSelected.returnQuantity}</span>
-                                                                <button onClick={() => updateReturnQty(itemObj._id || itemObj.id, isSelected.returnQuantity + 1, item.receivedQty || item.quantity || 0)} className="w-8 h-8 flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg">+</button>
+                                                            <div className="flex items-center bg-white dark:bg-gray-800 border border-primary/20 p-1 rounded-xl h-11 w-32">
+                                                                <button 
+                                                                    onClick={() => updateReturnQty(itemObj._id || itemObj.id, (parseInt(isSelected.returnQuantity) || 0) - 1, item.receivedQty || item.quantity || 0)} 
+                                                                    className="w-8 h-full flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <input 
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={item.receivedQty || item.quantity || 0}
+                                                                    value={isSelected.returnQuantity}
+                                                                    onChange={(e) => updateReturnQty(itemObj._id || itemObj.id, e.target.value, item.receivedQty || item.quantity || 0)}
+                                                                    className="flex-1 w-full h-full text-center font-black text-gray-900 dark:text-white bg-transparent outline-none border-x border-dashed border-gray-200 dark:border-gray-700 appearance-none text-sm"
+                                                                />
+                                                                <button 
+                                                                    onClick={() => updateReturnQty(itemObj._id || itemObj.id, (parseInt(isSelected.returnQuantity) || 0) + 1, item.receivedQty || item.quantity || 0)} 
+                                                                    className="w-8 h-full flex items-center justify-center hover:bg-primary/10 text-primary transition-all rounded-lg font-black text-lg"
+                                                                >
+                                                                    +
+                                                                </button>
                                                             </div>
                                                             <div className="text-right w-28 shrink-0">
                                                                 <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase leading-none mb-1.5">Debit Amount</p>

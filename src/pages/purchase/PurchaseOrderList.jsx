@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, FileText, Eye, Download, Printer, Plus, Calendar, ArrowUpRight, CheckCircle, Clock, X, Trash2, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+import { Search, FileText, Eye, Download, Printer, Plus, Calendar, ArrowUpRight, CheckCircle, Clock, X, Trash2, ChevronLeft, ChevronRight, ShoppingCart, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
@@ -100,6 +100,35 @@ const PurchaseOrderList = () => {
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
+    // CSV Download Function
+    const handleDownloadCSV = (order) => {
+        const csvRows = [];
+        // Header
+        csvRows.push("SR,Product Name,SKU,Supplier,Quantity");
+        
+        order.items.forEach((item, idx) => {
+            const supplierName = item.supplier?.name || order.supplierName || '-'; 
+            const sku = item.product?.sku || '-';
+            const row = [
+                idx + 1,
+                `"${item.medicineName.replace(/"/g, '""')}"`,
+                `"${sku.replace(/"/g, '""')}"`,
+                `"${supplierName.replace(/"/g, '""')}"`,
+                item.quantity
+            ];
+            csvRows.push(row.join(","));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `PO_${order.poNumber}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-6 animate-fade-in-up pb-10">
             {/* Header */}
@@ -161,7 +190,6 @@ const PurchaseOrderList = () => {
                                 <th className="px-6 py-4">Date</th>
                                 <th className="px-6 py-4">Supplier</th>
                                 <th className="px-6 py-4 text-center">Items</th>
-                                <th className="px-6 py-4">Total Amount</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -169,13 +197,13 @@ const PurchaseOrderList = () => {
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-20 text-center text-gray-500">
+                                    <td colSpan="6" className="px-6 py-20 text-center text-gray-500">
                                         Loading orders...
                                     </td>
                                 </tr>
                             ) : currentItems.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-10 text-center text-gray-400 font-medium">
+                                    <td colSpan="6" className="px-6 py-10 text-center text-gray-400 font-medium">
                                         No purchase orders found.
                                     </td>
                                 </tr>
@@ -187,9 +215,8 @@ const PurchaseOrderList = () => {
                                             {new Date(order.poDate).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-100">{order.supplierName}</td>
-                                        <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-300">{order.items.length}</td>
-                                        <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">
-                                            ₹{order.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-300">
+                                            {order.items.length} <span className="text-gray-400">|</span> <span className="text-sm font-bold text-primary">{order.items.reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0)} Qty</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${getStatusStyle(order.status)}`}>
@@ -198,22 +225,10 @@ const PurchaseOrderList = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                {/* Mark Dispatched Button - For Sent/Approved */}
-                                                {(order.status === 'Sent to Supplier' || order.status === 'Approved by Supplier') && (
+                                                {/* Receive / GRN Button - Available after sending to supplier */}
+                                                {['Sent to Supplier', 'Approved by Supplier', 'Dispatched'].includes(order.status) && (
                                                     <button 
-                                                        onClick={() => handleStatusUpdate(order._id, 'Dispatched')}
-                                                        className="p-1.5 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-all flex items-center gap-1" 
-                                                        title="Mark as Dispatched"
-                                                    >
-                                                        <ArrowUpRight size={16} />
-                                                        <span className="text-[10px] font-bold uppercase pr-1">Dispatch</span>
-                                                    </button>
-                                                )}
-
-                                                {/* Receive / GRN Button - Only for Dispatched */}
-                                                {order.status === 'Dispatched' && (
-                                                    <button 
-                                                        onClick={() => navigate('/inventory/physical-validation', { state: { prefill: { poData: order } } })}
+                                                        onClick={() => navigate('/purchase/physical-validation', { state: { prefill: { poData: order } } })}
                                                         className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-all flex items-center gap-1" 
                                                         title="Receive Items (Physical Check)"
                                                     >
@@ -221,6 +236,22 @@ const PurchaseOrderList = () => {
                                                         <span className="text-[10px] font-bold uppercase pr-1">Receive</span>
                                                     </button>
                                                 )}
+
+                                                <button 
+                                                    onClick={() => handleDownloadCSV(order)}
+                                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" 
+                                                    title="Download CSV"
+                                                >
+                                                    <FileSpreadsheet size={16} />
+                                                </button>
+
+                                                <button 
+                                                    onClick={() => navigate(`/purchase/orders/view/${order._id}`)}
+                                                    className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all" 
+                                                    title="View PO Invoice"
+                                                >
+                                                    <FileText size={16} />
+                                                </button>
 
                                                 <button 
                                                     onClick={() => navigate(`/purchase/create-order?id=${order._id}`)}

@@ -9,12 +9,13 @@ import ComingSoon from './components/ComingSoon';
 
 // Inventory Pages
 import InventoryDashboard from './pages/inventory/InventoryDashboard';
-import StockList from './pages/inventory/StockList';
+import StockHistory from './pages/inventory/StockHistory';
 import InventoryMaster from './pages/inventory/InventoryMaster';
 import PhysicalValidation from './pages/inventory/PhysicalValidation';
 import InventoryStockOut from './pages/inventory/InventoryStockOut';
 import ExpiryManagement from './pages/inventory/ExpiryManagement';
 import LowStockAlerts from './pages/inventory/LowStockAlerts';
+import NonMovingStock from './pages/inventory/NonMovingStock';
 
 import StatsHistory from './pages/inventory/StatsHistory';
 import ExpiryReport from './pages/inventory/ExpiryReport';
@@ -46,6 +47,7 @@ import ViewPurchaseInvoice from './pages/purchase/ViewPurchaseInvoice';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 import CreatePurchaseOrder from './pages/purchase/CreatePurchaseOrder';
 import ViewPurchaseReturn from './pages/purchase/ViewPurchaseReturn';
+import ViewPurchaseOrder from './pages/purchase/ViewPurchaseOrder';
 import PurchaseOrderList from './pages/purchase/PurchaseOrderList';
 import GRNList from './pages/inventory/GRNList';
 import GRNWaitlist from './pages/inventory/GRNWaitlist';
@@ -105,22 +107,17 @@ function App() {
               2. INVENTORY ROUTES 
              ======================= */}
           <Route path="inventory/dashboard" element={<InventoryDashboard />} />
-          <Route path="inventory/stock" element={<StockList />} />
+          <Route path="inventory/history" element={<StockHistory />} />
           <Route path="inventory/master" element={<InventoryMaster />} />
-          <Route path="inventory/physical-validation" element={<PhysicalValidation />} />
           <Route path="inventory/stock-out" element={<InventoryStockOut />} />
           <Route path="inventory/expiry" element={<ExpiryManagement />} />
           <Route path="inventory/expiry-report" element={<ExpiryReport />} />
           <Route path="inventory/low-stock" element={<LowStockAlerts />} />
+          <Route path="inventory/non-moving" element={<NonMovingStock />} />
 
           <Route path="inventory/stats-history" element={<StatsHistory />} />
           <Route path="inventory/packing-materials" element={<PackingMaterialManager />} />
           <Route path="inventory/locations" element={<PutAwayLocationManager />} />
-          <Route path="inventory/grn" element={<GRNList />} />
-          <Route path="inventory/grn/waitlist" element={<GRNWaitlist />} />
-          <Route path="inventory/putaway" element={<PutAwayBucket />} />
-          <Route path="inventory/grn/add" element={<AddGRN />} />
-          <Route path="inventory/grn/view/:id" element={<ViewGRN />} />
 
 
           {/* =======================
@@ -156,6 +153,16 @@ function App() {
           <Route path="purchase/suppliers" element={<SupplierList />} />
           <Route path="purchase/create-order" element={<CreatePurchaseOrder />} />
           <Route path="purchase/orders" element={<PurchaseOrderList />} />
+          <Route path="purchase/orders/view/:id" element={<ViewPurchaseOrder />} />
+          
+          {/* Moved from Inventory */}
+          <Route path="purchase/physical-validation" element={<PhysicalValidation />} />
+          <Route path="purchase/grn/add" element={<AddGRN />} />
+          <Route path="purchase/putaway" element={<PutAwayBucket />} />
+          <Route path="purchase/grn-list" element={<GRNList />} />
+          <Route path="purchase/grn/view/:id" element={<ViewGRN />} />
+          <Route path="purchase/grn/waitlist" element={<GRNWaitlist />} />
+
           <Route path="purchase/invoices" element={<PurchaseInvoices />} />
           <Route path="purchase/return" element={<PurchaseReturn />} />
           <Route path="purchase/return/view/:id" element={<ViewPurchaseReturn />} />

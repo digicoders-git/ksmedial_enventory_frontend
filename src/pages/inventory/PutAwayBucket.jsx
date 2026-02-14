@@ -12,6 +12,7 @@ const PutAwayBucket = () => {
     // Original State Structure
     const [purchases, setPurchases] = useState([]);
     const [saleReturns, setSaleReturns] = useState([]); // Store returns too
+    const [adjustments, setAdjustments] = useState([]); // Store stock adjustments
 
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null); 
@@ -47,6 +48,8 @@ const PutAwayBucket = () => {
     useEffect(() => {
         if (filters.putAwayType === 'Sales Return Receiving') {
             fetchPendingSaleReturns();
+        } else if (filters.putAwayType === 'Stock Adjustment') {
+            fetchPendingAdjustments();
         } else {
             fetchPendingPurchases();
         }
@@ -102,6 +105,24 @@ const PutAwayBucket = () => {
         }
     };
 
+    const fetchPendingAdjustments = async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.get('/products/putaway/pending');
+            if (data.success) {
+                setAdjustments(data.logs);
+                // Adjustments endpoint currently doesn't support pagination, so we set defaults
+                setTotalPages(1); 
+                setTotalRecords(data.logs.length);
+            }
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', 'Failed to fetch adjustments', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
@@ -112,12 +133,27 @@ const PutAwayBucket = () => {
     const handleFetchRecord = () => {
         setPage(1);
         if (filters.putAwayType === 'Sales Return Receiving') fetchPendingSaleReturns();
+        else if (filters.putAwayType === 'Stock Adjustment') fetchPendingAdjustments();
         else fetchPendingPurchases();
     };
 
     const handleSelect = (item) => {
         setSelectedItem(item);
-        setVerifiedItems(JSON.parse(JSON.stringify(item.items)));
+        if (filters.putAwayType === 'Stock Adjustment') {
+            // Transform adjustment log to match verifiedItems structure (array of items)
+            setVerifiedItems([{
+                _id: item.productId._id,
+                productName: item.productName || item.productId.name,
+                skuId: item.productId.sku,
+                batchNumber: item.batchNumber,
+                expiryDate: item.productId.expiryDate,
+                receivedQty: item.quantity,
+                rack: item.productId.rackLocation || '', // Default to current loc
+                price: item.productId.purchasePrice
+            }]);
+        } else {
+            setVerifiedItems(JSON.parse(JSON.stringify(item.items)));
+        }
     };
 
     const handleCSVUpload = (e) => {
@@ -163,6 +199,11 @@ const PutAwayBucket = () => {
 
         if (filters.putAwayType === 'Sales Return Receiving') {
             handleCompleteSaleReturn();
+            return;
+        }
+        
+        if (filters.putAwayType === 'Stock Adjustment') {
+            handleCompleteAdjustment();
             return;
         }
 
@@ -232,50 +273,139 @@ const PutAwayBucket = () => {
         }
     };
 
-    const handleDownloadCSV = () => {
-        const data = filters.putAwayType === 'Purchase Receipt Item' ? purchases : saleReturns;
-        if (data.length === 0) {
-            Swal.fire('Info', 'No records to download', 'info');
-            return;
-        }
+    const handleCompleteAdjustment = async () => {
+        const result = await Swal.fire({
+            title: 'Complete Stock Entry?',
+            text: "This will make the stock LIVE in inventory.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Yes, Make Live!'
+        });
 
-        const csvRows = [];
-        if (filters.putAwayType === 'Purchase Receipt Item') {
-            csvRows.push(['Invoice Number', 'Supplier', 'Product Name', 'SKU', 'Batch', 'Expiry', 'Received Qty', 'Rack', 'Status']);
-            data.forEach(p => {
-                p.items.forEach(item => {
+        if (result.isConfirmed) {
+            try {
+                // For adjustment, we only process the first item in verifiedItems (since 1 log = 1 item)
+                const item = verifiedItems[0];
+                const { data } = await api.put(`/products/putaway/complete/${selectedItem._id}`, { 
+                    rackLocation: item.rack 
+                });
+
+                if (data.success) {
+                    Swal.fire('Success!', 'Stock added to inventory.', 'success');
+                    setSelectedItem(null);
+                    fetchPendingAdjustments();
+                }
+            } catch (error) {
+                Swal.fire('Error', error.response?.data?.message || 'Failed', 'error');
+            }
+        }
+    };
+
+    const handleDownloadPendingReport = async () => {
+        let reportData = [];
+        const reportType = filters.putAwayType;
+        
+        Swal.fire({ title: 'Generating Report...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        try {
+            if (reportType === 'Purchase Receipt Item') {
+                const params = new URLSearchParams();
+                params.append('status', 'Putaway_Pending');
+                params.append('pageNumber', 1);
+                params.append('pageSize', 10000); // Fetch all/many for report
+                
+                Object.keys(filters).forEach(key => {
+                    if (filters[key] && key !== 'putAwayType') params.append(key, filters[key]);
+                });
+
+                const { data } = await api.get(`/purchases?${params.toString()}`);
+                if (data.success) reportData = data.purchases;
+
+            } else if (reportType === 'Sales Return Receiving') {
+                 const { data } = await api.get('/sales/returns', {
+                    params: {
+                        status: 'Putaway_Pending',
+                        page: 1,
+                        limit: 10000 
+                    }
+                });
+                if (data.success) reportData = data.returns;
+            } else if (reportType === 'Stock Adjustment') {
+                const { data } = await api.get('/products/putaway/pending');
+                if (data.success) reportData = data.logs;
+            }
+
+            if (!reportData || reportData.length === 0) {
+                Swal.close();
+                Swal.fire('Info', 'No pending records found to download.', 'info');
+                return;
+            }
+
+            const csvRows = [];
+            if (reportType === 'Purchase Receipt Item') {
+                csvRows.push(['Invoice Number', 'Supplier', 'Product Name', 'SKU', 'Batch', 'Expiry', 'Received Qty', 'Rack', 'Status']);
+                reportData.forEach(p => {
+                    p.items.forEach(item => {
+                        csvRows.push([
+                            p.invoiceNumber,
+                            p.supplierId?.name || '',
+                            item.productName,
+                            item.skuId || '',
+                            item.batchNumber,
+                            item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : '',
+                            item.receivedQty,
+                            item.rack || '',
+                            'Pending Putaway'
+                        ]);
+                    });
+                });
+            } else if (reportType === 'Stock Adjustment') {
+                csvRows.push(['Log ID', 'Product Name', 'Batch', 'Quantity', 'Adjusted By', 'Date']);
+                reportData.forEach(item => {
                     csvRows.push([
-                        p.invoiceNumber,
-                        p.supplierId?.name || '',
+                        `#${item._id.slice(-6).toUpperCase()}`,
                         item.productName,
-                        item.skuId || '',
                         item.batchNumber,
-                        item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : '',
-                        item.receivedQty,
-                        item.rack || '',
-                        'Pending'
-                    ]);
-                });
-            });
-        } else {
-            csvRows.push(['Return Number', 'Ref Invoice', 'Customer', 'Product Name', 'Return Qty', 'Status']);
-            data.forEach(r => {
-                r.items.forEach(item => {
-                    csvRows.push([
-                        r.returnNumber,
-                        r.invoiceNumber,
-                        r.customerName,
-                        item.name,
                         item.quantity,
-                        'Pending Putaway'
+                        item.adjustedByName,
+                        new Date(item.date).toLocaleDateString()
                     ]);
                 });
-            });
-        }
+            } else {
+                csvRows.push(['Return Number', 'Ref Invoice', 'Customer', 'Product Name', 'Return Qty', 'Status']);
+                reportData.forEach(r => {
+                    r.items.forEach(item => {
+                        csvRows.push([
+                            r.returnNumber,
+                            r.invoiceNumber,
+                            r.customerName,
+                            item.name,
+                            item.quantity,
+                            'Pending Putaway'
+                        ]);
+                    });
+                });
+            }
 
-        const csvString = Papa.unparse(csvRows);
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        saveAs(blob, `PutAway_${filters.putAwayType}_${new Date().toLocaleDateString()}.csv`);
+            const csvString = Papa.unparse(csvRows);
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            saveAs(blob, `PutAway_Pending_Report_${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+            
+            Swal.close();
+            Swal.fire({
+                icon: 'success', 
+                title: 'Report Downloaded',
+                text: `${reportData.length} records exported.`,
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+        } catch (error) {
+            Swal.close();
+            console.error("Report Generation Error", error);
+            Swal.fire('Error', 'Failed to generate report', 'error');
+        }
     };
 
     const handleBulkPutAwayUpload = (e) => {
@@ -499,6 +629,7 @@ const PutAwayBucket = () => {
                                 <select name="putAwayType" value={filters.putAwayType} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white font-bold text-primary">
                                     <option value="Purchase Receipt Item">Purchase Receipt Item</option>
                                     <option value="Sales Return Receiving">Sales Return Receiving</option>
+                                    <option value="Stock Adjustment">Stock Adjustment</option>
                                     <option value="Stock Transfer">Stock Transfer</option>
                                 </select>
                                 <input name="invoiceNos" value={filters.invoiceNos} onChange={handleFilterChange} placeholder="Invoice Nos." className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
@@ -558,11 +689,11 @@ const PutAwayBucket = () => {
                             )}
 
                              <button 
-                                onClick={handleDownloadCSV}
-                                className="px-3 py-2 border border-cyan-500 text-cyan-500 rounded-lg hover:bg-cyan-50 transition-colors"
-                                title="Download CSV"
+                                onClick={handleDownloadPendingReport}
+                                className="px-5 py-2 bg-indigo-500 text-white font-bold rounded-xl text-sm hover:bg-indigo-400 hover:shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap"
+                                title="Download Pending Report"
                              >
-                                 <Download size={16} />
+                                 <Download size={18} /> Report
                              </button>
                          </div>
                     </div>
@@ -582,6 +713,15 @@ const PutAwayBucket = () => {
                                             <th className="p-4">Total Amount</th>
                                             <th className="p-4">Date</th>
                                         </>
+                                    ) : filters.putAwayType === 'Stock Adjustment' ? (
+                                        <>
+                                            <th className="p-4">Log ID</th>
+                                            <th className="p-4">Product Name</th>
+                                            <th className="p-4">Batch</th>
+                                            <th className="p-4">Quantity</th>
+                                            <th className="p-4">Adjuster</th>
+                                            <th className="p-4">Date</th>
+                                        </>
                                     ) : (
                                         <>
                                             <th className="p-4">Return ID</th>
@@ -598,10 +738,10 @@ const PutAwayBucket = () => {
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {loading ? (
                                     <tr><td colSpan="6" className="p-10 text-center text-gray-500">Loading...</td></tr>
-                                ) : (filters.putAwayType === 'Purchase Receipt Item' ? purchases : saleReturns).length === 0 ? (
+                                ) : (filters.putAwayType === 'Purchase Receipt Item' ? purchases : filters.putAwayType === 'Stock Adjustment' ? adjustments : saleReturns).length === 0 ? (
                                     <tr><td colSpan="6" className="p-10 text-center text-gray-500">No items pending for Put Away</td></tr>
                                 ) : (
-                                    (filters.putAwayType === 'Purchase Receipt Item' ? purchases : saleReturns).map(item => (
+                                    (filters.putAwayType === 'Purchase Receipt Item' ? purchases : filters.putAwayType === 'Stock Adjustment' ? adjustments : saleReturns).map(item => (
                                         <tr key={item._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                                             {filters.putAwayType === 'Purchase Receipt Item' ? (
                                                 <>
@@ -610,6 +750,15 @@ const PutAwayBucket = () => {
                                                     <td className="p-4 text-sm"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">{item.items.length} items</span></td>
                                                     <td className="p-4 font-mono text-sm">₹{item.grandTotal?.toLocaleString()}</td>
                                                     <td className="p-4 text-sm text-gray-500">{new Date(item.invoiceDate).toLocaleDateString()}</td>
+                                                </>
+                                            ) : filters.putAwayType === 'Stock Adjustment' ? (
+                                                <>
+                                                    <td className="p-4 font-black text-green-600">#{item._id.slice(-6).toUpperCase()}</td>
+                                                    <td className="p-4 font-medium">{item.productName}</td>
+                                                    <td className="p-4 font-mono text-xs">{item.batchNumber}</td>
+                                                    <td className="p-4 font-bold text-gray-900 dark:text-white">{item.quantity}</td>
+                                                    <td className="p-4 text-sm text-gray-500">{item.adjustedByName}</td>
+                                                    <td className="p-4 text-sm text-gray-500">{new Date(item.date).toLocaleDateString()}</td>
                                                 </>
                                             ) : (
                                                 <>
@@ -624,7 +773,7 @@ const PutAwayBucket = () => {
                                             <td className="p-4">
                                                 <button 
                                                     onClick={() => handleSelect(item)}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 border ${filters.putAwayType === 'Purchase Receipt Item' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200' : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'}`}
+                                                    className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 border ${filters.putAwayType === 'Purchase Receipt Item' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200' : 'bg-green-50 text-green-600 hover:bg-green-100 border-green-200'}`}
                                                 >
                                                     Start Put Away <ArrowRight size={14} />
                                                 </button>
@@ -665,11 +814,19 @@ const PutAwayBucket = () => {
                          <div>
                              <button onClick={() => setSelectedItem(null)} className="text-sm text-gray-500 hover:underline mb-1 flex items-center gap-1">← Back to List</button>
                              <h2 className="text-xl font-black flex flex-wrap items-center gap-2 text-gray-800 dark:text-white">
-                                 {filters.putAwayType === 'Purchase Receipt Item' ? `Invoice: ${selectedItem.invoiceNumber}` : `Return: ${selectedItem.returnNumber}`}
-                                 <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${filters.putAwayType === 'Purchase Receipt Item' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                                     Waitlist
-                                 </span>
-                             </h2>
+                                {filters.putAwayType === 'Purchase Receipt Item' 
+                                    ? `Invoice: ${selectedItem.invoiceNumber}` 
+                                    : filters.putAwayType === 'Stock Adjustment' 
+                                    ? `Adjustment: ${selectedItem.productName}`
+                                    : `Return: ${selectedItem.returnNumber}`}
+                                <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                                    filters.putAwayType === 'Purchase Receipt Item' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 
+                                    filters.putAwayType === 'Stock Adjustment' ? 'bg-blue-100 text-blue-700 border-blue-200' : 
+                                    'bg-red-100 text-red-700 border-red-200'
+                                }`}>
+                                    Waitlist
+                                </span>
+                            </h2>
                              <p className="text-sm text-gray-500">Verify items and location before making live</p>
                          </div>
                          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -689,7 +846,9 @@ const PutAwayBucket = () => {
                              
                              <button 
                                 onClick={handleCompletePutAway}
-                                className={`w-full md:w-auto px-6 py-2 text-white rounded-lg text-sm font-bold shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 ${filters.putAwayType === 'Purchase Receipt Item' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                className={`w-full md:w-auto px-6 py-2 text-white rounded-lg text-sm font-bold shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 ${
+                                    filters.putAwayType === 'Sales Return Receiving' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                                }`}
                              >
                                  <CheckCircle size={18} /> Complete & Make Live
                              </button>
@@ -701,40 +860,52 @@ const PutAwayBucket = () => {
                              <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs font-bold text-gray-500 uppercase sticky top-0 z-10 backdrop-blur-sm border-b dark:border-gray-700">
                                  <tr>
                                      <th className="p-4">Product Name</th>
-                                     {filters.putAwayType === 'Purchase Receipt Item' ? (
+                                    {filters.putAwayType === 'Purchase Receipt Item' ? (
                                          <>
                                              <th className="p-4">Batch</th>
                                              <th className="p-4">Expiry</th>
                                              <th className="p-4">Qty (Received)</th>
                                              <th className="p-4">Free</th>
                                          </>
+                                     ) : filters.putAwayType === 'Stock Adjustment' ? (
+                                        <>
+                                            <th className="p-4">Batch</th>
+                                            <th className="p-4">Expiry</th>
+                                            <th className="p-4">Qty</th>
+                                        </>
                                      ) : (
-                                         <>
-                                             <th className="p-4">Return Price</th>
-                                             <th className="p-4 text-center">Return Qty</th>
-                                         </>
-                                     )}
+                                        <>
+                                            <th className="p-4">Return Price</th>
+                                            <th className="p-4 text-center">Return Qty</th>
+                                        </>
+                                    )}
                                      <th className="p-4 w-48">Rack/Bin</th>
                                  </tr>
                              </thead>
                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                  {verifiedItems.map((item, idx) => (
                                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/20">
-                                         <td className="p-4 font-medium text-gray-800 dark:text-gray-200">{item.productName || item.name}</td>
-                                         
-                                         {filters.putAwayType === 'Purchase Receipt Item' ? (
+                                        <td className="p-4 font-medium text-gray-800 dark:text-gray-200">{item.productName || item.name}</td>
+                                        
+                                        {filters.putAwayType === 'Purchase Receipt Item' ? (
                                              <>
                                                  <td className="p-4 font-mono text-xs text-gray-600 dark:text-gray-400">{item.batchNumber}</td>
                                                  <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}</td>
                                                  <td className="p-4 font-bold text-blue-600">{item.receivedQty}</td>
                                                  <td className="p-4 text-gray-500">{item.physicalFreeQty}</td>
                                              </>
-                                         ) : (
-                                             <>
-                                                 <td className="p-4 font-mono text-xs">Rs. {item.price}</td>
-                                                 <td className="p-4 font-bold text-red-600 text-center">{item.quantity}</td>
-                                             </>
-                                         )}
+                                         ) : filters.putAwayType === 'Stock Adjustment' ? (
+                                            <>
+                                                <td className="p-4 font-mono text-xs text-gray-600 dark:text-gray-400">{item.batchNumber}</td>
+                                                <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}</td>
+                                                <td className="p-4 font-bold text-green-600">{item.receivedQty}</td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="p-4 font-mono text-xs">Rs. {item.price}</td>
+                                                <td className="p-4 font-bold text-red-600 text-center">{item.quantity}</td>
+                                            </>
+                                        )}
                                          
                                          <td className="p-4">
                                             {/* Location Input is generic and works for both provided item structure allows adding rack property */}
