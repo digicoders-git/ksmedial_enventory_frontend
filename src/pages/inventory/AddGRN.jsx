@@ -543,47 +543,72 @@ const AddGRN = () => {
             return;
         }
 
-        try {
-            setLoading(true);
-            setLoading(true);
+        const result = await Swal.fire({
+            title: 'Confirm GRN Details?',
+            text: "Are you sure you want to save this GRN? Items will be moved to Put Away Bucket.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981', // Emerald-500
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, Save GRN'
+        });
 
-            const formDataToSend = new FormData();
-            formDataToSend.append('supplierId', formData.supplierId);
-            formDataToSend.append('invoiceDate', formData.invoiceDate);
-            formDataToSend.append('notes', formData.notes);
-            formDataToSend.append('items', JSON.stringify(items)); // Stringify complex objects
-            formDataToSend.append('invoiceSummary', JSON.stringify(invoiceSummary));
-            formDataToSend.append('taxBreakup', JSON.stringify(taxBreakup));
-            formDataToSend.append('subTotal', invoiceSummary.taxableAmount);
-            formDataToSend.append('taxAmount', invoiceSummary.amountAfterGst - invoiceSummary.taxableAmount);
-            formDataToSend.append('discount', 0);
-            formDataToSend.append('grandTotal', invoiceSummary.invoiceAmount);
-            formDataToSend.append('status', 'Putaway_Pending');
-            formDataToSend.append('paymentStatus', 'Pending');
-            formDataToSend.append('physicalReceivingId', physicalId);
-            
-            if (invoiceFile) {
-                formDataToSend.append('invoiceFile', invoiceFile);
-            }
+        if (result.isConfirmed) {
+            try {
+                setLoading(true);
 
-            const { data } = await api.post('/purchases', formDataToSend, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            
-            if (data.success) {
-                Swal.fire({
-                    title: 'GRN Created!',
-                    text: 'Items sent to Put Away Bucket for verification.',
-                    icon: 'success',
-                    timer: 2000
+                const formDataToSend = new FormData();
+                formDataToSend.append('supplierId', formData.supplierId);
+                formDataToSend.append('invoiceDate', formData.invoiceDate);
+                formDataToSend.append('invoiceNumber', formData.invoiceNumber);
+                formDataToSend.append('notes', formData.notes);
+                
+                // Properly stringify arrays/objects for FormData
+                formDataToSend.append('items', JSON.stringify(items)); 
+                formDataToSend.append('invoiceSummary', JSON.stringify(invoiceSummary));
+                formDataToSend.append('taxBreakup', JSON.stringify(taxBreakup));
+                
+                // Add explicit fields if backend expects them separately (though they are in summary)
+                formDataToSend.append('subTotal', invoiceSummary.taxableAmount);
+                formDataToSend.append('taxAmount', invoiceSummary.amountAfterGst - invoiceSummary.taxableAmount);
+                formDataToSend.append('discount', 0);
+                formDataToSend.append('grandTotal', invoiceSummary.invoiceAmount);
+                
+                formDataToSend.append('status', 'Putaway_Pending');
+                formDataToSend.append('paymentStatus', 'Pending');
+                if (physicalId) formDataToSend.append('physicalReceivingId', physicalId);
+                
+                if (invoiceFile) {
+                    formDataToSend.append('invoiceFile', invoiceFile);
+                }
+
+                // Log payload for debugging
+                // for (var pair of formDataToSend.entries()) {
+                //     console.log(pair[0]+ ', ' + pair[1]); 
+                // }
+
+                const { data } = await api.post('/purchases', formDataToSend, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
                 });
-                // Navigate to Invoice View
-                navigate(`/purchase/grn/view/${data.purchase._id}`);
+                
+                if (data.success) {
+                    await Swal.fire({
+                        title: 'GRN Created!',
+                        text: 'Items sent to Put Away Bucket for verification.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    // Navigate to Invoice View or List
+                    // navigate(`/purchase/grn/view/${data.purchase._id}`);
+                     navigate('/purchase/grn');
+                }
+            } catch (error) {
+                console.error("GRN Save Error:", error);
+                Swal.fire('Error', error.response?.data?.message || 'Failed to create GRN', 'error');
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            Swal.fire('Error', error.response?.data?.message || 'Failed to create GRN', 'error');
-        } finally {
-            setLoading(false);
         }
     };
 
