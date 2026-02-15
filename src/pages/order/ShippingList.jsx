@@ -33,7 +33,10 @@ const ShippingList = () => {
             setLoading(true);
             const { data } = await api.get('/orders');
             if (data.success) {
-                const shippingOrders = data.orders.filter(o => o.status === 'Shipping').map(order => ({
+                // Filter for all shipping-related statuses to ensure visibility
+                const shippingOrders = data.orders.filter(o => 
+                    ['Scanned For Shipping', 'shipped', 'Shipping'].includes(o.status)
+                ).map(order => ({
                     ...order,
                     vendorId: order.vendorId || 'N/A',
                     orderType: order.orderType || 'KS4'

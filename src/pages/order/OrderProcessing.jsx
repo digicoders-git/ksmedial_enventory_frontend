@@ -85,7 +85,7 @@ const OrderProcessing = () => {
             });
 
             if (result.isConfirmed) {
-                await api.put(`/orders/${orderId}`, { status: 'Packing' });
+                await api.put(`/orders/${orderId}/status`, { status: 'Packing' });
                 Swal.fire({
                     title: 'Moved to Packing!',
                     text: 'Order is now ready for packing.',
@@ -113,8 +113,8 @@ const OrderProcessing = () => {
             });
 
             if (result.isConfirmed) {
-                await api.put(`/orders/${orderId}`, { status: 'Shipping' });
-                 Swal.fire({
+                await api.put(`/orders/${orderId}/status`, { status: 'Scanned For Shipping' });
+                Swal.fire({
                     title: 'Moved to Shipping!',
                     text: 'Order is now ready for shipping.',
                     icon: 'success',
@@ -124,7 +124,9 @@ const OrderProcessing = () => {
                 fetchOrders(); 
             }
         } catch (error) {
-            Swal.fire('Error', 'Failed to update order status', 'error');
+            console.error(error);
+            const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
+            Swal.fire('Error', `Failed to update status: ${errorMsg}`, 'error');
         }
     };
 

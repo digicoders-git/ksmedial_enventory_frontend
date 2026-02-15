@@ -30,9 +30,9 @@ const OnlineOrders = () => {
     const [statusFilterOpen, setStatusFilterOpen] = useState(false);
     const [selectedStatuses, setSelectedStatuses] = useState([]);
     const statusOptions = [
-        'On Hold', 'Picking', 'Picklist Generated', 'Problem Queue', 
-        'Quality Check', 'Packing', 'Shipping', 'Scanned For Shipping', 
-        'Shipped', 'Cancelled', 'Unallocated', 'delivered'
+        'pending', 'confirmed', 'On Hold', 'Picking', 'Picklist Generated', 
+        'Problem Queue', 'Quality Check', 'Packing', 'Scanned For Shipping', 
+        'shipped', 'delivered', 'cancelled', 'Unallocated', 'Billing'
     ];
 
     // Pagination State
@@ -185,12 +185,90 @@ const OnlineOrders = () => {
         }
     };
 
+    const handleCancelOrder = async (orderId) => {
+        const result = await Swal.fire({
+            title: 'Cancel Order?',
+            text: "Are you sure you want to cancel this order? This action cannot be undone.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Cancel it!'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await api.put(`/orders/${orderId}/status`, { status: 'cancelled' });
+                if (response.data.success) {
+                    Swal.fire('Cancelled!', 'Order has been cancelled.', 'success');
+                    fetchOrders(); // Refresh list
+                }
+            } catch (error) {
+                console.error("Cancel Error:", error);
+                Swal.fire('Error', 'Failed to cancel order.', 'error');
+            }
+        }
+    };
+
+    const handleStatusUpdate = async (newStatus) => {
+        if (!selectedOrder) return;
+        try {
+            const { data } = await api.put(`/orders/${selectedOrder._id}/status`, { status: newStatus });
+            if (data.success) {
+                // Update local state
+                setOrders(prev => prev.map(o => o._id === selectedOrder._id ? { ...o, status: newStatus } : o));
+                setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Status Updated',
+                    text: `Order marked as ${newStatus}`,
+                    timer: 1000,
+                    showConfirmButton: false
+                });
+            }
+        } catch (error) {
+            console.error("Update Status Error", error);
+            Swal.fire('Error', 'Failed to update status', 'error');
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in pb-10">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Sales Orders</h1>
-                <p className="text-sm text-gray-500 font-medium">Manage and process orders with detailed filtering.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Sales Orders</h1>
+                    <p className="text-sm text-gray-500 font-medium">Manage and process orders with detailed filtering.</p>
+                </div>
+                <button 
+                    onClick={async () => {
+                        const result = await Swal.fire({
+                            title: 'Generate Test Data?',
+                            text: 'This will create 5 random test orders.',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Yes, Generate',
+                            confirmButtonColor: '#06b6d4'
+                        });
+
+                        if (result.isConfirmed) {
+                            try {
+                                setLoading(true);
+                                await api.post('/orders/seed');
+                                await fetchOrders();
+                                Swal.fire('Success', 'Test orders generated successfully!', 'success');
+                            } catch (error) {
+                                console.error(error); // Log full error
+                                const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
+                                Swal.fire('Error', `Failed to generate test data: ${errorMsg}`, 'error');
+                            } finally {
+                                setLoading(false);
+                            }
+                        }
+                    }}
+                    className="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg text-sm hover:bg-purple-700 shadow-lg shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-2"
+                >
+                    <Boxes size={18} /> Generate Test Data
+                </button>
             </div>
 
             {/* Filter Bar */}
@@ -399,9 +477,15 @@ const OnlineOrders = () => {
                                         <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{moment(order.expectedHandover).format('D MMM YYYY, HH:mm')}</td>
                                         <td className="px-6 py-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{order.city}</td>
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
-                                            <button className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                                                <XCircle size={18} />
-                                            </button>
+                                            {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                                <button 
+                                                    onClick={() => handleCancelOrder(order._id)}
+                                                    className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Cancel Order"
+                                                >
+                                                    <XCircle size={18} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -459,10 +543,27 @@ const OnlineOrders = () => {
                                 </div>
                                 <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
                                     <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Workflow Status</h3>
-                                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase ${getStatusColor(selectedOrder.status)}`}>
-                                        {selectedOrder.status}
+                                    
+                                    <div className="flex flex-col gap-2">
+                                        <select 
+                                            value={selectedOrder.status}
+                                            onChange={(e) => handleStatusUpdate(e.target.value)}
+                                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer shadow-sm hover:border-purple-300"
+                                        >
+                                            {statusOptions.map(option => (
+                                                <option key={option} value={option}>{option}</option>
+                                            ))}
+                                        </select>
+                                        <div className="flex items-center gap-1 text-[10px] text-purple-600/70 font-medium">
+                                            <RefreshCw size={10} className="animate-spin-slow" />
+                                            <span>Update instantly</span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-2">Expect Handover: {moment(selectedOrder.expectedHandover).format('DD MMM')}</p>
+
+                                    <p className="text-xs text-gray-500 mt-2 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
+                                        <span>Handover:</span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.expectedHandover).format('DD MMM')}</span>
+                                    </p>
                                 </div>
                              </div>
 
