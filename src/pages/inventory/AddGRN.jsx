@@ -599,9 +599,8 @@ const AddGRN = () => {
                         timer: 2000,
                         showConfirmButton: false
                     });
-                    // Navigate to Invoice View or List
-                    // navigate(`/purchase/grn/view/${data.purchase._id}`);
-                     navigate('/purchase/grn');
+                    // Navigate to Invoice View
+                    navigate(`/purchase/grn/view/${data.purchase._id}`);
                 }
             } catch (error) {
                 console.error("GRN Save Error:", error);

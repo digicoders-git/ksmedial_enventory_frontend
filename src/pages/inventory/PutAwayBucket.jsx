@@ -234,7 +234,7 @@ const PutAwayBucket = () => {
                         reverseButtons: true
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            navigate('/inventory/stock');
+                            navigate('/inventory/master');
                         } else {
                             setSelectedItem(null);
                             fetchPendingPurchases();
