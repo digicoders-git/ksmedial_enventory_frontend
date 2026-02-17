@@ -10,6 +10,7 @@ import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
 import Papa from 'papaparse';
+import { createPortal } from 'react-dom';
 
 const OnlineOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -513,9 +514,9 @@ const OnlineOrders = () => {
                     </button>
                 </div>
             </div>
-             {/* Order Details Modal (Preserved & Styled) */}
-            {showModal && selectedOrder && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            {/* Order Details Modal (Preserved & Styled) */}
+            {showModal && selectedOrder && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
                          {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
@@ -591,7 +592,8 @@ const OnlineOrders = () => {
                             </table>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

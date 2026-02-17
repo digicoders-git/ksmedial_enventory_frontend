@@ -380,7 +380,7 @@ const OrderProcessing = () => {
                                             <div className="space-y-1">
                                                 <p className="text-sm font-bold text-gray-800 dark:text-white">{item.productName}</p>
                                                 <div className="flex gap-4">
-                                                    <p className="text-[10px] text-gray-400">Price: <span className="text-gray-600 font-bold">₹{item.price}</span></p>
+                                                    <p className="text-[10px] text-gray-400">Price: <span className="text-gray-600 font-bold">₹{Number(item.productPrice || item.price || 0).toFixed(2)}</span></p>
                                                     <p className="text-[10px] text-gray-400">Status: <span className="text-green-500 font-bold">Available</span></p>
                                                 </div>
                                             </div>
