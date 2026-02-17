@@ -13,6 +13,11 @@ const OrderProcessing = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     
+    // Modal State
+    const [showQCModal, setShowQCModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [processingQC, setProcessingQC] = useState(false);
+
     // Shared Filters State
     const [filters, setFilters] = useState({
         orderId: '',
@@ -73,11 +78,19 @@ const OrderProcessing = () => {
     };
 
     // Action: Start QC (Moves to Packing)
-    const handleStartQC = async (orderId) => {
+    const handleStartQC = (order) => {
+        setSelectedOrder(order);
+        setShowQCModal(true);
+    };
+
+    const confirmQC = async () => {
+        if (!selectedOrder) return;
+        
         try {
+            setProcessingQC(true);
             const result = await Swal.fire({
                 title: 'Pass Quality Check?',
-                text: "This order will be moved to the Packing stage.",
+                text: "Confirm that all items in this order have been verified.",
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#10B981',
@@ -85,7 +98,7 @@ const OrderProcessing = () => {
             });
 
             if (result.isConfirmed) {
-                await api.put(`/orders/${orderId}/status`, { status: 'Packing' });
+                await api.put(`/orders/${selectedOrder._id}/status`, { status: 'Packing' });
                 Swal.fire({
                     title: 'Moved to Packing!',
                     text: 'Order is now ready for packing.',
@@ -93,10 +106,15 @@ const OrderProcessing = () => {
                     timer: 2000,
                     showConfirmButton: false
                 });
+                setShowQCModal(false);
+                setSelectedOrder(null);
                 fetchOrders(); 
             }
         } catch (error) {
+            console.error(error);
             Swal.fire('Error', 'Failed to update order status', 'error');
+        } finally {
+            setProcessingQC(false);
         }
     };
 
@@ -285,9 +303,9 @@ const OrderProcessing = () => {
                                     <td className="p-3 text-center">
                                         {activeTab === 'qc' ? (
                                             <button 
-                                                onClick={() => handleStartQC(order._id)} 
+                                                onClick={() => handleStartQC(order)} 
                                                 className="text-blue-600 hover:text-blue-800 hover:scale-110 transition-transform bg-blue-50 p-1.5 rounded-full" 
-                                                title="Pass QC"
+                                                title="View QC Detail"
                                             >
                                                 <Play size={16} fill="currentColor" />
                                             </button>
@@ -313,6 +331,97 @@ const OrderProcessing = () => {
                     <button disabled={currentPage>=totalPages} onClick={()=>setCurrentPage(c=>Math.min(totalPages,c+1))} className="p-1 rounded bg-gray-100 disabled:opacity-50"><ChevronRight size={16}/></button>
                 </div>
             </div>
+
+            {/* Quality Check Detail Modal */}
+            {showQCModal && selectedOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-up">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 bg-gradient-to-r from-[#003B5C] to-[#005a8d] text-white flex justify-between items-center">
+                            <div>
+                                <h2 className="text-lg font-black uppercase tracking-tight">Quality Check Details</h2>
+                                <p className="text-[10px] font-bold opacity-80 uppercase">Order ID: {selectedOrder._id.toUpperCase()}</p>
+                            </div>
+                            <button onClick={() => setShowQCModal(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            {/* Order Summary Info */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Vendor ID</p>
+                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.vendorId}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Order Type</p>
+                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.orderType}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Payment</p>
+                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.paymentMethod}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Total Amount</p>
+                                    <p className="text-xs font-black text-green-600">₹{selectedOrder.total.toFixed(2)}</p>
+                                </div>
+                            </div>
+
+                            {/* Item List */}
+                            <div className="space-y-3">
+                                <h3 className="text-xs font-black text-gray-500 uppercase flex items-center gap-2">
+                                    <Package size={14} /> Items To Verify ({selectedOrder.items.length})
+                                </h3>
+                                <div className="space-y-2">
+                                    {selectedOrder.items.map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border-l-4 border-cyan-500 rounded shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-bold text-gray-800 dark:text-white">{item.productName}</p>
+                                                <div className="flex gap-4">
+                                                    <p className="text-[10px] text-gray-400">Price: <span className="text-gray-600 font-bold">₹{item.price}</span></p>
+                                                    <p className="text-[10px] text-gray-400">Status: <span className="text-green-500 font-bold">Available</span></p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Quantity</p>
+                                                <p className="text-lg font-black text-cyan-600">{item.quantity}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* QC Notes/Checklist (Optional Visual) */}
+                            <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded border border-amber-100 dark:border-amber-900/30 flex gap-3">
+                                <AlertCircle className="text-amber-500 shrink-0" size={18} />
+                                <p className="text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                                    Please verify that the product names, quantities, and batch details match the physical items before passing the quality check.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowQCModal(false)}
+                                className="px-4 py-2 text-xs font-bold text-gray-500 uppercase hover:text-gray-700 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmQC}
+                                disabled={processingQC}
+                                className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-xs font-black uppercase rounded-lg shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                            >
+                                {processingQC ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                                Pass Quality Check
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
