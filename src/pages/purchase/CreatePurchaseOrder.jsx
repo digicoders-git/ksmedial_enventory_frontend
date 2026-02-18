@@ -264,7 +264,7 @@ const CreatePurchaseOrder = () => {
                 
                 Swal.fire({
                     title: 'Success!',
-                    text: `Purchase Order Created: ${poNumber}`,
+                    text: data.message || `Purchase Order Created: ${poNumber}`,
                     icon: 'success',
                     showConfirmButton: false,
                     timer: 1500

@@ -41,6 +41,7 @@ const PhysicalValidation = () => {
   const [dispatchedPOs, setDispatchedPOs] = useState([]);
   const [showPOSuggestions, setShowPOSuggestions] = useState(false);
   const poWrapperRef = React.useRef(null);
+  const [poItems, setPoItems] = useState([]); // Added state for PO items
 
   // State Declarations moved to top
   const [entries, setEntries] = useState([]);
@@ -65,6 +66,22 @@ const PhysicalValidation = () => {
     isPoNotPresent: false
   });
 
+  const fetchPOItems = async (poNumber) => {
+    try {
+        const { data } = await api.get(`/purchase-orders/${poNumber}`);
+        if (data && data.items) {
+            const items = data.items.map(item => ({
+                productName: item.medicineName || item.product?.name,
+                sku: item.product?.sku,
+                orderedQty: item.quantity,
+                receivedQty: item.quantity, // Default to match ordered
+            }));
+            setPoItems(items);
+        }
+    } catch (error) {
+        console.error("Failed to fetch PO items", error);
+    }
+  };
 
   useEffect(() => {
     const fetchDispatchedPOs = async () => {
@@ -85,6 +102,7 @@ const PhysicalValidation = () => {
                     invoiceValue: po.totalAmount
                 }));
                 setShowEntryModal(true);
+                fetchPOItems(po.poNumber); // Fetch items on prefill
                 window.history.replaceState({}, document.title);
             }
         } catch (error) {
@@ -108,6 +126,7 @@ const PhysicalValidation = () => {
                      skuCount: matchedPO.items.length,
                      invoiceValue: matchedPO.totalAmount
                  }));
+                 fetchPOItems(matchedPO.poNumber); // Fetch items on match
                  Swal.fire({
                      toast: true,
                      position: 'top-end',
@@ -117,7 +136,11 @@ const PhysicalValidation = () => {
                      timer: 1500
                  });
              }
+        } else {
+            setPoItems([]); // Clear items if no match
         }
+    } else {
+        setPoItems([]);
     }
   }, [formData.poIds, dispatchedPOs]);
 
@@ -178,8 +201,38 @@ const PhysicalValidation = () => {
         return;
     }
 
+    // Check for discrepancies in PO items
+    if (poItems.length > 0) {
+        const discrepancies = poItems.filter(i => i.orderedQty !== i.receivedQty);
+        if (discrepancies.length > 0) {
+            const result = await Swal.fire({
+                title: 'Quantity Mismatch!',
+                html: `
+                    <div class="text-left text-sm">
+                        <p class="mb-2 text-red-500 font-bold underline">Discrepancies found:</p>
+                        ${discrepancies.map(d => `<p>• ${d.productName}: Ordered <b>${d.orderedQty}</b>, Received <b>${d.receivedQty}</b></p>`).join('')}
+                    </div>
+                    <p class="mt-4 font-bold">Do you want to proceed with these differences?</p>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Proceed',
+                cancelButtonText: 'No, Re-check',
+                confirmButtonColor: '#ff9800'
+            });
+            if (!result.isConfirmed) return;
+        }
+    }
+
     try {
-        const { data } = await api.post('/physical-receiving', formData);
+        const payload = {
+            ...formData,
+            items: poItems.map(item => ({
+                ...item,
+                discrepancy: item.receivedQty - item.orderedQty
+            }))
+        };
+        const { data } = await api.post('/physical-receiving', payload);
         if (data.success) {
             Swal.fire({
                 icon: 'success',
@@ -192,6 +245,7 @@ const PhysicalValidation = () => {
                 `
             });
             setShowEntryModal(false);
+            setPoItems([]);
             setFormData({
                 supplierName: '',
                 invoiceNumber: '',
@@ -637,6 +691,54 @@ const PhysicalValidation = () => {
                             />
                             <label htmlFor="poNotPresent" className="text-sm text-gray-600 dark:text-gray-400 select-none">PO not present / Direct Purchase</label>
                         </div>
+
+                        {/* SKU Wise Quantity Check Section */}
+                        {poItems.length > 0 && (
+                            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-200 dark:border-gray-600 animate-fade-in">
+                                <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Package size={14} className="text-primary" /> SKU Wise Physical Check
+                                </h4>
+                                <div className="space-y-4">
+                                    {poItems.map((item, idx) => (
+                                        <div key={idx} className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">{item.productName}</p>
+                                                    {item.sku && <p className="text-[10px] text-gray-400 mt-0.5">SKU: {item.sku}</p>}
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-gray-400 uppercase font-black">Ordered</p>
+                                                    <p className="text-sm font-black text-primary">{item.orderedQty}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 pt-2 border-t border-gray-50 dark:border-gray-700/50">
+                                                <label className="text-[10px] font-black text-gray-500 uppercase flex-shrink-0">Physically Checked Qty:</label>
+                                                <input 
+                                                    type="number"
+                                                    value={item.receivedQty}
+                                                    onChange={(e) => {
+                                                        const newItems = [...poItems];
+                                                        newItems[idx].receivedQty = parseInt(e.target.value) || 0;
+                                                        setPoItems(newItems);
+                                                    }}
+                                                    className={`w-full px-3 py-1.5 rounded-lg border text-sm font-black outline-none transition-all ${
+                                                        item.receivedQty !== item.orderedQty 
+                                                        ? 'bg-orange-50 border-orange-200 text-orange-700 focus:ring-orange-500/20' 
+                                                        : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-white focus:ring-primary/20'
+                                                    }`}
+                                                />
+                                            </div>
+                                            {item.receivedQty !== item.orderedQty && (
+                                                <div className="mt-2 text-[10px] font-bold text-orange-500 flex items-center gap-1">
+                                                    <AlertCircle size={10} /> 
+                                                    {item.receivedQty < item.orderedQty ? `Difference: -${item.orderedQty - item.receivedQty} (Shortage)` : `Difference: +${item.receivedQty - item.orderedQty} (Excess)`}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="pt-6 flex justify-end gap-3">
