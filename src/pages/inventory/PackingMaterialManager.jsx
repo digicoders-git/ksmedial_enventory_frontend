@@ -52,6 +52,18 @@ const PackingMaterialManager = () => {
 
     const handleAdd = async (e) => {
         e.preventDefault();
+        
+        // Validation
+        if (!newMaterial.name || !newMaterial.type) {
+            Swal.fire({
+                title: 'Validation Error',
+                text: 'Material name and type are required',
+                icon: 'error',
+                confirmButtonColor: '#007242'
+            });
+            return;
+        }
+        
         try {
             const { data } = await api.post('/packing-materials', newMaterial);
             if (data.success) {
@@ -66,7 +78,15 @@ const PackingMaterialManager = () => {
     };
 
     const handleUpdateStock = async () => {
-        if (!stockQty || isNaN(stockQty) || Number(stockQty) <= 0) return;
+        if (!stockQty || isNaN(stockQty) || Number(stockQty) <= 0) {
+            Swal.fire({
+                title: 'Invalid Quantity',
+                text: 'Please enter a valid quantity greater than 0',
+                icon: 'error',
+                confirmButtonColor: '#007242'
+            });
+            return;
+        }
         try {
             const { data } = await api.put(`/packing-materials/${stockModal.id}/stock`, {
                 quantity: stockQty,
@@ -220,7 +240,7 @@ const PackingMaterialManager = () => {
                         </div>
                         <form onSubmit={handleAdd} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Material Name</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Material Name <span className="text-red-500">*</span></label>
                                 <input required type="text" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl border-none outline-none font-bold text-gray-800 dark:text-white" placeholder="e.g. Small Corrugated Box" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">

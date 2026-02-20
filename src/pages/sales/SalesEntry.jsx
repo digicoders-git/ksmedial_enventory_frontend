@@ -30,6 +30,7 @@ const SalesEntry = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [loading, setLoading] = useState(true);
+  const [customGst, setCustomGst] = useState('');
 
   // Focus Refs
   const itemSearchRef = useRef(null);
@@ -76,6 +77,7 @@ const SalesEntry = () => {
                     setCustomerSearch(sale.customerName || 'Walk-in');
                 }
                 setPaymentMode(sale.paymentMethod || 'Cash');
+                setCustomGst(sale.gstRate || '');
                 const populatedCart = sale.items.map(item => {
                     const invItem = inventory.find(p => p.id === item.productId?._id || p.id === item.productId);
                     const packSize = invItem ? getPackSize(invItem.packing) : 1;
@@ -285,17 +287,26 @@ const SalesEntry = () => {
   }
 
   const subTotal = cart.reduce((sum, item) => sum + (item.qty * item.rate), 0);
-  const totalTax = cart.reduce((sum, item) => {
-      const prod = inventory.find(p => p.id === item.id);
-      const taxRate = prod?.tax || 18;
-      return sum + (item.qty * item.rate * (taxRate / 100));
-  }, 0);
+  const gstRate = customGst !== '' ? parseFloat(customGst) || 0 : 0;
+  const totalTax = (subTotal * gstRate) / 100;
   const discountAmount = 0;
   const grandTotal = subTotal + totalTax - discountAmount;
 
   const handleProcessSale = () => {
     if (cart.length === 0) {
       Swal.fire('Empty Cart', 'Please add items to process sale.', 'info');
+      return;
+    }
+    
+    // Validate mandatory customer details
+    if (!patientDetails.name || !patientDetails.mobile) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Customer Details Required',
+        text: 'Please fill Customer Name and Mobile Number before proceeding.',
+        confirmButtonColor: '#007242'
+      });
+      setShowExtraDetails(true);
       return;
     }
     Swal.fire({
@@ -323,6 +334,7 @@ const SalesEntry = () => {
                 setCart([]);
                 setSelectedCustomer(null);
                 setCustomerSearch('');
+                setCustomGst('');
                 // Reset patient and shipping details for next correct entry
                 setPatientDetails({ name: '', age: '', gender: 'Male', mobile: '', address: '', doctorName: '', doctorAddress: '' });
                 setShippingDetails({ packingType: 'Box', boxCount: 0, polyCount: 0, isColdStorage: false });
@@ -722,7 +734,20 @@ const SalesEntry = () => {
             <div className="flex-1 w-full bg-gray-50/50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
                  <div className="space-y-2">
                       <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>₹{subTotal.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm text-gray-500"><span>Tax (GST)</span><span>₹{totalTax.toFixed(2)}</span></div>
+                      <div className="flex justify-between items-center text-sm text-gray-500">
+                        <span>GST</span>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            placeholder="0" 
+                            value={customGst} 
+                            onChange={(e) => setCustomGst(e.target.value)}
+                            className="w-16 px-2 py-1 text-xs text-right border border-gray-300 dark:border-gray-600 rounded outline-none focus:border-primary dark:bg-gray-700"
+                          />
+                          <span>%</span>
+                          <span className="font-bold">₹{totalTax.toFixed(2)}</span>
+                        </div>
+                      </div>
                       <div className="pt-3 border-t border-dashed border-gray-300 dark:border-gray-600 flex justify-between items-end">
                            <span className="text-sm font-black uppercase text-gray-600 dark:text-gray-400">Grand Total</span>
                            <span className="text-4xl font-black text-primary">₹{grandTotal.toFixed(2)}</span>

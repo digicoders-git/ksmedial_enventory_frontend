@@ -12,7 +12,9 @@ const LocationMaster = () => {
     const [filters, setFilters] = useState({
         keyword: '',
         category: '',
-        status: ''
+        status: '',
+        startDate: '',
+        endDate: ''
     });
     
     // Pagination
@@ -269,6 +271,18 @@ const LocationMaster = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validation
+        if (!formData.aisle || !formData.rack || !formData.shelf || !formData.bin) {
+            Swal.fire({
+                title: 'Validation Error',
+                text: 'Please fill all required fields: Aisle, Rack, Shelf, and Bin',
+                icon: 'error',
+                confirmButtonColor: '#007242'
+            });
+            return;
+        }
+        
         try {
             if (currentLocation) {
                 await api.put(`/locations/${currentLocation._id}`, formData);
@@ -291,28 +305,50 @@ const LocationMaster = () => {
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-center gap-4">
-                <span className="text-sm font-bold text-gray-500">Filter results:</span>
-                <input 
-                    name="keyword"
-                    value={filters.keyword}
-                    onChange={handleFilterChange}
-                    placeholder="Search location name"
-                    className="px-3 py-2 border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary w-full md:w-64 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-                <select name="category" value={filters.category} onChange={handleFilterChange} className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none w-full md:w-auto">
-                    <option value="">Category</option>
-                    <option value="Picking">Picking</option>
-                    <option value="Reserve">Reserve</option>
-                </select>
-                <select name="status" value={filters.status} onChange={handleFilterChange} className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none w-full md:w-auto">
-                    <option value="">Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-                <button onClick={handleSearch} className="px-6 py-2 bg-cyan-500 text-white font-bold rounded-lg text-sm hover:bg-cyan-600 transition-colors w-full md:w-auto">
-                    Fetch Record
-                </button>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                    <div className="lg:col-span-1">
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Search Location</label>
+                        <input 
+                            name="keyword"
+                            value={filters.keyword}
+                            onChange={handleFilterChange}
+                            placeholder="Search location name"
+                            className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Category</label>
+                        <select name="category" value={filters.category} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none">
+                            <option value="">All Categories</option>
+                            <option value="Picking">Picking</option>
+                            <option value="Reserve">Reserve</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Status</label>
+                        <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none">
+                            <option value="">All Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Created From</label>
+                        <input 
+                            type="datetime-local"
+                            name="startDate"
+                            value={filters.startDate}
+                            onChange={handleFilterChange}
+                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-1 focus:ring-primary"
+                        />
+                    </div>
+                    <div>
+                        <button onClick={handleSearch} className="w-full px-6 py-2 bg-cyan-500 text-white font-bold rounded-lg text-sm hover:bg-cyan-600 transition-colors">
+                            Fetch Record
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Stats & Actions */}
@@ -460,20 +496,20 @@ const LocationMaster = () => {
                             </div>
                             
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Aisle</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Aisle <span className="text-red-500">*</span></label>
                                 <input value={formData.aisle} onChange={(e) => setFormData({...formData, aisle: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Rack</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Rack <span className="text-red-500">*</span></label>
                                 <input value={formData.rack} onChange={(e) => setFormData({...formData, rack: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
                             </div>
                             
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Shelf</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Shelf <span className="text-red-500">*</span></label>
                                 <input value={formData.shelf} onChange={(e) => setFormData({...formData, shelf: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Bin</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Bin <span className="text-red-500">*</span></label>
                                 <input value={formData.bin} onChange={(e) => setFormData({...formData, bin: e.target.value})} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
                             </div>
                              <div className="space-y-1">

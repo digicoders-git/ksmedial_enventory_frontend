@@ -561,8 +561,8 @@ const SalesReturn = () => {
             </div>
 
             {/* List View Filters */}
-             <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col xl:flex-row gap-4 justify-between items-center px-5 py-5">
-                <div className="relative w-full xl:w-96">
+             <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col lg:flex-row gap-4 justify-between items-center px-5 py-5">
+                <div className="relative w-full lg:w-96">
                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
                    <input 
                       type="text" 
@@ -573,23 +573,29 @@ const SalesReturn = () => {
                     />
                 </div>
                 
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
                     <div className="flex items-center gap-2 bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 transition-all focus-within:ring-2 focus-within:ring-red-500/10 w-full sm:w-auto">
                         <Calendar size={18} className="text-gray-400" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">From</span>
                         <input 
-                            type="date" 
+                            type="datetime-local" 
                             value={startDate} 
                             onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }} 
                             className="bg-transparent border-none outline-none text-xs text-gray-700 dark:text-gray-200 font-bold" 
                         />
-                        <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest px-1">TO</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 transition-all focus-within:ring-2 focus-within:ring-red-500/10 w-full sm:w-auto">
+                        <Calendar size={18} className="text-gray-400" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">To</span>
                         <input 
-                            type="date" 
+                            type="datetime-local" 
                             value={endDate} 
                             onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }} 
                             className="bg-transparent border-none outline-none text-xs text-gray-700 dark:text-gray-200 font-bold" 
                         />
                     </div>
+                    
                     {(startDate || endDate) && (
                         <button 
                             onClick={() => { setStartDate(''); setEndDate(''); setCurrentPage(1); }}

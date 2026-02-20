@@ -10,14 +10,12 @@ const MedicineList = () => {
   const navigate = useNavigate();
   const { inventory: medicines, deleteItem } = useInventory(); // Use inventory as medicines
 
-  // Pagination & Search States
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Filter & Pagination Logic
   const { filteredMedicines, totalPages, paginationInfo } = useMemo(() => {
-    // Step 1: Search Filter
     let filtered = medicines;
     
     if (searchTerm.trim()) {
@@ -31,7 +29,14 @@ const MedicineList = () => {
       );
     }
 
-    // Step 2: Pagination
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.createdAt || item.date);
+        return itemDate >= filterDate;
+      });
+    }
+
     const totalItems = filtered.length;
     const totalPgs = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -48,7 +53,7 @@ const MedicineList = () => {
         currentPage
       }
     };
-  }, [medicines, searchTerm, currentPage, itemsPerPage]);
+  }, [medicines, searchTerm, dateFilter, currentPage, itemsPerPage]);
 
   // Handlers
   const handleSearchChange = (value) => {

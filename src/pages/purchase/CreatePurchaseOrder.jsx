@@ -200,15 +200,49 @@ const CreatePurchaseOrder = () => {
 {/* calculateTotals Function Removed */}
 
     const handleSubmit = async (status = 'Draft') => {
+        // Validation 1: Check if items exist
         if (items.length === 0) {
-            Swal.fire('Error', 'Please add items to the order', 'error');
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Items Added',
+                text: 'Please add at least one item to the order',
+                confirmButtonColor: '#007242'
+            });
             return;
         }
 
-        // Validate Suppliers
+        // Validation 2: Check if all items have suppliers
         const missingSupplier = items.some(i => !i.supplierId);
         if (missingSupplier) {
-            Swal.fire('Error', 'Please select a supplier for all items', 'error');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Supplier Required',
+                text: 'Please select a supplier for all items',
+                confirmButtonColor: '#007242'
+            });
+            return;
+        }
+
+        // Validation 3: Check if all items have valid quantity
+        const invalidQty = items.some(i => !i.quantity || i.quantity <= 0);
+        if (invalidQty) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid Quantity',
+                text: 'All items must have quantity greater than 0',
+                confirmButtonColor: '#007242'
+            });
+            return;
+        }
+
+        // Validation 4: Check PO Date
+        if (!formData.poDate) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'PO Date Required',
+                text: 'Please select a PO date',
+                confirmButtonColor: '#007242'
+            });
             return;
         }
 
@@ -531,15 +565,22 @@ const CreatePurchaseOrder = () => {
                 <div className="xl:col-span-3 space-y-6">
                     {/* Step 2 Details Form */}
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <Calendar size={14} className="text-primary"/>
+                            Order Details
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Supplier Removal - Now global fields only */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">PO Date</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                    PO Date <span className="text-red-500">*</span>
+                                </label>
                                 <input 
                                     type="date"
                                     value={formData.poDate}
                                     onChange={(e) => setFormData({...formData, poDate: e.target.value})}
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-bold"
+                                    required
                                 />
                             </div>
                             <div>
@@ -548,6 +589,7 @@ const CreatePurchaseOrder = () => {
                                     type="date"
                                     value={formData.expectedDeliveryDate}
                                     onChange={(e) => setFormData({...formData, expectedDeliveryDate: e.target.value})}
+                                    min={formData.poDate}
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm font-bold"
                                 />
                             </div>
@@ -560,6 +602,16 @@ const CreatePurchaseOrder = () => {
                                     className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border-none rounded-xl text-sm font-bold text-gray-400 cursor-not-allowed"
                                 />
                             </div>
+                        </div>
+                        <div className="mt-4">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Notes (Optional)</label>
+                            <textarea 
+                                value={formData.notes}
+                                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                                placeholder="Add any special instructions or notes..."
+                                rows="3"
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none"
+                            />
                         </div>
                     </div>
 
@@ -577,8 +629,8 @@ const CreatePurchaseOrder = () => {
                                 <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs font-black text-gray-500 uppercase tracking-widest">
                                     <tr>
                                         <th className="px-6 py-4">Medicine Name</th>
-                                        <th className="px-6 py-4 w-64">Supplier</th>
-                                        <th className="px-6 py-4 w-32 text-center">Qty</th>
+                                        <th className="px-6 py-4 w-64">Supplier <span className="text-red-500">*</span></th>
+                                        <th className="px-6 py-4 w-32 text-center">Qty <span className="text-red-500">*</span></th>
                                         <th className="px-6 py-4 text-center w-20">Action</th>
                                     </tr>
                                 </thead>
@@ -605,16 +657,19 @@ const CreatePurchaseOrder = () => {
                                                         <select 
                                                             value={item.supplierId}
                                                             onChange={(e) => updateItem(index, 'supplierId', e.target.value)}
-                                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-sm font-medium"
+                                                            className={`w-full px-3 py-2 bg-white dark:bg-gray-900 border rounded-lg outline-none focus:border-primary text-sm font-medium ${
+                                                                !item.supplierId ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-700'
+                                                            }`}
+                                                            required
                                                         >
-                                                            <option value="">Select Supplier</option>
+                                                            <option value="">Select Supplier *</option>
                                                             {suppliers.map(s => (
                                                                 <option key={s._id} value={s._id}>{s.name}</option>
                                                             ))}
                                                         </select>
                                                         <button 
                                                             onClick={handleQuickAddSupplier}
-                                                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+                                                            className="px-2 py-1 bg-primary/10 hover:bg-primary/20 rounded text-primary transition-colors"
                                                             title="Add Supplier"
                                                         >
                                                             <Plus size={14} />
@@ -627,7 +682,10 @@ const CreatePurchaseOrder = () => {
                                                         min="1"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                                                        className="w-24 px-3 py-2 mx-auto bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:border-primary text-center font-bold"
+                                                        className={`w-24 px-3 py-2 mx-auto border rounded-lg outline-none focus:border-primary text-center font-bold ${
+                                                            !item.quantity || item.quantity <= 0 ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                        }`}
+                                                        required
                                                     />
                                                 </td>
                                                 <td className="px-6 py-4 text-center">

@@ -30,6 +30,8 @@ const InventoryMaster = () => {
         batch: '',
         location: '',
         tags: '',
+        startDate: '',
+        endDate: '',
         nearExpiry: false,
         lowStock: false
     });
@@ -394,6 +396,42 @@ const InventoryMaster = () => {
                         >
                             <Search size={14} strokeWidth={3} /> Fetch Record
                         </button>
+                    </div>
+                </div>
+                
+                {/* Date Range Row */}
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">From Date & Time</label>
+                            <input 
+                                type="datetime-local" 
+                                name="startDate"
+                                value={filters.startDate}
+                                onChange={handleFilterChange}
+                                className="w-full text-xs p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">To Date & Time</label>
+                            <input 
+                                type="datetime-local" 
+                                name="endDate"
+                                value={filters.endDate}
+                                onChange={handleFilterChange}
+                                className="w-full text-xs p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            {(filters.startDate || filters.endDate) && (
+                                <button 
+                                    onClick={() => setFilters({...filters, startDate: '', endDate: ''})}
+                                    className="w-full py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30"
+                                >
+                                    <X size={14} strokeWidth={3} /> Clear Dates
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

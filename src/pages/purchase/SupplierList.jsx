@@ -372,6 +372,27 @@ const SupplierList = () => {
       address: formData.get('address'),
     };
 
+    // Validation
+    if (!supplierData.name || supplierData.name.trim() === '') {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Company Name Required',
+        text: 'Please enter the company name',
+        confirmButtonColor: '#007242'
+      });
+      return;
+    }
+
+    if (!supplierData.phone || supplierData.phone.trim() === '') {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Phone Number Required',
+        text: 'Please enter the phone number',
+        confirmButtonColor: '#007242'
+      });
+      return;
+    }
+
     try {
       if (selectedSupplier) {
         // Edit mode

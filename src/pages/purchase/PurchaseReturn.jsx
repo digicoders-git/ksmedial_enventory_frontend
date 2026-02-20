@@ -20,6 +20,8 @@ const PurchaseReturn = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [itemsPerPage] = useState(10);
     const [totalEntries, setTotalEntries] = useState(0);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [stats, setStats] = useState({
         totalReturnsAmount: 0,
         pendingAdjustmentCount: 0,
@@ -47,7 +49,9 @@ const PurchaseReturn = () => {
                 params: {
                     pageNumber: currentPage,
                     pageSize: itemsPerPage,
-                    keyword: searchTerm
+                    keyword: searchTerm,
+                    startDate: startDate,
+                    endDate: endDate
                 }
             });
             if (data.success) {
@@ -63,7 +67,7 @@ const PurchaseReturn = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, itemsPerPage, searchTerm]);
+    }, [currentPage, itemsPerPage, searchTerm, startDate, endDate]);
 
     const fetchSuppliers = useCallback(async () => {
         try {
@@ -521,6 +525,43 @@ const PurchaseReturn = () => {
                                     >
                                         <Download size={18} /> Export List
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Date Range Filters */}
+                            <div className="bg-gray-50/50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                <div className="flex flex-col sm:flex-row items-center gap-3">
+                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap">Filter by Date:</span>
+                                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
+                                        <div className="relative flex-1">
+                                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                                            <input 
+                                                type="datetime-local" 
+                                                value={startDate}
+                                                onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                                                className="w-full pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                            />
+                                        </div>
+                                        <span className="text-gray-400 dark:text-gray-600 font-black text-[10px]">TO</span>
+                                        <div className="relative flex-1">
+                                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                                            <input 
+                                                type="datetime-local" 
+                                                value={endDate}
+                                                onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                                                className="w-full pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                            />
+                                        </div>
+                                        {(startDate || endDate) && (
+                                            <button 
+                                                onClick={() => { setStartDate(''); setEndDate(''); setCurrentPage(1); }}
+                                                className="p-2.5 bg-white dark:bg-gray-800 text-red-500 hover:text-red-600 rounded-xl shadow-sm transition-all active:scale-95 border border-red-100 dark:border-red-900/30 flex items-center justify-center"
+                                                title="Clear Date Filter"
+                                            >
+                                                <X size={16} strokeWidth={3} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

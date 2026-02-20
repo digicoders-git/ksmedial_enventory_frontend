@@ -533,13 +533,114 @@ const AddGRN = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Validation 1: Supplier
         if (!formData.supplierId) {
-            Swal.fire('Error', 'Please select a supplier', 'error');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Supplier Required',
+                text: 'Please select a supplier before submitting',
+                confirmButtonColor: '#10b981'
+            });
             return;
         }
 
+        // Validation 2: Invoice Date
+        if (!formData.invoiceDate) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invoice Date Required',
+                text: 'Please select the invoice date',
+                confirmButtonColor: '#10b981'
+            });
+            return;
+        }
+
+        // Validation 3: Items
         if (items.length === 0) {
-            Swal.fire('Error', 'Please add at least one item', 'error');
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Items Added',
+                text: 'Please add at least one item to the GRN',
+                confirmButtonColor: '#10b981'
+            });
+            return;
+        }
+
+        // Validation 4: Check each item for required fields
+        const invalidItems = [];
+        items.forEach((item, index) => {
+            const errors = [];
+            
+            if (!item.supplierSkuId || item.supplierSkuId.trim() === '') {
+                errors.push('Supplier SKU ID');
+            }
+            if (!item.skuId || item.skuId.trim() === '') {
+                errors.push('SKU ID');
+            }
+            if (!item.pack || item.pack.trim() === '') {
+                errors.push('Pack');
+            }
+            if (!item.batchNumber || item.batchNumber.trim() === '') {
+                errors.push('Batch Number');
+            }
+            if (!item.expiryDate) {
+                errors.push('Expiry Date');
+            }
+            if (!item.mfgDate) {
+                errors.push('Mfg Date');
+            }
+            if (!item.orderedQty || item.orderedQty <= 0) {
+                errors.push('Ordered Qty');
+            }
+            if (!item.receivedQty || item.receivedQty <= 0) {
+                errors.push('Received Qty');
+            }
+            if (!item.poRate || item.poRate <= 0) {
+                errors.push('PO Rate');
+            }
+            if (!item.ptr || item.ptr <= 0) {
+                errors.push('PTR');
+            }
+            if (!item.baseRate || item.baseRate <= 0) {
+                errors.push('Base Rate');
+            }
+            if (!item.hsnCode || item.hsnCode.trim() === '') {
+                errors.push('HSN Code');
+            }
+            if (item.cgst === undefined || item.cgst === null || item.cgst < 0) {
+                errors.push('CGST');
+            }
+            if (item.sgst === undefined || item.sgst === null || item.sgst < 0) {
+                errors.push('SGST');
+            }
+            if (!item.mrp || item.mrp <= 0) {
+                errors.push('MRP');
+            }
+            
+            if (errors.length > 0) {
+                invalidItems.push({
+                    index: index + 1,
+                    name: item.productName,
+                    errors: errors
+                });
+            }
+        });
+
+        if (invalidItems.length > 0) {
+            const errorList = invalidItems.map(item => 
+                `<div class="text-left mb-2">
+                    <strong>Item ${item.index}: ${item.name}</strong><br/>
+                    <span class="text-red-500 text-sm">Missing: ${item.errors.join(', ')}</span>
+                </div>`
+            ).join('');
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Incomplete Item Details',
+                html: `<div class="max-h-60 overflow-y-auto">${errorList}</div>`,
+                confirmButtonColor: '#10b981',
+                width: '600px'
+            });
             return;
         }
 
@@ -719,7 +820,9 @@ const AddGRN = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Supplier *</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                    Supplier <span className="text-red-500">*</span>
+                                </label>
                                 <select
                                     value={formData.supplierId}
                                     onChange={(e) => {
@@ -739,7 +842,7 @@ const AddGRN = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Number *</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Number</label>
                                 <input
                                     type="text"
                                     value={formData.invoiceNumber}
@@ -751,12 +854,16 @@ const AddGRN = () => {
                                 <p className="text-[10px] text-gray-400 mt-1 font-medium">Invoice number will be auto-generated</p>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Date</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                    Invoice Date <span className="text-red-500">*</span>
+                                </label>
                                 <input
                                     type="date"
                                     value={formData.invoiceDate}
                                     onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
+                                    max={new Date().toISOString().split('T')[0]}
                                     className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    required
                                 />
                             </div>
                             <div>
@@ -916,28 +1023,27 @@ const AddGRN = () => {
                         <table className="w-full text-left text-xs">
                             <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
                                 <tr>
-                                    <th className="py-3 px-3">Supplier SKU ID</th>
-                                    <th className="py-3 px-3">SKU ID</th>
+                                    <th className="py-3 px-3">Supplier SKU ID <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">SKU ID <span className="text-red-500">*</span></th>
                                     <th className="py-3 px-3">Name</th>
-                                    <th className="py-3 px-3">Pack</th>
-                                    <th className="py-3 px-3">Batch</th>
-                                    <th className="py-3 px-3">Expiry</th>
-                                    <th className="py-3 px-3">Mfg Date</th>
-                                    <th className="py-3 px-3">System MRP</th>
-                                    <th className="py-3 px-3">Ordered Qty</th>
-                                    <th className="py-3 px-3">Received Qty</th>
+                                    <th className="py-3 px-3">Pack <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Batch <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Expiry <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Mfg Date <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Ordered Qty <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Received Qty <span className="text-red-500">*</span></th>
                                     <th className="py-3 px-3">Physical Free</th>
                                     <th className="py-3 px-3">Scheme Free</th>
-                                    <th className="py-3 px-3">PO Rate</th>
-                                    <th className="py-3 px-3">PTR</th>
-                                    <th className="py-3 px-3">Base Rate</th>
+                                    <th className="py-3 px-3">PO Rate <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">PTR <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">Base Rate <span className="text-red-500">*</span></th>
                                     <th className="py-3 px-3">Scheme Disc</th>
                                     <th className="py-3 px-3">Disc %</th>
                                     <th className="py-3 px-3">Amount</th>
-                                    <th className="py-3 px-3">HSN Code</th>
-                                    <th className="py-3 px-3">CGST</th>
-                                    <th className="py-3 px-3">SGST</th>
-                                    <th className="py-3 px-3">MRP</th>
+                                    <th className="py-3 px-3">HSN Code <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">CGST <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">SGST <span className="text-red-500">*</span></th>
+                                    <th className="py-3 px-3">MRP <span className="text-red-500">*</span></th>
                                     <th className="py-3 px-3">Margin</th>
                                     <th className="py-3 px-3 text-center">Action</th>
                                 </tr>
@@ -954,30 +1060,101 @@ const AddGRN = () => {
                                     items.map((item, index) => (
                                         <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                                             <td className="py-2 px-3">
-                                                <input type="text" value={item.supplierSkuId} onChange={(e) => updateItem(index, 'supplierSkuId', e.target.value)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.supplierSkuId} 
+                                                    onChange={(e) => updateItem(index, 'supplierSkuId', e.target.value)} 
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.supplierSkuId ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    placeholder="Required"
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="text" value={item.skuId} onChange={(e) => updateItem(index, 'skuId', e.target.value)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.skuId} 
+                                                    onChange={(e) => updateItem(index, 'skuId', e.target.value)} 
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.skuId ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    placeholder="Required"
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3 font-bold text-gray-800 dark:text-white">{item.productName}</td>
                                             <td className="py-2 px-3">
-                                                <input type="text" value={item.pack} onChange={(e) => updateItem(index, 'pack', e.target.value)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.pack} 
+                                                    onChange={(e) => updateItem(index, 'pack', e.target.value)} 
+                                                    className={`w-16 px-2 py-1 border rounded text-xs ${
+                                                        !item.pack ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    placeholder="Required"
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="text" value={item.batchNumber} onChange={(e) => updateItem(index, 'batchNumber', e.target.value)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.batchNumber} 
+                                                    onChange={(e) => updateItem(index, 'batchNumber', e.target.value)} 
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.batchNumber ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    placeholder="Required"
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="date" value={item.expiryDate} onChange={(e) => updateItem(index, 'expiryDate', e.target.value)} className="w-28 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="date" 
+                                                    value={item.expiryDate} 
+                                                    onChange={(e) => updateItem(index, 'expiryDate', e.target.value)} 
+                                                    min={new Date().toISOString().split('T')[0]}
+                                                    className={`w-28 px-2 py-1 border rounded text-xs ${
+                                                        !item.expiryDate ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="date" value={item.mfgDate} onChange={(e) => updateItem(index, 'mfgDate', e.target.value)} className="w-28 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="date" 
+                                                    value={item.mfgDate} 
+                                                    onChange={(e) => updateItem(index, 'mfgDate', e.target.value)} 
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    className={`w-28 px-2 py-1 border rounded text-xs ${
+                                                        !item.mfgDate ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
-                                            <td className="py-2 px-3 text-gray-500">{item.systemMrp}</td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.orderedQty} onChange={(e) => updateItem(index, 'orderedQty', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.orderedQty} 
+                                                    onChange={(e) => updateItem(index, 'orderedQty', parseFloat(e.target.value) || 0)} 
+                                                    min="1"
+                                                    className={`w-16 px-2 py-1 border rounded text-xs ${
+                                                        !item.orderedQty || item.orderedQty <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.receivedQty} onChange={(e) => updateItem(index, 'receivedQty', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded text-xs font-bold" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.receivedQty} 
+                                                    onChange={(e) => updateItem(index, 'receivedQty', parseFloat(e.target.value) || 0)} 
+                                                    min="1"
+                                                    className={`w-16 px-2 py-1 border rounded text-xs font-bold ${
+                                                        !item.receivedQty || item.receivedQty <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
                                                 <input type="number" value={item.physicalFreeQty} onChange={(e) => updateItem(index, 'physicalFreeQty', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
@@ -986,13 +1163,43 @@ const AddGRN = () => {
                                                 <input type="number" value={item.schemeFreeQty} onChange={(e) => updateItem(index, 'schemeFreeQty', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.poRate} onChange={(e) => updateItem(index, 'poRate', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.poRate} 
+                                                    onChange={(e) => updateItem(index, 'poRate', parseFloat(e.target.value) || 0)} 
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.poRate || item.poRate <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.ptr} onChange={(e) => updateItem(index, 'ptr', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.ptr} 
+                                                    onChange={(e) => updateItem(index, 'ptr', parseFloat(e.target.value) || 0)} 
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.ptr || item.ptr <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.baseRate} onChange={(e) => updateItem(index, 'baseRate', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs font-bold" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.baseRate} 
+                                                    onChange={(e) => updateItem(index, 'baseRate', parseFloat(e.target.value) || 0)} 
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className={`w-20 px-2 py-1 border rounded text-xs font-bold ${
+                                                        !item.baseRate || item.baseRate <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
                                                 <input type="number" value={item.schemeDiscount} onChange={(e) => updateItem(index, 'schemeDiscount', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
@@ -1002,16 +1209,55 @@ const AddGRN = () => {
                                             </td>
                                             <td className="py-2 px-3 font-bold text-emerald-600">{item.amount.toFixed(2)}</td>
                                             <td className="py-2 px-3">
-                                                <input type="text" value={item.hsnCode} onChange={(e) => updateItem(index, 'hsnCode', e.target.value)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.hsnCode} 
+                                                    onChange={(e) => updateItem(index, 'hsnCode', e.target.value)} 
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.hsnCode ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    placeholder="Required"
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.cgst} onChange={(e) => updateItem(index, 'cgst', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.cgst} 
+                                                    onChange={(e) => updateItem(index, 'cgst', parseFloat(e.target.value) || 0)} 
+                                                    min="0"
+                                                    step="0.01"
+                                                    className={`w-16 px-2 py-1 border rounded text-xs ${
+                                                        item.cgst === undefined || item.cgst === null || item.cgst < 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.sgst} onChange={(e) => updateItem(index, 'sgst', parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.sgst} 
+                                                    onChange={(e) => updateItem(index, 'sgst', parseFloat(e.target.value) || 0)} 
+                                                    min="0"
+                                                    step="0.01"
+                                                    className={`w-16 px-2 py-1 border rounded text-xs ${
+                                                        item.sgst === undefined || item.sgst === null || item.sgst < 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input type="number" value={item.mrp} onChange={(e) => updateItem(index, 'mrp', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs" />
+                                                <input 
+                                                    type="number" 
+                                                    value={item.mrp} 
+                                                    onChange={(e) => updateItem(index, 'mrp', parseFloat(e.target.value) || 0)} 
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
+                                                        !item.mrp || item.mrp <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                    required
+                                                />
                                             </td>
                                             <td className="py-2 px-3 text-gray-500">{item.margin}%</td>
                                             <td className="py-2 px-3 text-center">

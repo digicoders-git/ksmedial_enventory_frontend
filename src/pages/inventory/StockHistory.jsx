@@ -15,7 +15,9 @@ const StockHistory = () => {
     // Given the context used 'ADJUSTMENT' source for manual adjustments.
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('ADJUSTMENT'); // Default to Adjustment history
+    const [filterType, setFilterType] = useState('ADJUSTMENT');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -26,10 +28,8 @@ const StockHistory = () => {
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(t => {
-            // Filter by Type
             if (filterType !== 'ALL' && t.source !== filterType) return false;
             
-            // Search
             const searchLower = searchTerm.toLowerCase();
             const matchesSearch = 
                 t.items?.[0]?.name?.toLowerCase().includes(searchLower) ||
@@ -37,9 +37,17 @@ const StockHistory = () => {
                 t.reason?.toLowerCase().includes(searchLower) ||
                 t.reference?.toLowerCase().includes(searchLower);
 
-            return matchesSearch;
+            if (!matchesSearch) return false;
+
+            if (startDate || endDate) {
+                const transDate = new Date(t.date);
+                if (startDate && transDate < new Date(startDate)) return false;
+                if (endDate && transDate > new Date(endDate)) return false;
+            }
+
+            return true;
         });
-    }, [transactions, filterType, searchTerm]);
+    }, [transactions, filterType, searchTerm, startDate, endDate]);
 
     // Pagination
     const totalItems = filteredTransactions.length;
@@ -73,25 +81,49 @@ const StockHistory = () => {
             </div>
 
             {/* Controls */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col md:flex-row justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder="Search by Product, Adjuster, Reason..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm font-medium"
-                    />
-                </div>
-                
-                <div className="flex gap-2 relative">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                    <div className="lg:col-span-1">
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Search</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="Product, Adjuster, Reason..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm font-medium"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">From Date & Time</label>
+                        <input 
+                            type="datetime-local" 
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm font-medium"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">To Date & Time</label>
+                        <input 
+                            type="datetime-local" 
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm font-medium"
+                        />
+                    </div>
+                    
                     <div className="relative">
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Type Filter</label>
                         <button 
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                            className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                            className="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-between gap-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         >
-                            <Filter size={14} strokeWidth={2.5} /> {filterType === 'ADJUSTMENT' ? 'Adjustments Only' : filterType === 'ALL' ? 'All Transactions' : filterType}
+                            <span className="flex items-center gap-2"><Filter size={14} strokeWidth={2.5} /> {filterType === 'ADJUSTMENT' ? 'Adjustments' : filterType === 'ALL' ? 'All' : filterType}</span>
                         </button>
                         
                         {showFilterDropdown && (
@@ -104,6 +136,17 @@ const StockHistory = () => {
                         )}
                     </div>
                 </div>
+                
+                {(startDate || endDate) && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+                        <button 
+                            onClick={() => { setStartDate(''); setEndDate(''); }}
+                            className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-2 border border-red-200 dark:border-red-900/30"
+                        >
+                            <X size={14} strokeWidth={3} /> Clear Date Filter
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
