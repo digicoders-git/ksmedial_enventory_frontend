@@ -119,10 +119,10 @@ export const InventoryProvider = ({ children }) => {
                      reason: 'Purchase',
                      reference: p.invoiceNumber,
                      date: p.purchaseDate || p.createdAt,
-                     totalQty: p.items.reduce((acc, i) => acc + i.quantity, 0),
+                     totalQty: p.items.reduce((acc, i) => acc + (i.receivedQty || 0), 0),
                      items: p.items.map(i => ({
-                         name: i.name || 'Product',
-                         qty: i.quantity,
+                         name: i.productName || 'Product',
+                         qty: i.receivedQty || 0,
                          price: i.purchasePrice,
                          batch: i.batchNumber || 'N/A',
                          sku: 'N/A'
@@ -141,12 +141,12 @@ export const InventoryProvider = ({ children }) => {
                      reason: 'Sale Return',
                      reference: r.returnNumber,
                      date: r.createdAt,
-                     totalQty: r.items.reduce((acc, i) => acc + i.quantity, 0),
+                     totalQty: r.items.reduce((acc, i) => acc + (i.quantity || 0), 0),
                      items: r.items.map(i => ({
-                         name: i.name || 'Product',
-                         qty: i.quantity,
+                         name: i.productName || i.name || 'Product',
+                         qty: i.quantity || 0,
                          price: i.price || 0,
-                         batch: i.batchNumber || 'N/A',
+                         batch: i.batchNumber || i.productId?.batchNumber || 'N/A',
                          sku: 'N/A'
                      })),
                      totalAmount: r.totalAmount
@@ -168,8 +168,8 @@ export const InventoryProvider = ({ children }) => {
                          name: i.productId?.name || 'Product',
                          qty: i.returnQuantity || i.quantity,
                          price: i.purchasePrice || 0,
-                         batch: 'N/A',
-                         sku: 'N/A'
+                         batch: i.batchNumber || i.productId?.batchNumber || 'N/A',
+                         sku: i.productId?.sku || 'N/A'
                      })),
                      totalAmount: r.totalAmount
                  }));

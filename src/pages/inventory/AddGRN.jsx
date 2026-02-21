@@ -413,37 +413,44 @@ const AddGRN = () => {
             return;
         }
 
+        // Handle various possible price field names from backend
+        const purchaseRate = product.purchasePrice || product.rate || 0;
+        const mrpPrice = product.mrp || product.sellingPrice || 0;
+
         const newItem = {
             productId: product._id,
             productName: product.name,
             supplierSkuId: '',
             skuId: product.sku || '',
-            pack: product.packSize || '',
-            batchNumber: '',
-            expiryDate: '',
-            mfgDate: '',
-            systemMrp: product.mrp || 0,
-            orderedQty: 0,
-            receivedQty: 0,
+            pack: product.packing || product.packSize || '',
+            // Fallback keys for batch and dates to handle different API responses
+            batchNumber: (product.batchNumber && product.batchNumber !== 'N/A') ? product.batchNumber : (product.batchNo || ''),
+            expiryDate: (product.expiryDate && product.expiryDate !== 'N/A') ? product.expiryDate : (product.expiry || ''),
+            mfgDate: (product.manufacturingDate && product.manufacturingDate !== 'N/A') ? product.manufacturingDate : (product.mfgDate || ''),
+            systemMrp: mrpPrice,
+            orderedQty: 1, // Defaulting to 1 to avoid zero amount
+            receivedQty: 1, // Defaulting to 1 as requested
             physicalFreeQty: 0,
             schemeFreeQty: 0,
-            poRate: 0,
-            ptr: 0,
-            baseRate: 0,
+            poRate: purchaseRate,
+            ptr: product.ptr || 0,
+            baseRate: purchaseRate,
             schemeDiscount: 0,
             discountPercent: 0,
-            amount: 0,
+            amount: purchaseRate, // Calculate initial amount
             hsnCode: product.hsnCode || '',
-            cgst: 0,
-            sgst: 0,
+            cgst: product.tax ? (product.tax / 2) : 0,
+            sgst: product.tax ? (product.tax / 2) : 0,
             igst: 0,
-            purchasePrice: product.purchasePrice || 0,
-            sellingPrice: product.sellingPrice || 0,
-            mrp: product.mrp || 0,
-            margin: 0
+            purchasePrice: purchaseRate,
+            sellingPrice: product.sellingPrice || mrpPrice,
+            mrp: mrpPrice,
+            margin: purchaseRate > 0 ? ((mrpPrice - purchaseRate) / purchaseRate * 100).toFixed(2) : 0
         };
 
-        setItems([...items, newItem]);
+        const updatedItems = [...items, newItem];
+        setItems(updatedItems);
+        calculateSummary(updatedItems); // Immediately update summary
         setProductSearch('');
         setShowResults(false);
     };
@@ -452,19 +459,17 @@ const AddGRN = () => {
         const updatedItems = [...items];
         updatedItems[index][field] = value;
 
-        // Auto-calculate amount
-        if (['baseRate', 'receivedQty', 'discountPercent'].includes(field)) {
-            const item = updatedItems[index];
+        const item = updatedItems[index];
+
+        // Auto-calculate amount and margin based on updated fields
+        if (['baseRate', 'receivedQty', 'discountPercent', 'mrp'].includes(field)) {
             const baseAmount = (item.baseRate || 0) * (item.receivedQty || 0);
             const discountAmount = baseAmount * ((item.discountPercent || 0) / 100);
             item.amount = baseAmount - discountAmount;
-        }
-
-        // Auto-calculate margin
-        if (['purchasePrice', 'sellingPrice'].includes(field)) {
-            const item = updatedItems[index];
-            if (item.purchasePrice > 0) {
-                item.margin = ((item.sellingPrice - item.purchasePrice) / item.purchasePrice * 100).toFixed(2);
+            
+            // Recalculate margin when rate or MRP changes
+            if (item.baseRate > 0) {
+                item.margin = ((item.mrp - item.baseRate) / item.baseRate * 100).toFixed(2);
             }
         }
 
