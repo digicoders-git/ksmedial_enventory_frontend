@@ -197,6 +197,23 @@ const PutAwayBucket = () => {
     const handleCompletePutAway = async () => {
         if (!selectedItem) return;
 
+        // Validation: Check if all items have rack location
+        const missingRack = verifiedItems.filter(item => !item.rack || item.rack.trim() === '');
+        if (missingRack.length > 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Rack Location Required',
+                html: `<div class="text-left">
+                    <p class="mb-2">Please assign rack location for all items:</p>
+                    <ul class="list-disc pl-5 text-sm text-red-600">
+                        ${missingRack.map(item => `<li>${item.productName || item.name}</li>`).join('')}
+                    </ul>
+                </div>`,
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
+
         if (filters.putAwayType === 'Sales Return Receiving') {
             handleCompleteSaleReturn();
             return;
@@ -481,8 +498,42 @@ const PutAwayBucket = () => {
     const handleCreateLocation = async () => {
         try {
             const { aisle, rack, shelf, bin, category } = newLocationData;
-            if (!aisle || !rack || !shelf || !bin) {
-                Swal.fire('Error', 'Please fill all location fields (Aisle, Rack, Shelf, Bin)', 'error');
+            
+            // Validation
+            if (!aisle || aisle.trim() === '') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Aisle Required',
+                    text: 'Please enter the aisle value',
+                    confirmButtonColor: '#3085d6'
+                });
+                return;
+            }
+            if (!rack || rack.trim() === '') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Rack Required',
+                    text: 'Please enter the rack value',
+                    confirmButtonColor: '#3085d6'
+                });
+                return;
+            }
+            if (!shelf || shelf.trim() === '') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Shelf Required',
+                    text: 'Please enter the shelf value',
+                    confirmButtonColor: '#3085d6'
+                });
+                return;
+            }
+            if (!bin || bin.trim() === '') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Bin Required',
+                    text: 'Please enter the bin value',
+                    confirmButtonColor: '#3085d6'
+                });
                 return;
             }
             
@@ -940,39 +991,59 @@ const PutAwayBucket = () => {
                          </div>
                          <div className="grid grid-cols-2 gap-4">
                              <div>
-                                 <label className="text-xs text-gray-500 font-bold uppercase">Aisle</label>
+                                 <label className="text-xs text-gray-500 font-bold uppercase">
+                                     Aisle <span className="text-red-500">*</span>
+                                 </label>
                                  <input 
-                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary/50 ${
+                                        !newLocationData.aisle ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600'
+                                    }`}
                                     value={newLocationData.aisle}
                                     onChange={(e) => setNewLocationData(p => ({...p, aisle: e.target.value}))}
                                     placeholder="e.g. A1"
+                                    required
                                  />
                              </div>
                              <div>
-                                 <label className="text-xs text-gray-500 font-bold uppercase">Rack</label>
+                                 <label className="text-xs text-gray-500 font-bold uppercase">
+                                     Rack <span className="text-red-500">*</span>
+                                 </label>
                                  <input 
-                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary/50 ${
+                                        !newLocationData.rack ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600'
+                                    }`}
                                     value={newLocationData.rack}
                                     onChange={(e) => setNewLocationData(p => ({...p, rack: e.target.value}))}
                                     placeholder="e.g. R01"
+                                    required
                                  />
                              </div>
                              <div>
-                                 <label className="text-xs text-gray-500 font-bold uppercase">Shelf</label>
+                                 <label className="text-xs text-gray-500 font-bold uppercase">
+                                     Shelf <span className="text-red-500">*</span>
+                                 </label>
                                  <input 
-                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary/50 ${
+                                        !newLocationData.shelf ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600'
+                                    }`}
                                     value={newLocationData.shelf}
                                     onChange={(e) => setNewLocationData(p => ({...p, shelf: e.target.value}))}
                                     placeholder="e.g. S01"
+                                    required
                                  />
                              </div>
                              <div>
-                                 <label className="text-xs text-gray-500 font-bold uppercase">Bin</label>
+                                 <label className="text-xs text-gray-500 font-bold uppercase">
+                                     Bin <span className="text-red-500">*</span>
+                                 </label>
                                  <input 
-                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary/50 ${
+                                        !newLocationData.bin ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600'
+                                    }`}
                                     value={newLocationData.bin}
                                     onChange={(e) => setNewLocationData(p => ({...p, bin: e.target.value}))}
                                     placeholder="e.g. B1"
+                                    required
                                  />
                              </div>
                          </div>

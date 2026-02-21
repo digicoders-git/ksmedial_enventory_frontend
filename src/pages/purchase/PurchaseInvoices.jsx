@@ -330,20 +330,20 @@ const PurchaseInvoices = () => {
                                         <div className="relative flex-1 sm:flex-none">
                                             <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
                                             <input 
-                                                type="date" 
+                                                type="datetime-local" 
                                                 value={startDate}
                                                 onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
-                                                className="w-full sm:w-40 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                                className="w-full sm:w-48 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                                             />
                                         </div>
                                         <span className="text-gray-400 dark:text-gray-600 font-black text-[10px] hidden sm:block">TO</span>
                                         <div className="relative flex-1 sm:flex-none">
                                             <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
                                             <input 
-                                                type="date" 
+                                                type="datetime-local" 
                                                 value={endDate}
                                                 onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
-                                                className="w-full sm:w-40 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                                className="w-full sm:w-48 pl-9 pr-2 py-2.5 bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 rounded-xl text-[11px] font-black text-gray-800 dark:text-white uppercase outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                                             />
                                         </div>
                                     </div>

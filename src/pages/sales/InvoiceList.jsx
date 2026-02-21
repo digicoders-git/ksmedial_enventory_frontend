@@ -303,7 +303,7 @@ const InvoiceList = () => {
 
             {/* Advanced Filters */}
             <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase text-gray-500">Search</label>
                         <div className="relative">
@@ -320,23 +320,25 @@ const InvoiceList = () => {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-gray-500">Date Range</label>
-                        < div className="flex gap-2">
-                            <input 
-                                type="date"
-                                name="startDate"
-                                value={filters.startDate}
-                                onChange={handleFilterChange}
-                                className="w-full px-2 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                             <input 
-                                type="date"
-                                name="endDate"
-                                value={filters.endDate}
-                                onChange={handleFilterChange}
-                                className="w-full px-2 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                        </div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500">Start Date & Time</label>
+                        <input 
+                            type="datetime-local"
+                            name="startDate"
+                            value={filters.startDate}
+                            onChange={handleFilterChange}
+                            className="w-full px-2 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase text-gray-500">End Date & Time</label>
+                        <input 
+                            type="datetime-local"
+                            name="endDate"
+                            value={filters.endDate}
+                            onChange={handleFilterChange}
+                            className="w-full px-2 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
                     </div>
 
                     <div className="space-y-1">

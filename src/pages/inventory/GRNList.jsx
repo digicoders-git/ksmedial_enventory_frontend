@@ -237,58 +237,70 @@ Status: ${grn.status}
             </div>
 
             {/* Filter Section */}
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {/* ID */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">ID</label>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">ID</label>
                         <input 
                             name="id" 
-                            placeholder="Search ID" 
+                            placeholder="Search by ID" 
                             value={filters.id} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-24 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
                         />
                     </div>
                     
                     {/* Invoice Number */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">Invoice Number</label>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Invoice Number</label>
                         <input 
                             name="invoiceNumber" 
-                            placeholder="Invoice #" 
+                            placeholder="Search invoice #" 
                             value={filters.invoiceNumber} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-28 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
+                        />
+                    </div>
+
+                    {/* Supplier */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Supplier</label>
+                        <input 
+                            name="supplierName" 
+                            placeholder="Supplier name" 
+                            value={filters.supplierName} 
+                            onChange={handleFilterChange} 
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
                         />
                     </div>
 
                     {/* Priority */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">Priority</label>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Priority</label>
                         <select 
                             name="priority" 
                             value={filters.priority} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-20 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all font-bold"
                         >
-                            <option value="">All</option>
-                            <option value="P1">P1</option>
-                            <option value="P2">P2</option>
-                            <option value="P3">P3</option>
+                            <option value="">All Priorities</option>
+                            <option value="P1">P1 - High</option>
+                            <option value="P2">P2 - Medium</option>
+                            <option value="P3">P3 - Low</option>
                         </select>
                     </div>
                     
                     {/* Status */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">Status</label>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</label>
                         <select 
                             name="status" 
                             value={filters.status} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-28 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all font-bold"
                         >
-                            <option value="">All</option>
+                            <option value="">All Status</option>
                             <option value="Received">Received</option>
                             <option value="Pending">Pending</option>
                             <option value="Putaway_Pending">Putaway Pending</option>
@@ -297,46 +309,60 @@ Status: ${grn.status}
                     </div>
 
                     {/* Put Away Status */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">Put Away Status</label>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Put Away Status</label>
                         <select 
                             name="putAwayStatus" 
                             value={filters.putAwayStatus} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-28 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all font-bold"
                         >
-                            <option value="">All</option>
+                            <option value="">All Status</option>
                             <option value="Completed">Completed</option>
                             <option value="Pending">Pending</option>
                             <option value="Not Started">Not Started</option>
                         </select>
                     </div>
 
-                    {/* Supplier */}
-                    <div className="flex items-center gap-1">
-                        <label className="text-[10px] font-semibold text-gray-600 uppercase whitespace-nowrap">Supplier</label>
+                    {/* Start Date */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Start Date & Time</label>
                         <input 
-                            name="supplierName" 
-                            placeholder="Supplier Name" 
-                            value={filters.supplierName} 
+                            type="datetime-local"
+                            name="startDate" 
+                            value={filters.startDate} 
                             onChange={handleFilterChange} 
-                            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs w-28 outline-none focus:border-cyan-500"
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all font-bold"
+                        />
+                    </div>
+
+                    {/* End Date */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">End Date & Time</label>
+                        <input 
+                            type="datetime-local"
+                            name="endDate" 
+                            value={filters.endDate} 
+                            onChange={handleFilterChange} 
+                            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all font-bold"
                         />
                     </div>
 
                     {/* Action Buttons */}
-                    <button 
-                        onClick={handleSearch} 
-                        className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase px-3 py-1 rounded text-[10px] transition-all ml-auto"
-                    >
-                        Search
-                    </button>
-                    <button 
-                        onClick={clearFilters} 
-                        className="bg-gray-400 hover:bg-gray-500 text-white font-bold uppercase px-3 py-1 rounded text-[10px] transition-all"
-                    >
-                        Clear
-                    </button>
+                    <div className="flex items-end gap-2 lg:col-span-2">
+                        <button 
+                            onClick={handleSearch} 
+                            className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase px-4 py-2 rounded-lg text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <Search size={16} /> Search
+                        </button>
+                        <button 
+                            onClick={clearFilters} 
+                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold uppercase rounded-lg text-sm transition-all flex items-center gap-2"
+                        >
+                            <X size={16} /> Clear
+                        </button>
+                    </div>
                 </div>
             </div>
 

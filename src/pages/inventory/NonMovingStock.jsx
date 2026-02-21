@@ -6,6 +6,7 @@ const NonMovingStock = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -53,7 +54,6 @@ const NonMovingStock = () => {
     };
 
 
-    // Filter and Pagination
     const { filteredProducts, totalPages, paginationInfo } = useMemo(() => {
         let filtered = products;
 
@@ -63,6 +63,14 @@ const NonMovingStock = () => {
                 p.name.toLowerCase().includes(searchLower) || 
                 p.sku?.toLowerCase().includes(searchLower)
             );
+        }
+
+        if (dateFilter) {
+            const filterDate = new Date(dateFilter);
+            filtered = filtered.filter(p => {
+                const createdDate = new Date(p.createdAt);
+                return createdDate >= filterDate;
+            });
         }
 
         const totalItems = filtered.length;
@@ -81,7 +89,7 @@ const NonMovingStock = () => {
                 currentPage
             }
         };
-    }, [products, searchTerm, currentPage, itemsPerPage]);
+    }, [products, searchTerm, dateFilter, currentPage, itemsPerPage]);
 
     const handleSearchChange = (val) => {
         setSearchTerm(val);
@@ -135,20 +143,44 @@ const NonMovingStock = () => {
 
             {/* List */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between gap-4 bg-gray-50/30 dark:bg-gray-700/30">
-                    <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <AlertTriangle size={18} className="text-orange-500" /> Stagnant Inventory List
-                    </h3>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                        <input 
-                            type="text" 
-                            placeholder="Search Name or SKU..." 
-                            value={searchTerm}
-                            onChange={(e) => handleSearchChange(e.target.value)}
-                            className="pl-9 pr-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:border-primary outline-none w-64" 
-                        />
+                <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-700/30">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                        <div className="md:col-span-1">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-2">
+                                <AlertTriangle size={18} className="text-orange-500" /> Stagnant Inventory List
+                            </h3>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Added After Date</label>
+                            <input 
+                                type="datetime-local" 
+                                value={dateFilter}
+                                onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
+                                className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:border-primary outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <label className="text-[10px] font-black uppercase text-gray-500 mb-1 block">Search</label>
+                            <Search className="absolute left-3 top-[34px] -translate-y-1/2 text-gray-400" size={14} />
+                            <input 
+                                type="text" 
+                                placeholder="Name or SKU..." 
+                                value={searchTerm}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:border-primary outline-none" 
+                            />
+                        </div>
                     </div>
+                    {dateFilter && (
+                        <div className="mt-3 flex justify-end">
+                            <button 
+                                onClick={() => { setDateFilter(''); setCurrentPage(1); }}
+                                className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase rounded-lg flex items-center gap-1 border border-red-200 dark:border-red-900/30"
+                            >
+                                <X size={12} /> Clear Date
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto">

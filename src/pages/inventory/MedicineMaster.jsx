@@ -364,8 +364,33 @@ const MedicineMaster = () => {
           return;
       }
 
-      if (!formData.name) {
-         Swal.fire('Required', 'Medicine Name is required', 'warning');
+      // Validation for all mandatory fields
+      const missingFields = [];
+      if (!formData.name) missingFields.push('Medicine Name');
+      if (!formData.barcode) missingFields.push('SKU/Barcode');
+      if (!formData.genericName) missingFields.push('Generic Name');
+      if (!formData.company) missingFields.push('Manufacturer');
+      if (!formData.unit) missingFields.push('Base Unit');
+      if (!formData.group) missingFields.push('Medicine Group');
+      if (!formData.category) missingFields.push('Category');
+      if (!formData.packing) missingFields.push('Packing');
+      if (!formData.hsnCode) missingFields.push('HSN Code');
+      if (!formData.tax) missingFields.push('GST Tax');
+      if (!formData.rackLocation) missingFields.push('Rack Location');
+      if (!formData.purchasePrice) missingFields.push('Purchase Price');
+      if (!formData.sellingPrice) missingFields.push('Selling Price');
+      if (!formData.minLevel) missingFields.push('Min Stock Level');
+      if (!formData.batchNumber) missingFields.push('Batch Number');
+      if (!formData.manufacturingDate) missingFields.push('Manufacturing Date');
+      if (!formData.expiryDate) missingFields.push('Expiry Date');
+
+      if (missingFields.length > 0) {
+         Swal.fire({
+            title: 'Required Fields Missing',
+            html: `<div class="text-left"><p class="mb-2 font-bold">Please fill the following mandatory fields:</p><ul class="list-disc pl-5">${missingFields.map(f => `<li>${f}</li>`).join('')}</ul></div>`,
+            icon: 'error',
+            confirmButtonColor: '#007242'
+         });
          return;
       }
 
@@ -386,11 +411,9 @@ const MedicineMaster = () => {
         isPrescriptionRequired: formData.isPrescriptionRequired,
         group: formData.group,
         category: formData.category,
-        group: formData.group,
-        category: formData.category,
-        batchNumber: formData.batchNumber || 'N/A',
+        batchNumber: formData.batchNumber,
         manufacturingDate: formData.manufacturingDate || 'N/A',
-        expiryDate: formData.expiryDate || 'N/A',
+        expiryDate: formData.expiryDate,
         image: imagePreview
       };
 
@@ -614,7 +637,7 @@ const MedicineMaster = () => {
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Generic Name</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Generic Name <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
                       name="genericName"
@@ -626,7 +649,7 @@ const MedicineMaster = () => {
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Manufacturer</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Manufacturer <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
                       name="company"
@@ -638,7 +661,7 @@ const MedicineMaster = () => {
                  </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Medicine Group</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Medicine Group <span className="text-red-500">*</span></label>
                     <div className="flex gap-2">
                       <select 
                         name="group"
@@ -683,7 +706,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Therapeutic Category</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Therapeutic Category <span className="text-red-500">*</span></label>
                     <div className="flex gap-2">
                         <select 
                           name="category"
@@ -728,7 +751,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Base Unit</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Base Unit <span className="text-red-500">*</span></label>
                     <div className="flex gap-2">
                        <select 
                          name="unit"
@@ -763,9 +786,8 @@ const MedicineMaster = () => {
                     </div>
                   </div>
 
-                 {/* Packing - Advanced */}
                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Packing (e.g. 1x15)</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Packing (e.g. 1x15) <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
                       name="packing"
@@ -800,9 +822,8 @@ const MedicineMaster = () => {
                
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
-                  {/* Batch Number */}
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Batch Number</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Batch Number <span className="text-red-500">*</span></label>
                      <div className="relative flex gap-2">
                         <input 
                            type="text" 
@@ -827,9 +848,8 @@ const MedicineMaster = () => {
                      </div>
                   </div>
 
-                  {/* Manufacturing Date */}
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Manufacturing Date</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Manufacturing Date <span className="text-red-500">*</span></label>
                      <input 
                        type="date" 
                        name="manufacturingDate"
@@ -839,9 +859,8 @@ const MedicineMaster = () => {
                      />
                   </div>
 
-                  {/* Expiry Date */}
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Expiry Date</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Expiry Date <span className="text-red-500">*</span></label>
                      <input 
                        type="date" 
                        name="expiryDate"
@@ -862,7 +881,7 @@ const MedicineMaster = () => {
                
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">HSN Code</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">HSN Code <span className="text-red-500">*</span></label>
                      <input 
                        type="text" 
                        name="hsnCode"
@@ -874,7 +893,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">GST Tax (%)</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">GST Tax (%) <span className="text-red-500">*</span></label>
                      <select 
                        name="tax"
                        value={formData.tax}
@@ -890,7 +909,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Rack / Shelf Location</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Rack / Shelf Location <span className="text-red-500">*</span></label>
                      <select 
                        name="rackLocation"
                        value={formData.rackLocation}
@@ -917,7 +936,7 @@ const MedicineMaster = () => {
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Purchase Price (Rate)</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Purchase Price (Rate) <span className="text-red-500">*</span></label>
                      <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₹</span>
                         <input 
@@ -932,7 +951,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Selling Price (MRP)</label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Selling Price (MRP) <span className="text-red-500">*</span></label>
                      <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₹</span>
                         <input 
@@ -976,7 +995,7 @@ const MedicineMaster = () => {
 
                <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Low Stock Alert Level</label>
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Low Stock Alert Level <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <input 
                         type="number" 

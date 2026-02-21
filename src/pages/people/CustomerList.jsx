@@ -126,22 +126,45 @@ const CustomerList = () => {
         Swal.fire({
             title: 'Add New Customer',
             html: `
-                <input id="swal-name" class="swal2-input" placeholder="Full Name">
-                <input id="swal-phone" class="swal2-input" placeholder="Mobile Number">
-                <input id="swal-address" class="swal2-input" placeholder="Address / Location">
-                <input id="swal-opening-bal" class="swal2-input" type="number" placeholder="Opening Balance (Pending)">
+                <div class="text-left space-y-3 p-2">
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Full Name <span class="text-red-500">*</span></label>
+                        <input id="swal-name" class="swal2-input !m-0 w-full" placeholder="Enter full name">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Mobile Number <span class="text-red-500">*</span></label>
+                        <input id="swal-phone" class="swal2-input !m-0 w-full" placeholder="Enter mobile number">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Address / Location</label>
+                        <input id="swal-address" class="swal2-input !m-0 w-full" placeholder="Enter address (optional)">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Opening Balance</label>
+                        <input id="swal-opening-bal" class="swal2-input !m-0 w-full" type="number" placeholder="Pending amount (optional)">
+                    </div>
+                </div>
             `,
             confirmButtonText: 'Add Customer',
             confirmButtonColor: '#007242',
             showCancelButton: true,
             preConfirm: () => {
-                const name = document.getElementById('swal-name').value;
-                const phone = document.getElementById('swal-phone').value;
-                const address = document.getElementById('swal-address').value;
+                const name = document.getElementById('swal-name').value.trim();
+                const phone = document.getElementById('swal-phone').value.trim();
+                const address = document.getElementById('swal-address').value.trim();
                 const pending = document.getElementById('swal-opening-bal').value;
 
-                if (!name || !phone) {
-                    Swal.showValidationMessage('Name and Mobile are required');
+                if (!name) {
+                    Swal.showValidationMessage('Customer name is required');
+                    return false;
+                }
+                if (!phone) {
+                    Swal.showValidationMessage('Mobile number is required');
+                    return false;
+                }
+                if (phone.length < 10) {
+                    Swal.showValidationMessage('Please enter a valid 10-digit mobile number');
+                    return false;
                 }
                 return { name, phone, address, pendingAmount: pending || 0 };
             }
@@ -291,19 +314,42 @@ const CustomerList = () => {
         Swal.fire({
             title: 'Edit Customer',
             html: `
-                <input id="swal-edit-name" class="swal2-input" value="${customer.name}" placeholder="Full Name">
-                <input id="swal-edit-phone" class="swal2-input" value="${customer.phone}" placeholder="Mobile Number">
-                <input id="swal-edit-address" class="swal2-input" value="${customer.address || ''}" placeholder="Address">
+                <div class="text-left space-y-3 p-2">
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Full Name <span class="text-red-500">*</span></label>
+                        <input id="swal-edit-name" class="swal2-input !m-0 w-full" value="${customer.name}" placeholder="Full Name">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Mobile Number <span class="text-red-500">*</span></label>
+                        <input id="swal-edit-phone" class="swal2-input !m-0 w-full" value="${customer.phone}" placeholder="Mobile Number">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase block mb-1">Address</label>
+                        <input id="swal-edit-address" class="swal2-input !m-0 w-full" value="${customer.address || ''}" placeholder="Address">
+                    </div>
+                </div>
             `,
             confirmButtonText: 'Update Details',
             confirmButtonColor: '#007242',
             showCancelButton: true,
             preConfirm: () => {
-                return {
-                    name: document.getElementById('swal-edit-name').value,
-                    phone: document.getElementById('swal-edit-phone').value,
-                    address: document.getElementById('swal-edit-address').value
-                };
+                const name = document.getElementById('swal-edit-name').value.trim();
+                const phone = document.getElementById('swal-edit-phone').value.trim();
+                const address = document.getElementById('swal-edit-address').value.trim();
+                
+                if (!name) {
+                    Swal.showValidationMessage('Customer name is required');
+                    return false;
+                }
+                if (!phone) {
+                    Swal.showValidationMessage('Mobile number is required');
+                    return false;
+                }
+                if (phone.length < 10) {
+                    Swal.showValidationMessage('Please enter a valid 10-digit mobile number');
+                    return false;
+                }
+                return { name, phone, address };
             }
         }).then(async (result) => {
             if (result.isConfirmed) {
