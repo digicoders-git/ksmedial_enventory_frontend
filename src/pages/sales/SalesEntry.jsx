@@ -28,6 +28,8 @@ const SalesEntry = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showPatientNameSuggestions, setShowPatientNameSuggestions] = useState(false);
+  const [showPatientMobileSuggestions, setShowPatientMobileSuggestions] = useState(false);
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [loading, setLoading] = useState(true);
   const [customGst, setCustomGst] = useState('');
@@ -35,6 +37,9 @@ const SalesEntry = () => {
   // Focus Refs
   const itemSearchRef = useRef(null);
   const customerInputRef = useRef(null);
+  const patientNameRef = useRef(null);
+  const patientMobileRef = useRef(null);
+  const patientAgeRef = useRef(null);
   const paymentSelectRef = useRef(null);
   const processBtnRef = useRef(null);
 
@@ -318,9 +323,33 @@ const SalesEntry = () => {
         confirmButtonColor: '#007242',
     }).then(async (result) => {
         if (result.isConfirmed) {
+            // Verify customer based on mobile number
+            let finalCustomer = null;
+            if (patientDetails.mobile) {
+                // Check if this mobile exists in our list
+                finalCustomer = customers.find(c => c.phone === patientDetails.mobile);
+                
+                if (!finalCustomer && patientDetails.name) {
+                    // Create New Customer automatically as requested
+                    try {
+                        const custRes = await api.post('/customers', {
+                            name: patientDetails.name,
+                            phone: patientDetails.mobile,
+                            address: patientDetails.address
+                        });
+                        if (custRes.data.success) {
+                            finalCustomer = custRes.data.customer;
+                            setCustomers(prev => [...prev, finalCustomer]);
+                        }
+                    } catch (err) {
+                        console.error("Auto-customer creation failed:", err);
+                    }
+                }
+            }
+
             const saleData = cart.map(item => ({ id: item.id, qty: item.qty }));
             const metadata = { 
-                customer: selectedCustomer || (customerSearch ? { name: customerSearch } : 'Walk-in'), 
+                customer: finalCustomer || (patientDetails.name ? { name: patientDetails.name } : (customerSearch ? { name: customerSearch } : 'Walk-in')),
                 paymentMode,
                 totalAmount: grandTotal,
                 subTotal,
@@ -432,6 +461,44 @@ const SalesEntry = () => {
       if (e.key === 'Enter') {
           handleProcessSale();
       }
+  };
+
+  const handlePatientNameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+        const matches = customers.filter(c => c.name.toLowerCase().includes(patientDetails.name.toLowerCase()));
+        if (matches.length > 0) {
+            const first = matches[0];
+            setSelectedCustomer(first);
+            setCustomerSearch(first.name);
+            setPatientDetails({
+                ...patientDetails,
+                name: first.name,
+                mobile: first.phone || '',
+                address: first.address || ''
+            });
+            setShowPatientNameSuggestions(false);
+        }
+        patientMobileRef.current?.focus();
+    }
+  };
+
+  const handlePatientMobileKeyDown = (e) => {
+    if (e.key === 'Enter') {
+        const matches = customers.filter(c => c.phone?.includes(patientDetails.mobile));
+        if (matches.length > 0) {
+            const first = matches[0];
+            setSelectedCustomer(first);
+            setCustomerSearch(first.name);
+            setPatientDetails({
+                ...patientDetails,
+                name: first.name,
+                mobile: first.phone || '',
+                address: first.address || ''
+            });
+            setShowPatientMobileSuggestions(false);
+        }
+        patientAgeRef.current?.focus();
+    }
   };
 
   return (
@@ -668,14 +735,99 @@ const SalesEntry = () => {
                  {showExtraDetails && (
                      <div className="mt-3 p-4 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
                          {/* Patient Info */}
-                         <div className="space-y-3">
+                          <div className="space-y-3">
                             <h4 className="text-xs font-black uppercase text-gray-400">Patient info</h4>
                             <div className="grid grid-cols-2 gap-2">
-                                <input placeholder="Patient Name" value={patientDetails.name} onChange={e => setPatientDetails({...patientDetails, name: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
-                                <input placeholder="Mobile" value={patientDetails.mobile} onChange={e => setPatientDetails({...patientDetails, mobile: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
+                                <div className="relative">
+                                    <input 
+                                        ref={patientNameRef}
+                                        placeholder="Patient Name" 
+                                        value={patientDetails.name} 
+                                        onFocus={() => setShowPatientNameSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowPatientNameSuggestions(false), 200)}
+                                        onKeyDown={handlePatientNameKeyDown}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setPatientDetails({...patientDetails, name: val});
+                                            setShowPatientNameSuggestions(true);
+                                        }} 
+                                        className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                                    />
+                                    {showPatientNameSuggestions && patientDetails.name.length > 1 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[110] max-h-40 overflow-y-auto">
+                                            {customers.filter(c => c.name.toLowerCase().includes(patientDetails.name.toLowerCase())).map(c => (
+                                                <div 
+                                                    key={c._id}
+                                                    onClick={() => {
+                                                        setSelectedCustomer(c);
+                                                        setCustomerSearch(c.name);
+                                                        setPatientDetails({
+                                                            ...patientDetails,
+                                                            name: c.name,
+                                                            mobile: c.phone || '',
+                                                            address: c.address || ''
+                                                        });
+                                                        setShowPatientNameSuggestions(false);
+                                                    }}
+                                                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-[11px] border-b last:border-0"
+                                                >
+                                                    <p className="font-bold">{c.name}</p>
+                                                    <p className="text-gray-400">{c.phone}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="relative">
+                                    <input 
+                                        ref={patientMobileRef}
+                                        placeholder="Mobile" 
+                                        value={patientDetails.mobile} 
+                                        onFocus={() => setShowPatientMobileSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowPatientMobileSuggestions(false), 200)}
+                                        onKeyDown={handlePatientMobileKeyDown}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setPatientDetails({...patientDetails, mobile: val});
+                                            setShowPatientMobileSuggestions(true);
+                                        }} 
+                                        className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                                    />
+                                    {showPatientMobileSuggestions && patientDetails.mobile.length > 2 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[110] max-h-40 overflow-y-auto">
+                                            {customers.filter(c => c.phone?.includes(patientDetails.mobile)).map(c => (
+                                                <div 
+                                                    key={c._id}
+                                                    onClick={() => {
+                                                        setSelectedCustomer(c);
+                                                        setCustomerSearch(c.name);
+                                                        setPatientDetails({
+                                                            ...patientDetails,
+                                                            name: c.name,
+                                                            mobile: c.phone || '',
+                                                            address: c.address || ''
+                                                        });
+                                                        setShowPatientMobileSuggestions(false);
+                                                    }}
+                                                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-[11px] border-b last:border-0"
+                                                >
+                                                    <p className="font-bold">{c.phone}</p>
+                                                    <p className="text-gray-400">{c.name}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                                <input placeholder="Age" value={patientDetails.age} onChange={e => setPatientDetails({...patientDetails, age: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
+                                <input 
+                                    ref={patientAgeRef}
+                                    placeholder="Age" 
+                                    value={patientDetails.age} 
+                                    onChange={e => setPatientDetails({...patientDetails, age: e.target.value})} 
+                                    onKeyDown={(e) => e.key === 'Enter' && paymentSelectRef.current?.focus()}
+                                    className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                                />
                                 <select value={patientDetails.gender} onChange={e => setPatientDetails({...patientDetails, gender: e.target.value})} className="col-span-2 w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
@@ -683,7 +835,7 @@ const SalesEntry = () => {
                                 </select>
                             </div>
                              <input placeholder="Address" value={patientDetails.address} onChange={e => setPatientDetails({...patientDetails, address: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
-                         </div>
+                          </div>
 
                          {/* Shipping Info */}
                          <div className="space-y-3">

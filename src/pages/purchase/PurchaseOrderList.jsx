@@ -215,8 +215,13 @@ const PurchaseOrderList = () => {
                                             {new Date(order.poDate).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-100">{order.supplierName}</td>
-                                        <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-300">
-                                            {order.items.length} <span className="text-gray-400">|</span> <span className="text-sm font-bold text-primary">{order.items.reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0)} Qty</span>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-gray-900 dark:text-white font-bold">{order.items.length} <span className="text-[10px] text-gray-400 font-normal uppercase">SKUs</span></span>
+                                                <span className="text-[11px] text-primary font-bold bg-primary/5 px-2 py-0.5 rounded-full mt-1">
+                                                    {order.items.reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0)} Total Qty
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${getStatusStyle(order.status)}`}>

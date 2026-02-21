@@ -59,6 +59,17 @@ const AddGRN = () => {
     
     const prefillHandled = React.useRef(false);
 
+    const formatDateForInput = (dateStr) => {
+        if (!dateStr || dateStr === 'N/A') return '';
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return '';
+            return date.toISOString().split('T')[0];
+        } catch (e) {
+            return '';
+        }
+    };
+
     useEffect(() => {
         fetchSuppliers();
         fetchProducts();
@@ -91,35 +102,38 @@ const AddGRN = () => {
                             if (po && po.items) {
                                 const poItems = po.items.map(item => {
                                     const prodId = item.product?._id || item.product;
-                                    const product = products.find(p => p._id === prodId); // Handle populated or ID
+                                    const product = products.find(p => p._id === prodId); 
+                                    const purchaseRate = parseFloat(item.purchaseRate || product?.purchasePrice || product?.rate || 0);
+                                    const mrpPrice = parseFloat(product?.mrp || product?.sellingPrice || 0);
+
                                     return {
                                         productId: product?._id || prodId || '',
                                         productName: item.medicineName || product?.name || '',
                                         supplierSkuId: '',
                                         skuId: product?.sku || '',
-                                        pack: product?.packSize || '',
-                                        batchNumber: '',
-                                        expiryDate: '',
-                                        mfgDate: '',
-                                        systemMrp: product?.mrp || 0,
+                                        pack: product?.packing || product?.packSize || '',
+                                        batchNumber: (product?.batchNumber && product?.batchNumber !== 'N/A') ? product?.batchNumber : (product?.batchNo || product?.batch || ''),
+                                        expiryDate: formatDateForInput(product?.expiryDate || product?.expiry || product?.exp),
+                                        mfgDate: formatDateForInput(product?.manufacturingDate || product?.mfgDate || product?.mfg),
+                                        systemMrp: mrpPrice,
                                         orderedQty: item.quantity || 0,
                                         receivedQty: item.quantity || 0, // Default to ordered
                                         physicalFreeQty: 0,
                                         schemeFreeQty: 0,
-                                        poRate: item.purchaseRate || 0,
-                                        ptr: 0,
-                                        baseRate: item.purchaseRate || 0,
+                                        poRate: purchaseRate,
+                                        ptr: parseFloat(product?.ptr || purchaseRate || 0),
+                                        baseRate: purchaseRate,
                                         schemeDiscount: 0,
                                         discountPercent: 0,
                                         amount: 0, // Will recalculate
                                         hsnCode: product?.hsnCode || '',
-                                        cgst: (item.gst || 0) / 2,
-                                        sgst: (item.gst || 0) / 2,
+                                        cgst: (item.gst || product?.tax || 0) / 2,
+                                        sgst: (item.gst || product?.tax || 0) / 2,
                                         igst: 0,
-                                        purchasePrice: item.purchaseRate || 0,
-                                        sellingPrice: product?.sellingPrice || 0,
-                                        mrp: product?.mrp || 0,
-                                        margin: 0
+                                        purchasePrice: purchaseRate,
+                                        sellingPrice: product?.sellingPrice || mrpPrice,
+                                        mrp: mrpPrice,
+                                        margin: purchaseRate > 0 ? ((mrpPrice - purchaseRate) / purchaseRate * 100).toFixed(2) : 0
                                     };
                                 });
                                 
@@ -346,10 +360,9 @@ const AddGRN = () => {
                         cgst: (parseFloat(row['GST %']) / 2) || 0,
                         sgst: (parseFloat(row['GST %']) / 2) || 0,
                         igst: 0, // Handle correctly if needed
-                        purchasePrice: parseFloat(row['Purchase Rate']) || 0,
-                        sellingPrice: product?.sellingPrice || 0,
-                        mrp: parseFloat(row['MRP']) || 0,
-                        margin: 0
+                        sellingPrice: product?.sellingPrice || mrpPrice,
+                        mrp: mrpPrice,
+                        margin: parseFloat(row['Margin']) || 0
                     };
                 }).filter(Boolean);
 
@@ -413,9 +426,9 @@ const AddGRN = () => {
             return;
         }
 
-        // Handle various possible price field names from backend
-        const purchaseRate = product.purchasePrice || product.rate || 0;
-        const mrpPrice = product.mrp || product.sellingPrice || 0;
+        const purchaseRate = parseFloat(product.purchasePrice || product.rate || 0);
+        const mrpPrice = parseFloat(product.mrp || product.sellingPrice || 0);
+        const ptrPrice = parseFloat(product.ptr || purchaseRate || 0);
 
         const newItem = {
             productId: product._id,
@@ -423,21 +436,21 @@ const AddGRN = () => {
             supplierSkuId: '',
             skuId: product.sku || '',
             pack: product.packing || product.packSize || '',
-            // Fallback keys for batch and dates to handle different API responses
-            batchNumber: (product.batchNumber && product.batchNumber !== 'N/A') ? product.batchNumber : (product.batchNo || ''),
-            expiryDate: (product.expiryDate && product.expiryDate !== 'N/A') ? product.expiryDate : (product.expiry || ''),
-            mfgDate: (product.manufacturingDate && product.manufacturingDate !== 'N/A') ? product.manufacturingDate : (product.mfgDate || ''),
+            // Fallback keys for batch and dates with robust formatting
+            batchNumber: (product.batchNumber && product.batchNumber !== 'N/A') ? product.batchNumber : (product.batchNo || product.batch || ''),
+            expiryDate: formatDateForInput(product.expiryDate || product.expiry || product.exp),
+            mfgDate: formatDateForInput(product.manufacturingDate || product.mfgDate || product.mfg),
             systemMrp: mrpPrice,
-            orderedQty: 1, // Defaulting to 1 to avoid zero amount
-            receivedQty: 1, // Defaulting to 1 as requested
+            orderedQty: 1, 
+            receivedQty: 1, 
             physicalFreeQty: 0,
             schemeFreeQty: 0,
             poRate: purchaseRate,
-            ptr: product.ptr || 0,
+            ptr: ptrPrice,
             baseRate: purchaseRate,
             schemeDiscount: 0,
             discountPercent: 0,
-            amount: purchaseRate, // Calculate initial amount
+            amount: purchaseRate, 
             hsnCode: product.hsnCode || '',
             cgst: product.tax ? (product.tax / 2) : 0,
             sgst: product.tax ? (product.tax / 2) : 0,
@@ -445,7 +458,7 @@ const AddGRN = () => {
             purchasePrice: purchaseRate,
             sellingPrice: product.sellingPrice || mrpPrice,
             mrp: mrpPrice,
-            margin: purchaseRate > 0 ? ((mrpPrice - purchaseRate) / purchaseRate * 100).toFixed(2) : 0
+            margin: mrpPrice > 0 ? ((mrpPrice - purchaseRate) / mrpPrice * 100).toFixed(2) : (purchaseRate > 0 ? 0 : 0)
         };
 
         const updatedItems = [...items, newItem];
@@ -461,15 +474,31 @@ const AddGRN = () => {
 
         const item = updatedItems[index];
 
-        // Auto-calculate amount and margin based on updated fields
-        if (['baseRate', 'receivedQty', 'discountPercent', 'mrp'].includes(field)) {
-            const baseAmount = (item.baseRate || 0) * (item.receivedQty || 0);
-            const discountAmount = baseAmount * ((item.discountPercent || 0) / 100);
+        // If PO Rate or PTR is updated, also update Base Rate to stay in sync
+        if (field === 'poRate' || field === 'ptr') {
+            item.baseRate = value;
+        }
+
+        // Auto-calculate amount and margin based on updated fields (Trigger on any price/qty change)
+        if (['poRate', 'ptr', 'baseRate', 'receivedQty', 'discountPercent', 'mrp'].includes(field)) {
+            const currentRate = parseFloat(item.baseRate) || 0;
+            const currentQty = parseFloat(item.receivedQty) || 0;
+            const currentDisc = parseFloat(item.discountPercent) || 0;
+            const currentMrp = parseFloat(item.mrp) || 0;
+
+            const baseAmount = currentRate * currentQty;
+            const discountAmount = baseAmount * (currentDisc / 100);
             item.amount = baseAmount - discountAmount;
             
-            // Recalculate margin when rate or MRP changes
-            if (item.baseRate > 0) {
-                item.margin = ((item.mrp - item.baseRate) / item.baseRate * 100).toFixed(2);
+            // Recalculate margin: (MRP - Cost) / MRP * 100
+            // This is the standard Retail Margin formula
+            if (currentMrp > 0) {
+                item.margin = (((currentMrp - currentRate) / currentMrp) * 100).toFixed(2);
+            } else if (currentRate > 0) {
+                // Fallback to markup if MRP is 0
+                item.margin = (((currentMrp - currentRate) / currentRate) * 100).toFixed(2);
+            } else {
+                item.margin = "0.00";
             }
         }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect  } from 'react';
 import { Plus, Search, Filter, MoreVertical, FileEdit, Trash2, Eye, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -8,7 +8,11 @@ import { useInventory } from '../../context/InventoryContext';
 
 const MedicineList = () => {
   const navigate = useNavigate();
-  const { inventory: medicines, deleteItem } = useInventory(); // Use inventory as medicines
+  const { allMedicines: medicines, deleteItem, fetchAllMedicines } = useInventory(); // Use allMedicines instead of live inventory
+  
+  useEffect(() => {
+    fetchAllMedicines();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
@@ -257,9 +261,16 @@ const MedicineList = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.status === 'Active' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30'}`}>
-                         {item.status}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.status === 'Active' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30'}`}>
+                           {item.status}
+                        </span>
+                        {item.isInventoryLive && (
+                          <span className="px-2 py-0.5 rounded bg-blue-500 text-white text-[9px] font-black uppercase tracking-tighter">
+                            Live
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       {item.stock} <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal ml-1 uppercase">{item.unit}</span>

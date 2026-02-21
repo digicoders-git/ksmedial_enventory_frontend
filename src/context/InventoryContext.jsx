@@ -7,12 +7,13 @@ export const useInventory = () => useContext(InventoryContext);
 
 export const InventoryProvider = ({ children }) => {
     const [inventory, setInventory] = useState([]);
+    const [allMedicines, setAllMedicines] = useState([]); // Master list (all)
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchInventory = async () => {
         try {
-            const { data } = await api.get('/products');
+            const { data } = await api.get('/products?isLive=true');
             if (data.success) {
                 const mapped = data.products.map(p => ({
                     id: p._id,
@@ -38,7 +39,8 @@ export const InventoryProvider = ({ children }) => {
                     description: p.description || '',
                     isPrescriptionRequired: p.isPrescriptionRequired || false,
                     rackLocation: p.rackLocation || '',
-                    createdAt: p.createdAt
+                    createdAt: p.createdAt,
+                    isInventoryLive: p.isInventoryLive
                 }));
                 setInventory(mapped);
             }
@@ -46,6 +48,36 @@ export const InventoryProvider = ({ children }) => {
             console.error("Error fetching inventory:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAllMedicines = async () => {
+        try {
+            const { data } = await api.get('/products');
+            if (data.success) {
+                const mapped = data.products.map(p => ({
+                    id: p._id,
+                    name: p.name,
+                    stock: p.quantity || 0,
+                    rate: p.sellingPrice || 0,
+                    mrp: p.sellingPrice || 0,
+                    purchasePrice: p.purchasePrice || 0,
+                    category: p.category,
+                    batch: p.batchNumber,
+                    sku: p.sku,
+                    exp: (p.expiryDate && !isNaN(new Date(p.expiryDate).getTime())) ? new Date(p.expiryDate).toISOString().split('T')[0] : '',
+                    unit: p.unit || 'Pc',
+                    status: p.status || 'Active',
+                    company: p.company || 'N/A',
+                    generic: p.genericName || 'N/A',
+                    packing: p.packing || '',
+                    rackLocation: p.rackLocation || '',
+                    isInventoryLive: p.isInventoryLive
+                }));
+                setAllMedicines(mapped);
+            }
+        } catch (error) {
+            console.error("Error fetching all medicines:", error);
         }
     };
 
@@ -187,6 +219,7 @@ export const InventoryProvider = ({ children }) => {
 
     useEffect(() => {
         fetchInventory();
+        fetchAllMedicines();
         fetchTransactions();
         fetchSuppliers();
     }, []);
@@ -463,6 +496,7 @@ export const InventoryProvider = ({ children }) => {
     return (
         <InventoryContext.Provider value={{ 
             inventory, 
+            allMedicines,
             sellItems,
             adjustStock,
             bulkAdjustStock,
@@ -485,6 +519,7 @@ export const InventoryProvider = ({ children }) => {
             generateSKU,
             loading,
             fetchInventory,
+            fetchAllMedicines,
             fetchTransactions
         }}>
             {children}

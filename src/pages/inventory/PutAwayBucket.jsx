@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
+import { useInventory } from '../../context/InventoryContext';
 import api from '../../api/axios';
 
 const PutAwayBucket = () => {
     const navigate = useNavigate();
+    const { fetchInventory } = useInventory();
     
     // Original State Structure
     const [purchases, setPurchases] = useState([]);
@@ -63,9 +65,13 @@ const PutAwayBucket = () => {
             params.append('pageNumber', page);
             params.append('pageSize', pageSize);
 
-            // Append all filters
+            // Append all filters with mapping for dates
             Object.keys(filters).forEach(key => {
-                if (filters[key] && key !== 'putAwayType') params.append(key, filters[key]);
+                if (filters[key] && key !== 'putAwayType') {
+                    if (key === 'createdFrom') params.append('startDate', filters[key]);
+                    else if (key === 'createdTo') params.append('endDate', filters[key]);
+                    else params.append(key, filters[key]);
+                }
             });
 
             const { data } = await api.get(`/purchases?${params.toString()}`);
@@ -85,13 +91,19 @@ const PutAwayBucket = () => {
     const fetchPendingSaleReturns = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/sales/returns', {
-                params: {
-                    status: 'Putaway_Pending',
-                    page,
-                    limit: pageSize
-                }
-            });
+            const params = {
+                status: 'Putaway_Pending',
+                page,
+                limit: pageSize
+            };
+
+            // Map frontend filters to backend expected keys for Sales Returns
+            if (filters.createdFrom) params.startDate = filters.createdFrom;
+            if (filters.createdTo) params.endDate = filters.createdTo;
+            if (filters.invoiceNos) params.keyword = filters.invoiceNos;
+            if (filters.skuName) params.keyword = filters.skuName; // Basic keyword search
+
+            const { data } = await api.get('/sales/returns', { params });
             if (data.success) {
                 setSaleReturns(data.returns);
                 setTotalPages(data.pages);
@@ -108,7 +120,11 @@ const PutAwayBucket = () => {
     const fetchPendingAdjustments = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/products/putaway/pending');
+            const params = {};
+            if (filters.createdFrom) params.startDate = filters.createdFrom;
+            if (filters.createdTo) params.endDate = filters.createdTo;
+
+            const { data } = await api.get('/products/putaway/pending', { params });
             if (data.success) {
                 setAdjustments(data.logs);
                 // Adjustments endpoint currently doesn't support pagination, so we set defaults
@@ -249,14 +265,15 @@ const PutAwayBucket = () => {
                         confirmButtonText: 'View Stock List',
                         cancelButtonText: 'Stay Here',
                         reverseButtons: true
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            navigate('/inventory/master');
-                        } else {
-                            setSelectedItem(null);
-                            fetchPendingPurchases();
-                        }
-                    });
+                        }).then((result) => {
+                            fetchInventory(); // Update global inventory state
+                            if (result.isConfirmed) {
+                                navigate('/inventory/master');
+                            } else {
+                                setSelectedItem(null);
+                                fetchPendingPurchases();
+                            }
+                        });
                 }
             } catch (error) {
                 Swal.fire('Error', error.response?.data?.message || 'Failed', 'error');
@@ -281,6 +298,7 @@ const PutAwayBucket = () => {
 
                 if (data.success) {
                     Swal.fire('Restocked!', 'Stock updated based on return items.', 'success');
+                    fetchInventory(); // Update global inventory state
                     setSelectedItem(null);
                     fetchPendingSaleReturns();
                 }
@@ -310,6 +328,7 @@ const PutAwayBucket = () => {
 
                 if (data.success) {
                     Swal.fire('Success!', 'Stock added to inventory.', 'success');
+                    fetchInventory(); // Update global inventory state
                     setSelectedItem(null);
                     fetchPendingAdjustments();
                 }
@@ -461,6 +480,7 @@ const PutAwayBucket = () => {
                     const { data } = await api.post('/purchases/bulk-putaway-upload', { items: itemsToUpdate });
                     if (data.success) {
                         Swal.fire('Success', data.message, 'success');
+                        fetchInventory(); // Update global inventory state
                         fetchPendingPurchases(); 
                     }
                 } catch (error) {
@@ -668,8 +688,14 @@ const PutAwayBucket = () => {
 
                             {/* Row 2 */}
                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <input name="createdFrom" type="date" value={filters.createdFrom} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                                <input name="createdTo" type="date" value={filters.createdTo} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 <div className="flex flex-col">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">From Date & Time</label>
+                                    <input name="createdFrom" type="datetime-local" value={filters.createdFrom} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 </div>
+                                 <div className="flex flex-col">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">To Date & Time</label>
+                                    <input name="createdTo" type="datetime-local" value={filters.createdTo} onChange={handleFilterChange} className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                 </div>
                                 <input name="supplierName" value={filters.supplierName} onChange={handleFilterChange} placeholder="Supplier Name" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                                 <input name="pickingAisle" value={filters.pickingAisle} onChange={handleFilterChange} placeholder="Picking Aisle" className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                             </div>

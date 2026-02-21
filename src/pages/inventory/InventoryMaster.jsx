@@ -56,6 +56,7 @@ const InventoryMaster = () => {
             const queryParams = new URLSearchParams({
                 page,
                 limit,
+                isLive: true,
                 ...filters
             });
             const { data } = await api.get(`/products/search?${queryParams}`);
@@ -74,7 +75,7 @@ const InventoryMaster = () => {
 
     useEffect(() => {
         fetchProducts();
-    }, [page, limit]);
+    }, [page, limit, filters]);
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
