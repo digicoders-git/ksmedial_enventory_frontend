@@ -276,6 +276,11 @@ const PurchaseReturn = () => {
             return;
         }
 
+        if (!reason || reason === '') {
+            Swal.fire('Error', 'Please select a reason for return.', 'warning');
+            return;
+        }
+
         const totalValue = calculateRefund();
 
         Swal.fire({
@@ -905,7 +910,9 @@ const PurchaseReturn = () => {
 
                                 <div className="p-8 bg-gray-50 dark:bg-gray-750/50 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-10 items-start md:items-end justify-between">
                                     <div className="w-full md:w-1/2 text-left">
-                                        <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-3">Reason for Return</label>
+                                        <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-3">
+                                            Reason for Return <span className="text-red-500">*</span>
+                                        </label>
                                         <div className="space-y-3">
                                             <select 
                                                 value={reason}

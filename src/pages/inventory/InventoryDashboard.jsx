@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Package, AlertTriangle, RefreshCcw, DollarSign, Activity, TrendingUp, FileText } from 'lucide-react';
 import { AdjustStockModal, StockCheckModal } from './InventoryModals';
 import { useNavigate } from 'react-router-dom';
@@ -234,8 +234,8 @@ const InventoryDashboard = () => {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Net Valuation</p>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">₹{Number(dashboardStats.totalStockValue).toLocaleString()}</h3>
-            <p className="text-[11px] text-emerald-500 font-bold mt-1">Live Market Rate</p>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">₹{Math.round(dashboardStats.totalStockValue).toLocaleString()}</h3>
+            <p className="text-[11px] text-emerald-500 font-bold mt-1">Based on Purchase Cost</p>
           </div>
         </div>
 

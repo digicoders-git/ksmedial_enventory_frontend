@@ -70,10 +70,12 @@ const PhysicalValidation = () => {
   const fetchPOItems = async (poNumber) => {
     try {
         const { data } = await api.get(`/purchase-orders/${poNumber}`);
-        if (data && data.items) {
-            const items = data.items.map(item => ({
-                productName: item.medicineName || item.product?.name,
-                sku: item.product?.sku,
+        const poData = data.success ? data.data : data; // Handle both wrapped and unwrapped
+        
+        if (poData && poData.items) {
+            const items = poData.items.map(item => ({
+                productName: item.medicineName || item.product?.name || 'Unknown Product',
+                sku: item.product?.sku || 'N/A',
                 orderedQty: item.quantity,
                 receivedQty: item.quantity, // Default to match ordered
             }));
@@ -87,9 +89,10 @@ const PhysicalValidation = () => {
   useEffect(() => {
     const fetchDispatchedPOs = async () => {
         try {
-            const { data } = await api.get('/purchase-orders'); // Removed status query to filter client-side properly
+            const { data } = await api.get('/purchase-orders'); 
+            const poList = data.success ? data.data : data; // Handle wrapped vs unwrapped
             const allowedStatuses = ['Dispatched', 'Sent to Supplier', 'Approved by Supplier'];
-            const dispatched = Array.isArray(data) ? data.filter(po => allowedStatuses.includes(po.status)) : [];
+            const dispatched = Array.isArray(poList) ? poList.filter(po => allowedStatuses.includes(po.status)) : [];
             setDispatchedPOs(dispatched);
 
             // Handle Prefill from navigation state if present
@@ -118,8 +121,10 @@ const PhysicalValidation = () => {
     if (formData.poIds && dispatchedPOs.length > 0) {
         const matchedPO = dispatchedPOs.find(po => po.poNumber.toLowerCase() === formData.poIds.trim().toLowerCase());
         if (matchedPO) {
-             // Only update if data is missing or different to avoid overriding manual edits unnecessarily, 
-             // but ensure we fill if it's a match.
+             // Always ensure we have the item details for the matched PO
+             fetchPOItems(matchedPO.poNumber);
+
+             // Update other fields if they aren't already set correctly
              if (formData.supplierName !== matchedPO.supplierName || formData.skuCount != matchedPO.items.length) {
                  setFormData(prev => ({
                      ...prev,
@@ -127,7 +132,6 @@ const PhysicalValidation = () => {
                      skuCount: matchedPO.items.length,
                      invoiceValue: matchedPO.totalAmount
                  }));
-                 fetchPOItems(matchedPO.poNumber); // Fetch items on match
                  Swal.fire({
                      toast: true,
                      position: 'top-end',
@@ -226,6 +230,17 @@ const PhysicalValidation = () => {
             icon: 'warning',
             title: 'Invalid SKU Count',
             text: 'Please enter a valid number of SKUs (greater than 0)',
+            confirmButtonColor: '#007242'
+        });
+        return;
+    }
+
+    // Validation 4: PO Id (Required if PO present)
+    if (!formData.poIds && !formData.isPoNotPresent) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'PO Required',
+            text: 'Please select a Purchase Order or check "PO not present"',
             confirmButtonColor: '#007242'
         });
         return;
@@ -755,7 +770,9 @@ const PhysicalValidation = () => {
                     </div>
 
                     <div className="space-y-2 relative" ref={poWrapperRef}>
-                        <label className="text-sm text-gray-600 dark:text-gray-400">Select Purchase Order (Optional)</label>
+                        <label className="text-sm text-gray-600 dark:text-gray-400 font-bold flex items-center gap-1">
+                            Select Purchase Order <span className="text-red-500">*</span>
+                        </label>
                         <input 
                             name="poIds" 
                             value={formData.poIds} 
@@ -780,6 +797,7 @@ const PhysicalValidation = () => {
                                                 // Estimate Invoice Value from PO Total (though real invoice may differ)
                                                 invoiceValue: po.totalAmount
                                             }));
+                                            fetchPOItems(po.poNumber); // Explicitly fetch items on select
                                             setShowPOSuggestions(false);
                                         }}
                                         className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0"

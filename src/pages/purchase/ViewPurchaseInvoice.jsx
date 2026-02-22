@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Printer, Download } from 'lucide-react';
+import { ArrowLeft, Printer, Download, FileText } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QRCodeCanvas } from 'qrcode.react'; 
@@ -65,7 +65,8 @@ const ViewPurchaseInvoice = () => {
                     taxAmount: taxAmount,
                     discountAmount: p.discount || 0,
                     grandTotal: p.grandTotal,
-                    notes: p.notes
+                    notes: p.notes,
+                    invoiceFile: p.invoiceFile
                 });
             } else {
                 setError("Invoice not found");
@@ -193,6 +194,16 @@ const ViewPurchaseInvoice = () => {
             <ArrowLeft size={18} /> Back
         </button>
         <div className="flex gap-2">
+            {invoice.invoiceFile && (
+                <a 
+                    href={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${invoice.invoiceFile}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded hover:bg-emerald-100 font-semibold shadow-sm"
+                >
+                    <FileText size={16} /> View Original
+                </a>
+            )}
             <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 font-semibold shadow-sm">
                 <Download size={16} /> PDF
             </button>

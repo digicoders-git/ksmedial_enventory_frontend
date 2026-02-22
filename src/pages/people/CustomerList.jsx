@@ -67,6 +67,7 @@ const CustomerList = () => {
                 setCustomers(data.customers);
                 setTotalPages(data.pages);
                 setTotalEntries(data.total);
+                setTotalReceivables(data.summary?.totalReceivables || 0);
             }
         } catch (error) {
             console.error("Failed to fetch customers", error);
@@ -98,7 +99,7 @@ const CustomerList = () => {
     }, [customers, filterType]);
 
 
-    const totalReceivables = customers.reduce((acc, curr) => acc + (curr.pendingAmount || 0), 0);
+    const [totalReceivables, setTotalReceivables] = useState(0);
 
     const handleSearchChange = (value) => {
         setSearchTerm(value);
@@ -288,6 +289,34 @@ const CustomerList = () => {
         setIsBulkMode(false);
     };
 
+    const downloadSampleCSV = () => {
+        const sampleData = [
+            {
+                "Name": "Aman Shrivastav",
+                "Phone": "9876543210",
+                "Address": "Indira Nagar, Lucknow",
+                "Balance": "500"
+            },
+            {
+                "Name": "Rahul Gupta",
+                "Phone": "8877665544",
+                "Address": "Hazratganj, Lucknow",
+                "Balance": "0"
+            }
+        ];
+
+        const csv = Papa.unparse(sampleData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'customer_import_sample.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleDelete = (id, name) => {
         Swal.fire({
             title: 'Delete Customer?',
@@ -406,44 +435,38 @@ const CustomerList = () => {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
-                    <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                    {/* View Switcher */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
                         <button 
                             disabled={isBulkMode}
                             onClick={() => setViewMode('card')}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
-                                ${viewMode === 'card' 
-                                    ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm ring-1 ring-black/5' 
-                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} disabled:opacity-50`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                            title="Grid View"
                         >
-                            <LayoutGrid size={16} strokeWidth={2.5} />
-                            <span className="xl:hidden">Grid View</span>
+                            <LayoutGrid size={18} strokeWidth={2.5} />
                         </button>
                         <button 
                             disabled={isBulkMode}
                             onClick={() => setViewMode('table')}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
-                                ${viewMode === 'table' 
-                                    ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm ring-1 ring-black/5' 
-                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} disabled:opacity-50`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                            title="List View"
                         >
-                            <List size={16} strokeWidth={2.5} />
-                            <span className="xl:hidden">List View</span>
+                            <List size={18} strokeWidth={2.5} />
                         </button>
                     </div>
 
                     {!isBulkMode && totalEntries > 0 && (
                         <button 
                             onClick={handleClearAll}
-                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 font-black uppercase tracking-widest transition-all text-[11px] flex items-center justify-center gap-2"
+                            className="h-[46px] px-4 rounded-xl border border-red-100 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all group"
                         >
-                            <Trash2 size={16} strokeWidth={3} />
-                            <span>Clear All</span>
+                            <Trash2 size={18} strokeWidth={2.5} />
                         </button>
                     )}
 
                     {!isBulkMode && (
-                        <div className="w-full sm:w-auto relative">
+                        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm h-[46px]">
                             <input 
                                 type="file" 
                                 accept=".csv" 
@@ -454,20 +477,27 @@ const CustomerList = () => {
                             />
                             <label 
                                 htmlFor="csv-upload"
-                                className={`w-full sm:w-auto px-6 py-3.5 rounded-xl border-2 border-dashed border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/10 cursor-pointer transition-all text-[11px] flex items-center justify-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`flex items-center gap-2 px-4 h-full border-r border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all text-[11px] font-black uppercase tracking-wider text-gray-600 dark:text-gray-300 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                {uploading ? <Loader className="animate-spin" size={16} /> : <UploadCloud size={16} strokeWidth={3} />}
+                                {uploading ? <Loader className="animate-spin" size={16} /> : <UploadCloud size={16} strokeWidth={3} className="text-emerald-500" />}
                                 <span>Bulk Upload</span>
                             </label>
+                            <button 
+                                onClick={downloadSampleCSV}
+                                className="px-4 h-full hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-400 hover:text-emerald-600 transition-all border-l border-gray-100 dark:border-gray-700"
+                                title="Download Sample CSV"
+                            >
+                                <FileText size={16} strokeWidth={2.5} />
+                            </button>
                         </div>
                     )}
 
                     <button 
                         onClick={isBulkMode ? handleBulkSave : handleAddCustomer}
-                        className={`w-full sm:w-auto px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-900/20' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'}`}
+                        className={`h-[46px] px-6 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-700 hover:bg-emerald-800 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'}`}
                     >
                         {isBulkMode ? <CheckCircle size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />}
-                        <span>{isBulkMode ? `Save ${bulkData.length}` : 'Add Customer'}</span>
+                        <span>{isBulkMode ? `Save (${bulkData.length})` : 'Add Customer'}</span>
                     </button>
                 </div>
             </div>

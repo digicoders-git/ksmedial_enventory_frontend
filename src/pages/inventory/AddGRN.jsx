@@ -825,8 +825,21 @@ const AddGRN = () => {
                                         type="file" 
                                         id="invoice-upload"
                                         className="hidden" 
-                                        accept=".jpeg,.jpg,.png,.pdf,.doc,.docx"
-                                        onChange={(e) => setInvoiceFile(e.target.files[0])}
+                                        accept="*"
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file && file.size > 50 * 1024 * 1024) {
+                                                Swal.fire({
+                                                    icon: 'error',
+                                                    title: 'File Too Large',
+                                                    text: 'Invoice file size must be less than 50MB',
+                                                    confirmButtonColor: '#10b981'
+                                                });
+                                                e.target.value = null;
+                                                return;
+                                            }
+                                            setInvoiceFile(file);
+                                        }}
                                     />
                                     <button 
                                         type="button"

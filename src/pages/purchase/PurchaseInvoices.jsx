@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, FileText, Eye, Download, Printer, MoreVertical, Calendar, ArrowUpRight, ArrowDownRight, CheckCircle, Clock, Plus, Truck, AlertCircle, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, FileText, Eye, Download, Printer, MoreVertical, Calendar, ArrowUpRight, ArrowDownRight, CheckCircle, Clock, Plus, Truck, AlertCircle, Edit2, Trash2, X, ChevronLeft, ChevronRight, File } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
@@ -55,7 +55,8 @@ const PurchaseInvoices = () => {
                     payment: p.paymentStatus,
                     gst: p.supplierId?.gstNumber || 'N/A',
                     address: p.supplierId?.address || 'N/A',
-                    phone: p.supplierId?.phone || 'N/A'
+                    phone: p.supplierId?.phone || 'N/A',
+                    invoiceFile: p.invoiceFile
                 }));
                 setInvoices(mappedInvoices);
                 setTotalPages(data.pages);
@@ -376,6 +377,7 @@ const PurchaseInvoices = () => {
                                     <th className="px-6 py-4">Amount</th>
                                     <th className="px-6 py-4">Payment</th>
                                     <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4 text-center">Invoice</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -411,6 +413,21 @@ const PurchaseInvoices = () => {
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${getStatusStyle(inv.status)}`}>
                                                     {inv.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {inv.invoiceFile ? (
+                                                    <a 
+                                                        href={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${inv.invoiceFile}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-100 transition-all"
+                                                        title="View Uploaded Invoice"
+                                                    >
+                                                        <File size={14} /> View
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase">None</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">

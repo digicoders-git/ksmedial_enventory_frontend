@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Download, Search, ChevronLeft, ChevronRight, PackageX } from 'lucide-react';
+import { AlertTriangle, Download, Search, ChevronLeft, ChevronRight, PackageX, X } from 'lucide-react';
+import Swal from 'sweetalert2';
 import api from '../../api/axios';
 
 const NonMovingStock = () => {
@@ -20,6 +21,19 @@ const NonMovingStock = () => {
             const { data } = await api.get('/products/non-moving');
             if (data.success) {
                 setProducts(data.products);
+                if (data.products.length > 0) {
+                    Swal.fire({
+                        title: 'Stagnant Stock Detected!',
+                        text: `Found ${data.products.length} items with no sales in the last 30 days.`,
+                        icon: 'warning',
+                        confirmButtonColor: '#f97316',
+                        toast: true,
+                        position: 'top-end',
+                        timer: 5000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                }
             }
         } catch (error) {
             console.error('Error fetching non-moving stock:', error);
@@ -140,6 +154,23 @@ const NonMovingStock = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Alert Banner */}
+            {products.length > 0 && (
+                <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-500 p-5 rounded-r-2xl shadow-sm animate-pulse-slow">
+                    <div className="flex gap-4">
+                        <div className="flex-shrink-0">
+                            <AlertTriangle className="h-6 w-6 text-orange-500" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black text-orange-800 dark:text-orange-400 uppercase tracking-wider">Critical Inventory Alert</h4>
+                            <p className="text-sm text-orange-700 dark:text-orange-300/80 mt-1 font-medium">
+                                These items are blocking <span className="font-bold">₹{totalValue.toLocaleString()}</span> in capital. They haven't moved in over 30 days. Consider liquidation or checking batch visibility.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* List */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">

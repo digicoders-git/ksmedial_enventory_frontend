@@ -226,7 +226,7 @@ export const InventoryProvider = ({ children }) => {
 
     // Derived statistics
     const totalProducts = inventory.length;
-    const totalStockValue = inventory.reduce((acc, item) => acc + (item.stock * item.rate), 0);
+    const totalStockValue = inventory.reduce((acc, item) => acc + (item.stock * (item.purchasePrice || 0)), 0);
     const totalStockUnits = inventory.reduce((acc, item) => acc + item.stock, 0);
     const lowStockItems = inventory.filter(item => item.stock > 0 && item.stock <= (item.reorderLevel || 20)).length;
     const outOfStockItems = inventory.filter(item => item.stock === 0).length;

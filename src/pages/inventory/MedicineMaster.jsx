@@ -374,8 +374,6 @@ const MedicineMaster = () => {
       if (!formData.group) missingFields.push('Medicine Group');
       if (!formData.category) missingFields.push('Category');
       if (!formData.packing) missingFields.push('Packing');
-      if (!formData.hsnCode) missingFields.push('HSN Code');
-      if (!formData.tax) missingFields.push('GST Tax');
       if (!formData.rackLocation) missingFields.push('Rack Location');
       if (!formData.purchasePrice) missingFields.push('Purchase Price');
       if (!formData.sellingPrice) missingFields.push('Selling Price');
@@ -881,7 +879,7 @@ const MedicineMaster = () => {
                
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">HSN Code <span className="text-red-500">*</span></label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">HSN Code</label>
                      <input 
                        type="text" 
                        name="hsnCode"
@@ -893,7 +891,7 @@ const MedicineMaster = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">GST Tax (%) <span className="text-red-500">*</span></label>
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">GST Tax (%)</label>
                      <select 
                        name="tax"
                        value={formData.tax}

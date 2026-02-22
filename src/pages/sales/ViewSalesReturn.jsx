@@ -1,219 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Phone, Mail, Printer, ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import KS2Logo from '/KS2-Logo.png'; 
 import api from '../../api/axios';
-import Swal from 'sweetalert2';
 
 const ViewSalesReturn = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [returnNote, setReturnNote] = useState(null);
-
-  // QR Code Logic - JSON format for better scannability
-  const qrData = returnNote ? JSON.stringify({
-    type: "SALES_RETURN",
-    company: "KS Pharma Net",
-    returnNo: returnNote.id,
-    refInvoice: returnNote.originalInvoiceId,
-    date: returnNote.date,
-    customer: returnNote.customer,
-    refundAmount: returnNote.refundAmount.toFixed(2),
-    status: returnNote.status,
-    verified: true
-  }) : '';
-
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
-
-  const handleDownloadPDF = () => {
-    if (!returnNote) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Helper to add Logo
-    const img = new Image();
-    img.src = KS2Logo;
-    
-    img.onload = () => {
-        // Logo
-        doc.addImage(img, 'PNG', 14, 10, 45, 20);
-
-        // QR Code for PDF
-        const qrImg = new Image();
-        qrImg.crossOrigin = "anonymous";
-        qrImg.src = qrCodeUrl;
-
-        qrImg.onload = () => {
-            // QR in top right - Clean without any text overlay
-            doc.addImage(qrImg, 'PNG', pageWidth - 44, 45, 30, 30);
-
-            // Company Info
-            doc.setFontSize(11);
-            doc.setTextColor(0);
-            doc.setFont('helvetica', 'bold');
-            doc.text(returnNote.shop?.shopName || 'KS Pharma Net', 14, 40);
-            
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(100);
-            doc.text(returnNote.shop?.address || '123, Health Avenue, Medical District', 14, 46);
-            doc.text(`Phone: ${returnNote.shop?.contactNumber || '+91 98765 43210'}`, 14, 51);
-            doc.text(`Email: ${returnNote.shop?.email || 'support@kspharma.com'}`, 14, 56);
-
-            // Credit Note Header
-            doc.setFontSize(32);
-            doc.setTextColor(220, 38, 38); // Red-600
-            doc.setFont('helvetica', 'bold');
-            doc.text('CREDIT NOTE', pageWidth - 14, 25, { align: 'right' });
-            
-            doc.setFontSize(16);
-            doc.setTextColor(0);
-            doc.text(`#${returnNote.id}`, pageWidth - 14, 38, { align: 'right' });
-
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text('Ref Invoice: ', pageWidth - 45, 82, { align: 'right' });
-            doc.setTextColor(0);
-            doc.setFont('helvetica', 'bold');
-            doc.text(returnNote.originalInvoiceId, pageWidth - 14, 82, { align: 'right' });
-            
-            // Status Badge - Moved below QR code to avoid overlap
-            const statusX = pageWidth - 35;
-            const statusY = 88;
-            doc.setDrawColor(254, 242, 242);
-            doc.setFillColor(254, 242, 242);
-            doc.roundedRect(statusX, statusY, 21, 6, 1, 1, 'FD');
-            doc.setTextColor(185, 28, 28);
-            doc.setFontSize(8);
-            doc.text(returnNote.status.toUpperCase(), statusX + 10.5, statusY + 4.2, { align: 'center' });
-
-            doc.setFontSize(9);
-            doc.setTextColor(100);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Date: ${returnNote.date}`, pageWidth - 14, 100, { align: 'right' });
-
-            doc.setDrawColor(245);
-            doc.line(14, 75, pageWidth - 14, 75);
-
-            // Details Row
-            doc.setFontSize(8);
-            doc.setTextColor(160);
-            doc.setFont('helvetica', 'bold');
-            doc.text('CUSTOMER DETAILS', 14, 85);
-            doc.text('RETURN REASON', pageWidth - 14, 85, { align: 'right' });
-
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.text(returnNote.customer, 14, 93);
-            
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.setFont('helvetica', 'normal');
-            const splitAddress = doc.splitTextToSize(returnNote.address, 70);
-            doc.text(splitAddress, 14, 100);
-            doc.text(`Tel: ${returnNote.contact}`, 14, 100 + (splitAddress.length * 5));
-
-            // Right side - Reason Box
-            const reasonY = 93;
-            const reasonText = `"${returnNote.reason}"`;
-            const reasonWidth = doc.getTextWidth(reasonText) + 10;
-            doc.setDrawColor(230);
-            doc.setFillColor(250, 250, 250);
-            doc.roundedRect(pageWidth - reasonWidth - 14, reasonY - 5, reasonWidth, 10, 1, 1, 'FD');
-            doc.setTextColor(50);
-            doc.text(reasonText, pageWidth - 14 - (reasonWidth/2), reasonY + 1.5, { align: 'center' });
-
-            // Items Table
-            const tableColumn = ["#", "Item Name", "Rate", "Ret Qty", "Tax", "Total"];
-            const tableRows = returnNote.items.map((item, index) => [
-                index + 1,
-                item.name,
-                `Rs. ${item.rate.toFixed(2)}`,
-                item.qty,
-                `${item.tax}%`,
-                `Rs. ${(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}`
-            ]);
-
-            autoTable(doc, {
-                startY: 125,
-                head: [tableColumn],
-                body: tableRows,
-                theme: 'striped',
-                headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', halign: 'center' },
-                bodyStyles: { fontSize: 9 },
-                columnStyles: {
-                    0: { halign: 'center', cellWidth: 10 },
-                    1: { halign: 'left' },
-                    2: { halign: 'right' },
-                    3: { halign: 'center' },
-                    4: { halign: 'right' },
-                    5: { halign: 'right' },
-                },
-                margin: { left: 14, right: 14 },
-            });
-
-            // Summary Area
-            const finalY = doc.lastAutoTable.finalY + 15;
-            
-            // Note
-            doc.setFontSize(9);
-            doc.setTextColor(0);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Declaration:', 14, finalY);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(100);
-            const declaration = "We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct.";
-            const splitDecl = doc.splitTextToSize(declaration, 80);
-            doc.text(splitDecl, 14, finalY + 5);
-
-            // Calculation
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text(`Subtotal (Refund)`, pageWidth - 65, finalY);
-            doc.setTextColor(0);
-            doc.text(`Rs. ${returnNote.subtotal.toFixed(2)}`, pageWidth - 14, finalY, { align: 'right' });
-            
-            doc.setTextColor(100);
-            doc.text(`Reversed Tax`, pageWidth - 65, finalY + 8);
-            doc.setTextColor(0);
-            doc.text(`Rs. ${returnNote.taxAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
-
-            doc.setDrawColor(230);
-            doc.line(pageWidth - 75, finalY + 14, pageWidth - 14, finalY + 14);
-
-            doc.setFontSize(14);
-            doc.setFont('helvetica', 'black');
-            doc.setTextColor(185, 28, 28); // Red-700
-            doc.text(`TOTAL REFUND`, pageWidth - 75, finalY + 24);
-            doc.text(`- Rs. ${returnNote.refundAmount.toFixed(2)}`, pageWidth - 14, finalY + 24, { align: 'right' });
-
-            // Signature Lines
-            const sigY = 265;
-            doc.setDrawColor(150);
-            doc.line(30, sigY, 80, sigY);
-            doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
-            
-            doc.setFontSize(8);
-            doc.setTextColor(100);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Customer Signature', 55, sigY + 5, { align: 'center' });
-            doc.text('Authorized Signatory', pageWidth - 55, sigY + 5, { align: 'center' });
-
-            doc.save(`${returnNote.id}_credit_note.pdf`);
-        };
-    };
-    
-    // Fallback if image fails to load
-    img.onerror = () => {
-        doc.setFontSize(22);
-        doc.setTextColor(220, 38, 38);
-        doc.text('KS PHARMA NET', 14, 22);
-        doc.save(`${returnNote.id}_credit_note.pdf`);
-    }
-  };
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchReturnData = async () => {
@@ -221,290 +19,290 @@ const ViewSalesReturn = () => {
             const { data } = await api.get(`/sales/returns/${id}`);
             if (data.success) {
                 const ret = data.saleReturn;
-                const sale = ret.saleId;
+                const sale = ret.saleId || {};
+                const customer = sale.customerId || {};
                 
-                // Populate returnNote with real data
+                // Calculate Tax Breakup
+                const taxBreakup = {};
+                let totalTaxable = 0;
+                let totalGst = 0;
+                
+                const items = ret.items.map(i => {
+                    const product = i.productId || {};
+                    const rate = i.price || 0;
+                    const qty = i.quantity || 0;
+                    const gstPercent = i.tax || product.tax || 12;
+                    
+                    const amountWithoutTax = rate * qty;
+                    const gstAmount = (amountWithoutTax * gstPercent) / 100;
+                    const amountWithTax = amountWithoutTax + gstAmount;
+                    
+                    if (!taxBreakup[gstPercent]) {
+                        taxBreakup[gstPercent] = { taxable: 0, gst: 0 };
+                    }
+                    taxBreakup[gstPercent].taxable += amountWithoutTax;
+                    taxBreakup[gstPercent].gst += gstAmount;
+                    
+                    totalTaxable += amountWithoutTax;
+                    totalGst += gstAmount;
+
+                    return {
+                        skuId: product.sku || product.barcode || (product._id ? product._id.slice(-6).toUpperCase() : 'N/A'),
+                        skuName: i.name || product.name || 'Unknown Item',
+                        batch: i.batchNumber || product.batchNumber || 'N/A',
+                        expiry: product.expiryDate || 'N/A',
+                        qty: qty,
+                        mrp: product.sellingPrice || i.price || 0,
+                        rate: rate,
+                        gstPercent: gstPercent,
+                        amountWithoutTax: amountWithoutTax,
+                        amountWithTax: amountWithTax,
+                        invoiceNumber: ret.invoiceNumber
+                    };
+                });
+
                 setReturnNote({
                     id: ret.returnNumber,
-                    dbId: ret._id,
                     date: new Date(ret.createdAt).toLocaleDateString(),
-                    originalInvoiceId: ret.invoiceNumber,
-                    customer: ret.customerName || 'Walk-in',
-                    contact: sale?.customerId?.phone || 'N/A',
-                    address: sale?.customerId?.address || 'N/A',
-                    reason: ret.reason || 'Not specified',
-                    status: ret.status,
-                    items: ret.items.map(item => ({
-                        name: item.name,
-                        qty: item.quantity,
-                        rate: item.price,
-                        tax: item.productId?.tax || 18,
-                        subtotal: item.subtotal
-                    })),
-                    subtotal: ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-                    taxAmount: ret.totalAmount - ret.items.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-                    refundAmount: ret.totalAmount,
-                    shop: data.shop
+                    customer: {
+                        name: ret.customerName || customer.name || 'Walk-in Customer',
+                        address: customer.address || 'N/A',
+                        phone: customer.phone || 'N/A',
+                        gst: customer.gstNumber || 'N/A'
+                    },
+                    items: items,
+                    taxBreakup: taxBreakup,
+                    totalTaxable: totalTaxable,
+                    totalGst: totalGst,
+                    totalAmount: ret.totalAmount,
+                    reason: ret.reason || 'N/A',
+                    shop: data.shop || {
+                        shopName: 'KS Pharma Net Solutions Pvt. Ltd.',
+                        address: '123, Health Avenue, Medical District',
+                        contactNumber: '+91 98765 43210',
+                        email: 'support@kspharma.com'
+                    }
                 });
+            } else {
+                setError("Sales Return not found");
             }
-        } catch (error) {
-            console.error("Error fetching return details:", error);
-            Swal.fire('Error', 'Failed to load return details', 'error');
+        } catch (err) {
+            setError("Failed to load Sales Return details");
+            console.error(err);
+        } finally {
+            setLoading(false);
         }
     };
 
     if (id) fetchReturnData();
   }, [id]);
 
-  if (!returnNote) return (
-      <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-  );
+  const handleDownloadPDF = async () => {
+      const input = document.getElementById('credit-note-content');
+      if (!input) return;
+
+      try {
+          const clone = input.cloneNode(true);
+          clone.style.width = '210mm'; 
+          clone.style.minHeight = '297mm'; 
+          clone.style.position = 'absolute';
+          clone.style.left = '-9999px';
+          clone.style.top = '0';
+          clone.style.background = 'white';
+          document.body.appendChild(clone);
+
+          const canvas = await html2canvas(clone, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+          document.body.removeChild(clone);
+
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`CreditNote_${returnNote.id}.pdf`);
+      } catch (err) {
+          console.error("PDF generation failed:", err);
+      }
+  };
+
+  if (loading) return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div></div>;
+  if (error) return <div className="text-center text-red-500 mt-20 font-bold">{error}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 animate-fade-in print:p-0 print:bg-white">
+    <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white text-black font-sans">
       
-      {/* Action Header - Hidden on Print */}
-      <div className="max-w-4xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden">
-        <button 
-            onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/sales/return');
-              }
-            }}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 text-gray-600 dark:text-gray-300 hover:text-red-500 transition-colors bg-white dark:bg-gray-800 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md font-bold active:scale-95"
-        >
-            <ArrowLeft size={18} strokeWidth={2.5} />
-            <span className="uppercase text-xs tracking-widest">Back to List</span>
+      {/* Header Actions */}
+      <div className="max-w-[210mm] mx-auto mb-6 flex justify-between items-center print:hidden">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-black font-semibold">
+            <ArrowLeft size={18} /> Back
         </button>
-        
-        <div className="flex gap-3 w-full sm:w-auto">
-            <button 
-                onClick={handleDownloadPDF}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition-all font-bold active:scale-95"
-            >
-                <Download size={18} strokeWidth={2.5} />
-                <span className="uppercase text-xs tracking-widest">PDF</span>
+        <div className="flex gap-2">
+            <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 font-semibold shadow-sm text-sm">
+                <Download size={16} /> PDF
             </button>
-            <button 
-                onClick={() => window.print()} 
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl shadow-lg shadow-red-200 hover:shadow-red-300 hover:bg-red-700 transition-all font-black active:scale-95"
-            >
-                <Printer size={18} strokeWidth={3} />
-                <span className="uppercase text-xs tracking-widest">Print Note</span>
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow-sm text-sm">
+                <Printer size={16} /> Print
             </button>
         </div>
       </div>
 
-      {/* Invoice Card */}
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden print:shadow-none print:border-none print:rounded-none print:max-w-none print:w-full">
-        
-        {/* Top Branding Section */}
-        <div className="bg-gradient-to-br from-red-50 to-white dark:from-gray-800 dark:to-gray-900 border-b border-gray-100 dark:border-gray-700 p-6 md:p-12">
-            <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
-                <div className="flex flex-col gap-6 w-full lg:w-1/2">
-                    <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm w-fit">
-                        <img src="/KS2-Logo.png" alt="Logo" className="h-16 md:h-20 w-auto object-contain" />
-                    </div>
-                    <div className="space-y-3 text-sm text-gray-500 dark:text-gray-400">
-                        <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{returnNote.shop?.shopName || 'KS Pharma Net'}</h2>
-                        <div className="flex items-start gap-3">
-                            <MapPin size={16} className="text-red-500 shrink-0 mt-0.5"/>
-                            <span className="font-medium text-gray-600 dark:text-gray-300">{returnNote.shop?.address || '123, Health Avenue, Medical District'}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Phone size={16} className="text-red-500 shrink-0"/>
-                            <span className="font-bold text-gray-800 dark:text-gray-200">{returnNote.shop?.contactNumber || '+91 98765 43210'}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Mail size={16} className="text-red-500 shrink-0"/>
-                            <span className="font-medium">{returnNote.shop?.email || 'support@kspharma.com'}</span>
-                        </div>
-                    </div>
-                </div>
+      {/* A4 Sheet */}
+      <div id="credit-note-content" className="w-[210mm] min-h-[297mm] mx-auto bg-white p-6 shadow-xl print:shadow-none print:w-full print:p-4 text-[10px] leading-tight border border-black print:border-none box-border relative">
+          
+          {/* Header */}
+          <div className="text-center mb-4">
+              <div className="font-bold text-xs uppercase tracking-wide mb-1">SALES RETURN MEMO (CREDIT NOTE)</div>
+              <div className="flex items-center justify-center gap-3 mb-2">
+                   <img src={KS2Logo} alt="Logo" className="h-10 object-contain" />
+              </div>
+              <h1 className="text-lg font-bold uppercase">{returnNote.shop.shopName}</h1>
+              <div className="text-[9px] mt-1 space-y-0.5">
+                  <div>{returnNote.shop.address}</div>
+                  <div><strong>Phone:</strong> {returnNote.shop.contactNumber} | <strong>Email:</strong> {returnNote.shop.email}</div>
+                  {returnNote.shop.gstNumber && <div><strong>GST No.:</strong> {returnNote.shop.gstNumber}</div>}
+              </div>
+          </div>
 
-                <div className="text-left lg:text-right w-full lg:w-auto lg:pt-0 pt-8 border-t lg:border-t-0 border-gray-100 dark:border-gray-700">
-                    <h1 className="text-6xl md:text-8xl font-black text-red-500/5 dark:text-red-400/5 uppercase tracking-tighter leading-none mb-1 -mt-2 lg:block hidden">Return</h1>
-                    <div className="flex flex-col lg:items-end">
-                        <span className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-2">Credit Note No.</span>
-                        <div className="text-3xl font-black text-gray-800 dark:text-white leading-none">#{returnNote.id}</div>
-                        <div className="text-xs font-bold text-gray-400 mt-2 uppercase tracking-widest">Ref: {returnNote.originalInvoiceId}</div>
-                    </div>
-                    
-                    <div className="mt-8 flex flex-col lg:items-end gap-6">
-                        <div className="flex flex-col lg:items-end">
-                            <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Scan & Verify</span>
-                            <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg ring-4 ring-red-500/5">
-                                <img src={qrCodeUrl} alt="Return QR" className="w-20 h-20 md:w-24 md:h-24 mix-blend-multiply dark:mix-blend-normal rounded-lg" />
-                            </div>
-                        </div>
-                        <div className="flex flex-col lg:items-end gap-2">
-                            <div className="px-4 py-1.5 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100 dark:border-red-900/30 shadow-sm">
-                                 {returnNote.status}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">
-                                ISSUED: <span className="text-gray-900 dark:text-white">{returnNote.date}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* Details Section */}
-        <div className="p-6 md:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <div>
-                <h3 className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-[0.2em] mb-4">Customer Details</h3>
-                <div className="text-2xl font-black text-gray-900 dark:text-white mb-2">{returnNote.customer}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
-                    {returnNote.address}
-                </div>
-                <div className="mt-4 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200">
-                    <Phone size={16} className="text-red-500" />
-                    <span>{returnNote.contact}</span>
-                </div>
-            </div>
-            
-            <div className="lg:text-right pt-8 lg:pt-0 border-t lg:border-t-0 border-gray-100 dark:border-gray-700">
-                 <h3 className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-[0.2em] mb-4">Return Reason</h3>
-                 <div className="p-4 bg-red-50/50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 inline-block max-w-md">
-                    <p className="text-sm font-black text-red-800 dark:text-red-400 italic leading-relaxed">
-                        "{returnNote.reason}"
-                    </p>
+          <div className="mb-4">
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                     <div className="font-bold">Return Number : <span className="font-normal">{returnNote.id}</span></div>
+                     <div className="font-bold">Return Date : <span className="font-normal">{returnNote.date}</span></div>
+                     <div className="font-bold">Original Invoice : <span className="font-normal">{returnNote.items[0]?.invoiceNumber || 'N/A'}</span></div>
                  </div>
-            </div>
-        </div>
+                 <div className="text-right">
+                    <div className="inline-block p-1 px-3 border border-red-500 text-red-600 font-bold uppercase rounded-md">
+                        {returnNote.reason}
+                    </div>
+                 </div>
+             </div>
+             <div className="mt-3 p-2 bg-gray-50 border border-gray-100 rounded">
+                 <div className="font-bold border-b border-gray-200 pb-1 mb-1 uppercase text-[9px]">Customer Details</div>
+                 <div className="font-bold">Name : <span className="font-normal">{returnNote.customer.name}</span></div>
+                 <div className="font-bold">Address : <span className="font-normal">{returnNote.customer.address}</span></div>
+                 <div className="font-bold">Phone : <span className="font-normal">{returnNote.customer.phone}</span></div>
+                 {returnNote.customer.gst !== 'N/A' && <div className="font-bold">GST No : <span className="font-normal">{returnNote.customer.gst}</span></div>}
+             </div>
+          </div>
+          
+          <div className="border-t border-black mb-1"></div>
+          
+          {/* Items Table */}
+          <table className="w-full border-collapse border border-black mb-4">
+              <thead>
+                  <tr className="bg-gray-100 text-[8px] font-bold text-center">
+                      <th className="border border-black p-1 w-[4%]">Sr.No.</th>
+                      <th className="border border-black p-1 w-[12%]">SKU ID</th>
+                      <th className="border border-black p-1 w-[25%] text-left">Item Description</th>
+                      <th className="border border-black p-1 w-[10%]">Batch</th>
+                      <th className="border border-black p-1 w-[8%]">Exp.</th>
+                      <th className="border border-black p-1 w-[6%]">Qty</th>
+                      <th className="border border-black p-1 w-[8%] text-right">MRP</th>
+                      <th className="border border-black p-1 w-[10%] text-right">Rate</th>
+                      <th className="border border-black p-1 w-[5%]">GST%</th>
+                      <th className="border border-black p-1 w-[12%] text-right">Amount</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {returnNote.items.map((item, idx) => (
+                      <tr key={idx} className="text-[9px]">
+                          <td className="border border-black p-1 text-center">{idx + 1}</td>
+                          <td className="border border-black p-1 text-center">{item.skuId}</td>
+                          <td className="border border-black p-1 text-left">{item.skuName}</td>
+                          <td className="border border-black p-1 text-center">{item.batch}</td>
+                          <td className="border border-black p-1 text-center">
+                              {item.expiry !== 'N/A' ? new Date(item.expiry).toLocaleDateString('en-GB', { month: '2-digit', year: '2-digit' }) : '-'}
+                          </td>
+                          <td className="border border-black p-1 text-center font-bold">{item.qty}</td>
+                          <td className="border border-black p-1 text-right">{item.mrp.toFixed(2)}</td>
+                          <td className="border border-black p-1 text-right">{item.rate.toFixed(2)}</td>
+                          <td className="border border-black p-1 text-center">{item.gstPercent}</td>
+                          <td className="border border-black p-1 text-right font-bold">{item.amountWithTax.toFixed(2)}</td>
+                      </tr>
+                  ))}
+              </tbody>
+          </table>
 
-        {/* Items Table */}
-        <div className="px-6 md:px-12 pb-8 pt-8">
-            <div className="border rounded-2xl overflow-hidden border-gray-200 dark:border-gray-700 shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[700px] lg:min-w-0">
-                        <thead>
-                            <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-200 font-black uppercase text-[10px] tracking-widest">
-                                <th className="py-5 px-6 w-16 text-center">#</th>
-                                <th className="py-5 px-6">Item Name</th>
-                                <th className="py-5 px-6 text-center">Qty</th>
-                                <th className="py-5 px-6 text-right">Rate</th>
-                                <th className="py-5 px-6 text-right">Tax (GST)</th>
-                                <th className="py-5 px-6 text-right">Total Refund</th>
+          {/* Footer - Tax Breakup & Summaries */}
+          <div className="flex border border-black text-[9px]">
+              {/* Tax Breakup Table */}
+              <div className="w-[60%] border-r border-black">
+                  <table className="w-full text-center border-collapse">
+                      <thead>
+                          <tr className="border-b border-black font-bold bg-gray-50">
+                              <th className="border-r border-black p-1 text-left px-2">GST %</th>
+                              <th className="border-r border-black p-1 text-right px-2">Taxable Value</th>
+                              <th className="border-r border-black p-1 text-right px-2">CGST</th>
+                              <th className="border-r border-black p-1 text-right px-2">SGST</th>
+                              <th className="p-1 px-2 text-right">Total Tax</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {Object.entries(returnNote.taxBreakup).map(([rate, data]) => (
+                            <tr key={rate} className="border-b border-black last:border-0">
+                                <td className="border-r border-black p-1 text-left px-2 font-bold">{rate}%</td>
+                                <td className="border-r border-black p-1 text-right px-2">{data.taxable.toFixed(2)}</td>
+                                <td className="border-r border-black p-1 text-right px-2">{(data.gst / 2).toFixed(2)}</td>
+                                <td className="border-r border-black p-1 text-right px-2">{(data.gst / 2).toFixed(2)}</td>
+                                <td className="p-1 text-right px-2 font-bold">{data.gst.toFixed(2)}</td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {returnNote.items.map((item, index) => (
-                                <tr key={index} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
-                                    <td className="py-5 px-6 text-center text-gray-400 font-black italic">{index + 1}</td>
-                                    <td className="py-5 px-6">
-                                        <div className="font-bold text-gray-900 dark:text-white text-base">{item.name}</div>
-                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mt-0.5">HSN: 3004 / Returned Item</div>
-                                    </td>
-                                    <td className="py-5 px-6 text-center">
-                                        <span className="bg-red-50 dark:bg-red-900/30 px-3 py-1 rounded-lg text-xs font-black text-red-700 dark:text-red-400">
-                                            {item.qty < 10 ? `0${item.qty}` : item.qty}
-                                        </span>
-                                    </td>
-                                    <td className="py-5 px-6 text-right font-bold text-gray-700 dark:text-gray-300">₹{item.rate.toFixed(2)}</td>
-                                    <td className="py-5 px-6 text-right">
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{item.tax}% GST</span>
-                                            <span className="font-bold text-gray-500 text-xs">₹{((item.qty * item.rate * item.tax)/100).toFixed(2)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="py-5 px-6 text-right">
-                                        <span className="font-black text-red-600 dark:text-red-400 text-base">- ₹{(item.qty * item.rate * (1 + item.tax/100)).toFixed(2)}</span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {/* Mobile Helper Text */}
-            <p className="lg:hidden text-center text-[10px] text-gray-400 font-black uppercase tracking-widest mt-4 animate-pulse">
-                ← Swipe to see full details →
-            </p>
-        </div>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+              
+              {/* Grand Totals */}
+              <div className="w-[40%] bg-white">
+                   <div className="flex justify-between p-1.5 px-3 border-b border-gray-100">
+                       <span className="text-gray-600">Total Taxable Amount:</span>
+                       <span className="font-bold">₹{returnNote.totalTaxable.toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between p-1.5 px-3 border-b border-gray-100">
+                       <span className="text-gray-600">Total GST Amount:</span>
+                       <span className="font-bold">₹{returnNote.totalGst.toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between p-2 px-3 bg-red-50 font-black text-red-700 text-xs mt-auto">
+                       <span className="uppercase">Net Refund Amount:</span>
+                       <span>₹{Math.round(returnNote.totalAmount).toLocaleString()}</span>
+                   </div>
+                   <div className="p-1 text-[8px] text-gray-400 text-center italic">
+                       (Amount in words: {returnNote.totalAmount.toFixed(0)} only)
+                   </div>
+              </div>
+          </div>
+          
+          <div className="mt-8 flex justify-between px-10">
+              <div className="text-center">
+                  <div className="h-12 border-b border-black w-32 mb-1"></div>
+                  <div className="font-bold text-[9px] uppercase">Customer's Signature</div>
+              </div>
+              <div className="text-center">
+                  <div className="font-bold text-[8px] mb-8">For {returnNote.shop.shopName}</div>
+                  <div className="h-0 border-b border-black w-40 mb-1"></div>
+                  <div className="font-bold text-[9px] uppercase">Authorized Signatory</div>
+              </div>
+          </div>
 
-        {/* Footer Summary */}
-        <div className="bg-gray-50 dark:bg-gray-850 p-6 md:p-12 flex flex-col md:flex-row justify-end items-start gap-12 print:break-inside-avoid">
-             <div className="flex-1 text-[10px] text-gray-400 dark:text-gray-500 space-y-3 max-w-sm uppercase tracking-widest leading-loose">
-                <p className="font-black text-gray-900 dark:text-white text-xs">Declaration:</p>
-                <p>We declare that this credit note shows the actual price of the goods returned and that all particulars are true and correct. This is a computer generated document.</p>
-             </div>
-
-             <div className="w-full md:w-80 space-y-6">
-                <div className="space-y-3">
-                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400">
-                        <span>Subtotal (Refund)</span>
-                        <span className="text-gray-700 dark:text-gray-300">₹{returnNote.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400">
-                        <span>Reversed Tax</span>
-                        <span className="text-gray-700 dark:text-gray-300">₹{returnNote.taxAmount.toFixed(2)}</span>
-                    </div>
-                </div>
-                
-                <div className="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-6 mt-4">
-                    <div className="flex flex-col">
-                        <span className="font-black text-gray-900 dark:text-white text-base uppercase tracking-tighter">Total Refund</span>
-                        <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest">Credited to Account</span>
-                    </div>
-                    <span className="font-black text-red-600 dark:text-red-500 text-3xl tracking-tighter">- ₹{returnNote.refundAmount.toFixed(2)}</span>
-                </div>
-             </div>
-        </div>
-        
-        {/* Print Only Footer - Signatures */}
-        <div className="hidden print:flex justify-between items-end px-12 pb-12 mt-12">
-            <div className="text-center">
-                <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
-                <p className="text-xs font-bold uppercase text-gray-600">Customer Signature</p>
-            </div>
-            <div className="text-center">
-                 <div className="h-16 w-32 border-b border-gray-400 mb-2"></div>
-                <p className="text-xs font-bold uppercase text-gray-600">Authorized Signatory</p>
-            </div>
-        </div>
+          {/* Declaration */}
+          <div className="absolute bottom-6 left-6 right-6 text-[7px] text-gray-400 border-t border-gray-100 pt-2 flex justify-between">
+              <span>This is a computer generated document and does not require a physical signature.</span>
+              <span>Page 1 of 1</span>
+          </div>
 
       </div>
+
       <style>{`
           @media print {
-              @page { margin: 0; size: auto; }
-              body { 
-                background: white; 
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+              @page { margin: 5mm; }
+              body { background: white; }
+              #credit-note-content { 
+                  margin: 0;
+                  box-shadow: none;
+                  border: none;
+                  width: 100%;
               }
-              body > *:not(#root) { display: none; }
-              .max-w-4xl {
-                  max-width: none !important;
-                  width: 100% !important;
-                  margin: 0 !important;
-                  box-shadow: none !important;
-                  border: none !important;
-              }
-              * {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-              }
-              p, div, span, h1, h2, h3, h4, th, td {
-                  color: #000 !important;
-              }
-              .text-red-500, .text-red-600, .text-red-700 {
-                  color: #dc2626 !important;
-              }
-              .bg-red-50 {
-                   background-color: #fef2f2 !important;
-              }
-              .overflow-hidden {
-                  overflow: visible !important;
-              }
-              .p-8, .md\\:p-12 {
-                  padding: 20px !important;
-              }
+              button { display: none; }
           }
       `}</style>
     </div>

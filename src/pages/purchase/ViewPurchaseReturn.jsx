@@ -56,7 +56,7 @@ const ViewPurchaseReturn = () => {
                     totalGst += gstAmount;
 
                     return {
-                        skuId: product.sku || product.barcode || 'N/A',
+                        skuId: product.sku || (product._id ? product._id.slice(-6).toUpperCase() : 'N/A'),
                         skuName: product.name || 'Unknown Item',
                         batch: i.batchNumber || 'N/A',
                         expiry: product.expiry || 'N/A', // Purchase return item might not have specific expiry stored, fallback to product
@@ -79,7 +79,7 @@ const ViewPurchaseReturn = () => {
                         name: r.supplierId?.name || 'Unknown Supplier',
                         address: r.supplierId?.address || 'N/A',
                         gst: r.supplierId?.gstNumber || 'N/A',
-                        dl: r.supplierId?.dlNumber || 'N/A' // Assuming DL might be in supplier model
+                        dl: r.supplierId?.drugLicenseNumber || 'N/A'
                     },
                     items: items,
                     taxBreakup: taxBreakup,

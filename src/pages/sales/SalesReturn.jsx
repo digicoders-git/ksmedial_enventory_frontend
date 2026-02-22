@@ -483,7 +483,7 @@ const SalesReturn = () => {
                         </div>
                         <div className="p-6 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-6 items-start md:items-end justify-between">
                              <div className="w-full md:w-1/2">
-                                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Return Reason</label>
+                                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Return Reason <span className="text-red-500">*</span></label>
                                  <div className="space-y-2">
                                      <select 
                                         value={reason} 
