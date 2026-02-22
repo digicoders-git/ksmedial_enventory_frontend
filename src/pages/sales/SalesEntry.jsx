@@ -312,14 +312,39 @@ const SalesEntry = () => {
     }
     
     // Validate mandatory customer details
-    if (!patientDetails.name || !patientDetails.mobile) {
+    if (!patientDetails.name.trim()) {
       Swal.fire({
         icon: 'warning',
-        title: 'Customer Details Required',
-        text: 'Please fill Customer Name and Mobile Number before proceeding.',
+        title: 'Patient Name Required',
+        text: 'Please enter the patient or customer name.',
         confirmButtonColor: '#007242'
       });
       setShowExtraDetails(true);
+      setTimeout(() => patientNameRef.current?.focus(), 500);
+      return;
+    }
+
+    if (!patientDetails.mobile || patientDetails.mobile.length !== 10) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Valid Mobile Required',
+        text: 'Please enter a valid 10-digit mobile number.',
+        confirmButtonColor: '#007242'
+      });
+      setShowExtraDetails(true);
+      setTimeout(() => patientMobileRef.current?.focus(), 500);
+      return;
+    }
+
+    if (!patientDetails.age || isNaN(patientDetails.age) || patientDetails.age <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Valid Age Required',
+        text: 'Please enter a valid age for the patient.',
+        confirmButtonColor: '#007242'
+      });
+      setShowExtraDetails(true);
+      setTimeout(() => patientAgeRef.current?.focus(), 500);
       return;
     }
     Swal.fire({
@@ -795,7 +820,7 @@ const SalesEntry = () => {
                                         onBlur={() => setTimeout(() => setShowPatientMobileSuggestions(false), 200)}
                                         onKeyDown={handlePatientMobileKeyDown}
                                         onChange={e => {
-                                            const val = e.target.value;
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                                             setPatientDetails({...patientDetails, mobile: val});
                                             setShowPatientMobileSuggestions(true);
                                         }} 
@@ -832,7 +857,10 @@ const SalesEntry = () => {
                                     ref={patientAgeRef}
                                     placeholder="Age" 
                                     value={patientDetails.age} 
-                                    onChange={e => setPatientDetails({...patientDetails, age: e.target.value})} 
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+                                        setPatientDetails({...patientDetails, age: val});
+                                    }} 
                                     onKeyDown={(e) => e.key === 'Enter' && paymentSelectRef.current?.focus()}
                                     className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
                                 />
