@@ -52,23 +52,29 @@ const CreatePurchaseOrder = () => {
         try {
             setLoading(true);
             const { data } = await api.get(`/purchase-orders/${id}`);
-            const order = data; 
+            const order = data.data || data.order || data; 
             
+            const formatDate = (dateVal) => {
+                if (!dateVal || dateVal === 'N/A') return '';
+                const d = new Date(dateVal);
+                return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+            };
+
             setFormData({
-                poDate: new Date(order.createdAt).toISOString().split('T')[0], 
-                expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate).toISOString().split('T')[0] : '',
+                poDate: formatDate(order.poDate || order.createdAt) || new Date().toISOString().split('T')[0], 
+                expectedDeliveryDate: formatDate(order.expectedDeliveryDate),
                 notes: order.notes || ''
             });
 
-            // Map items
-            const mappedItems = order.items.map(item => ({
-                product: item.product._id || item.product, 
-                medicineName: item.product.name || item.medicineName || 'Unknown Product', 
-                supplierId: order.supplierId, // Existing orders are single supplier
-                quantity: item.quantity,
-                purchaseRate: item.purchaseRate,
+            // Map items with safety checks
+            const mappedItems = (order.items || []).map(item => ({
+                product: item.product?._id || item.product, 
+                medicineName: item.product?.name || item.medicineName || 'Unknown Product', 
+                supplierId: order.supplierId?._id || order.supplierId, // Existing orders are single supplier
+                quantity: item.quantity || 0,
+                purchaseRate: item.purchaseRate || 0,
                 gst: item.gst || 0,
-                totalAmount: item.totalAmount
+                totalAmount: item.totalAmount || 0
             }));
             setItems(mappedItems);
 

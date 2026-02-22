@@ -20,7 +20,9 @@ const PurchaseOrderList = () => {
         try {
             setLoading(true);
             const { data } = await api.get('/purchase-orders');
-            setOrders(Array.isArray(data) ? data : []);
+            // Extract array from wrapped response if present
+            const ordersList = Array.isArray(data) ? data : (data.data || []);
+            setOrders(ordersList);
         } catch (error) {
             console.error("Failed to fetch orders", error);
             setOrders([]);

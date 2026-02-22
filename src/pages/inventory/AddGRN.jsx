@@ -70,6 +70,68 @@ const AddGRN = () => {
         }
     };
 
+    const fetchAndSetPOItems = async (poId) => {
+        if (!poId) return false;
+        try {
+            // Handle multiple POs (take first) if comma separated
+            const idToFetch = poId.split(',')[0].trim();
+            const { data: response } = await api.get(`/purchase-orders/${idToFetch}`);
+            const po = response.data || response.order || response;
+            
+            if (po && po.items) {
+                const poItems = po.items.map(item => {
+                    const prodId = item.product?._id || item.product;
+                    const product = products.find(p => p._id === prodId); 
+                    const purchaseRate = parseFloat(item.purchaseRate || product?.purchasePrice || product?.rate || 0);
+                    const mrpPrice = parseFloat(product?.mrp || product?.sellingPrice || 0);
+
+                    return {
+                        productId: product?._id || prodId || '',
+                        productName: item.medicineName || product?.name || '',
+                        supplierSkuId: '',
+                        skuId: product?.sku || item.product?.sku || '',
+                        pack: product?.packing || product?.packSize || '',
+                        batchNumber: (product?.batchNumber && product?.batchNumber !== 'N/A') ? product?.batchNumber : (product?.batchNo || product?.batch || ''),
+                        expiryDate: formatDateForInput(product?.expiryDate || product?.expiry || product?.exp),
+                        mfgDate: formatDateForInput(product?.manufacturingDate || product?.mfgDate || product?.mfg),
+                        systemMrp: mrpPrice,
+                        orderedQty: item.quantity || 0,
+                        receivedQty: item.quantity || 0,
+                        physicalFreeQty: 0,
+                        schemeFreeQty: 0,
+                        poRate: purchaseRate,
+                        ptr: parseFloat(product?.ptr || purchaseRate || 0),
+                        baseRate: purchaseRate,
+                        schemeDiscount: 0,
+                        discountPercent: 0,
+                        amount: 0,
+                        hsnCode: product?.hsnCode || '',
+                        cgst: (item.gst || product?.tax || 0) / 2,
+                        sgst: (item.gst || product?.tax || 0) / 2,
+                        igst: 0,
+                        purchasePrice: purchaseRate,
+                        sellingPrice: product?.sellingPrice || mrpPrice,
+                        mrp: mrpPrice,
+                        margin: mrpPrice > 0 ? ((mrpPrice - purchaseRate) / mrpPrice * 100).toFixed(2) : 0
+                    };
+                });
+                
+                const enriched = poItems.map(i => {
+                    i.amount = i.baseRate * i.receivedQty;
+                    return i;
+                });
+                
+                setItems(enriched);
+                calculateSummary(enriched);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error("Failed to fetch PO details", error);
+            return false;
+        }
+    };
+
     useEffect(() => {
         fetchSuppliers();
         fetchProducts();
@@ -95,76 +157,27 @@ const AddGRN = () => {
                 
                 // Fetch PO Items if PO ID is present
                 if (entryData?.poIds) {
-                    const fetchPOItems = async () => {
-                        try {
-                            // Fetch PO by Number (backend now supports this)
-                            const { data: po } = await api.get(`/purchase-orders/${entryData.poIds}`);
-                            if (po && po.items) {
-                                const poItems = po.items.map(item => {
-                                    const prodId = item.product?._id || item.product;
-                                    const product = products.find(p => p._id === prodId); 
-                                    const purchaseRate = parseFloat(item.purchaseRate || product?.purchasePrice || product?.rate || 0);
-                                    const mrpPrice = parseFloat(product?.mrp || product?.sellingPrice || 0);
-
-                                    return {
-                                        productId: product?._id || prodId || '',
-                                        productName: item.medicineName || product?.name || '',
-                                        supplierSkuId: '',
-                                        skuId: product?.sku || '',
-                                        pack: product?.packing || product?.packSize || '',
-                                        batchNumber: (product?.batchNumber && product?.batchNumber !== 'N/A') ? product?.batchNumber : (product?.batchNo || product?.batch || ''),
-                                        expiryDate: formatDateForInput(product?.expiryDate || product?.expiry || product?.exp),
-                                        mfgDate: formatDateForInput(product?.manufacturingDate || product?.mfgDate || product?.mfg),
-                                        systemMrp: mrpPrice,
-                                        orderedQty: item.quantity || 0,
-                                        receivedQty: item.quantity || 0, // Default to ordered
-                                        physicalFreeQty: 0,
-                                        schemeFreeQty: 0,
-                                        poRate: purchaseRate,
-                                        ptr: parseFloat(product?.ptr || purchaseRate || 0),
-                                        baseRate: purchaseRate,
-                                        schemeDiscount: 0,
-                                        discountPercent: 0,
-                                        amount: 0, // Will recalculate
-                                        hsnCode: product?.hsnCode || '',
-                                        cgst: (item.gst || product?.tax || 0) / 2,
-                                        sgst: (item.gst || product?.tax || 0) / 2,
-                                        igst: 0,
-                                        purchasePrice: purchaseRate,
-                                        sellingPrice: product?.sellingPrice || mrpPrice,
-                                        mrp: mrpPrice,
-                                        margin: purchaseRate > 0 ? ((mrpPrice - purchaseRate) / purchaseRate * 100).toFixed(2) : 0
-                                    };
-                                });
-                                
-                                // Trigger calculation for enriched items
-                                const enriched = poItems.map(i => {
-                                    i.amount = i.baseRate * i.receivedQty;
-                                    return i;
-                                });
-                                
-                                setItems(enriched);
-                                calculateSummary(enriched);
-                                Swal.fire({
-                                    title: 'Data Loaded',
-                                    text: `Prefilled from Physical ID: ${phId} & PO: ${entryData.poIds}`,
-                                    icon: 'success',
-                                    timer: 2000,
-                                    showConfirmButton: false
-                                });
-                            }
-                        } catch (error) {
-                            console.error("Failed to fetch PO details", error);
+                    const loadItems = async () => {
+                        const success = await fetchAndSetPOItems(entryData.poIds);
+                        if (success) {
                             Swal.fire({
                                 title: 'Data Loaded',
-                                text: `Prefilled from Physical ID: ${phId}. (Could not fetch items for PO: ${entryData.poIds})`,
+                                text: `Prefilled from Physical ID: ${phId} & PO: ${entryData.poIds}`,
+                                icon: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                title: 'Data Loaded',
+                                text: `Prefilled from Physical ID: ${phId}. (Items not linked or PO not found)`,
                                 icon: 'info',
                                 timer: 2000,
                                 showConfirmButton: false
                             });
                         }
                     };
-                    fetchPOItems();
+                    loadItems();
                 } else {
                      Swal.fire({
                         title: 'Data Loaded',
@@ -270,8 +283,13 @@ const AddGRN = () => {
                 if (supplier) {
                     setSelectedSupplierDetails(supplier);
                 }
-                
-                Swal.fire('Success', `Loaded details for Invoice ${entry.invoiceNumber}`, 'success');
+
+                if (entry.poIds) {
+                    await fetchAndSetPOItems(entry.poIds);
+                    Swal.fire('Success', `Loaded details & Items for Invoice ${entry.invoiceNumber}`, 'success');
+                } else {
+                    Swal.fire('Success', `Loaded details for Invoice ${entry.invoiceNumber}`, 'success');
+                }
             }
         } catch (error) {
             Swal.fire('Error', 'Physical Validation ID not found', 'error');
@@ -336,6 +354,8 @@ const AddGRN = () => {
                     const name = row['Medicine Name'] || row['Item Name'];
                     const product = products.find(p => p.name.toLowerCase() === name.toLowerCase());
                     
+                    const mrpPrice = parseFloat(row['MRP']) || parseFloat(product?.mrp) || parseFloat(product?.sellingPrice) || 0;
+
                     return {
                         productId: product?._id || '',
                         productName: name,
@@ -362,6 +382,7 @@ const AddGRN = () => {
                         igst: 0, // Handle correctly if needed
                         sellingPrice: product?.sellingPrice || mrpPrice,
                         mrp: mrpPrice,
+                        purchasePrice: parseFloat(row['Base Rate']) || parseFloat(row['Purchase Rate']) || 0,
                         margin: parseFloat(row['Margin']) || 0
                     };
                 }).filter(Boolean);
@@ -605,6 +626,9 @@ const AddGRN = () => {
         items.forEach((item, index) => {
             const errors = [];
             
+            if (!item.productId || item.productId.trim() === '') {
+                errors.push('Product (Not found in system)');
+            }
             if (!item.supplierSkuId || item.supplierSkuId.trim() === '') {
                 errors.push('Supplier SKU ID');
             }

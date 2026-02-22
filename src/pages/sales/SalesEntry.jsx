@@ -13,7 +13,7 @@ const getPackSize = (packingStr) => {
 
 const SalesEntry = () => {
   const navigate = useNavigate();
-  const { inventory, sellItems, loading: inventoryLoading } = useInventory();
+  const { inventory, sellItems, loading: inventoryLoading, fetchInventory } = useInventory();
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -48,7 +48,8 @@ const SalesEntry = () => {
         try {
             const [catRes, custRes] = await Promise.all([
                 api.get('/categories'),
-                api.get('/customers')
+                api.get('/customers'),
+                fetchInventory() // Ensure inventory is fresh on mount
             ]);
             if (catRes.data.success) {
                 setCategories(['All', ...catRes.data.categories.map(c => c.name)]);
@@ -65,7 +66,14 @@ const SalesEntry = () => {
         }
     };
     fetchData();
-  }, []);
+  }, []); // Run only once on mount
+
+  useEffect(() => {
+    // Refresh inventory whenever window gets focus (e.g. returning from another tab where GRN was added)
+    const handleFocus = () => fetchInventory();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchInventory]);
 
   useEffect(() => {
     const fetchInvoice = async () => {

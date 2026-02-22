@@ -35,8 +35,8 @@ const ViewPurchaseOrder = () => {
             setLoading(true);
             const { data } = await api.get(`/purchase-orders/${id}`);
             if (data) {
-                // If the backend returns the order directly or wrapped
-                const orderData = data.order || data; 
+                // Correctly extract order from the backend response wrapper
+                const orderData = data.data || data.order || data; 
                 
                 // Fetch Supplier details if needed (assuming partial details in order)
                 // For now, we rely on what's in the order object or what we can display
@@ -58,7 +58,7 @@ const ViewPurchaseOrder = () => {
         // Header
         csvRows.push("SR,Product Name,SKU,Supplier,Quantity");
         
-        order.items.forEach((item, idx) => {
+        (order.items || []).forEach((item, idx) => {
             const supplierName = item.supplier?.name || '-';
             const sku = item.product?.sku || '-';
             const row = [
@@ -139,7 +139,7 @@ const ViewPurchaseOrder = () => {
   const supplierName = order.supplierName || 'Unknown Supplier';
   
   // Calculate Totals
-  const totalQty = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQty = (order.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
   const totalAmount = order.totalAmount || 0;
 
   return (
@@ -214,8 +214,8 @@ const ViewPurchaseOrder = () => {
                     <div className="w-[25%] p-2 flex flex-col justify-start">
                         <div>
                             <div className="font-bold text-lg mb-1">{order.poNumber}</div>
-                            <div className="font-bold">Date: {new Date(order.poDate).toLocaleDateString()}</div>
-                            <div className="font-bold mt-1">Exp. Delivery: {order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate).toLocaleDateString() : 'N/A'}</div>
+                            <div className="font-bold">Date: {order.poDate ? new Date(order.poDate).toLocaleDateString() : 'N/A'}</div>
+                            <div className="font-bold mt-1">Exp. Delivery: {(order.expectedDeliveryDate && order.expectedDeliveryDate !== 'N/A') ? new Date(order.expectedDeliveryDate).toLocaleDateString() : 'N/A'}</div>
                             <div className="mt-4 flex flex-col items-center">
                                 <div className="w-20 h-20 bg-white p-1 border">
                                     <QRCodeCanvas value={`PO:${order.poNumber}|Amt:${totalAmount}`} size={70} style={{ height: "auto", maxWidth: "100%", width: "100%" }} />
@@ -241,7 +241,7 @@ const ViewPurchaseOrder = () => {
                             </tr>
                         </thead>
                         <tbody className="text-[9px]">
-                            {order.items.map((item, idx) => (
+                            {(order.items || []).map((item, idx) => (
                                 <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                                     <td className="border-r border-black px-1 py-1 text-center">{idx + 1}</td>
                                     <td className="border-r border-black px-1 py-1 font-semibold">

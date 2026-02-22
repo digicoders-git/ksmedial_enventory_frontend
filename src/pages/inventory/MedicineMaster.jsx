@@ -130,6 +130,8 @@ const MedicineMaster = () => {
       'Name',
       'SKU',
       'Generic Name',
+      'Packing',
+      'Medicine Group',
       'Category',
       'Manufacturer',
       'HSN',
@@ -139,12 +141,15 @@ const MedicineMaster = () => {
       'Purchase Price',
       'Selling Price',
       'Min Level',
+      'Batch Number',
+      'Mfg Date',
+      'Expiry Date',
       'Prescription Required (Yes/No)'
     ];
 
     const sampleData = [
-      'Dolo 650,SKU-DOLO650,Paracetamol,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,No',
-      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,Antibiotic,GSK,3004,12,Strip,R-02,150.00,200.00,20,Yes'
+      'Dolo 650,SKU-DOLO650,Paracetamol,15 Tabs,Analgesic,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,BN1234,2024-01-01,2026-01-01,No',
+      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,10 Tabs,Antibiotic,Tablet,GSK,3004,12,Strip,R-02,150.00,200.00,20,BN9999,2024-02-01,2026-02-01,Yes'
     ];
 
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -200,6 +205,10 @@ const MedicineMaster = () => {
                 const min = normalizedRow.minlevel || normalizedRow.stocklevel || normalizedRow.reorderlevel || 20;
                 const img = normalizedRow.imageurl || normalizedRow.image || '';
                 const rx = (normalizedRow.prescriptionrequired || normalizedRow.rx || normalizedRow.schedh || '').toLowerCase().includes('yes') || normalizedRow.prescriptionrequired === '1';
+                
+                const batch = normalizedRow.batchnumber || normalizedRow.batch || normalizedRow.batchno || '';
+                const mfgDate = normalizedRow.mfgdate || normalizedRow.manufacturingdate || '';
+                const expDate = normalizedRow.expirydate || normalizedRow.expiry || normalizedRow.exp || '';
 
                 return {
                     id: index + 1,
@@ -218,7 +227,10 @@ const MedicineMaster = () => {
                     reorderLevel: Number(min) || 0,
                     image: String(img).trim(),
                     status: 'Active',
-                    isPrescriptionRequired: rx
+                    isPrescriptionRequired: rx,
+                    batchNumber: String(batch).trim(),
+                    manufacturingDate: mfgDate,
+                    expiryDate: expDate
                 };
             }).filter(m => m.name); // Require name at least
             
@@ -320,8 +332,9 @@ const MedicineMaster = () => {
               try {
                   const payload = {
                       ...item,
-                      batchNumber: 'N/A',
-                      expiryDate: 'N/A'
+                      batchNumber: item.batchNumber || 'N/A',
+                      expiryDate: item.expiryDate || 'N/A',
+                      manufacturingDate: item.manufacturingDate || 'N/A'
                   };
                   delete payload.id;
 
