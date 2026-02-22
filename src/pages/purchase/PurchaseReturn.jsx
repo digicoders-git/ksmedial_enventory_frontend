@@ -324,7 +324,7 @@ const PurchaseReturn = () => {
 
                         if (newReturn?._id) {
                             setTimeout(() => {
-                                navigate(`/purchase/return/view/${newReturn._id}?autoPrint=true`);
+                                navigate(`/purchase/return/view/${newReturn._id}`);
                             }, 1500);
                         } else {
                             setView('list');
@@ -356,7 +356,7 @@ const PurchaseReturn = () => {
     };
 
     const handlePrint = (returnItem) => {
-        navigate(`/purchase/return/view/${returnItem._id}?autoPrint=true`);
+        navigate(`/purchase/return/view/${returnItem._id}`);
     };
 
     const handleEdit = (returnItem) => {

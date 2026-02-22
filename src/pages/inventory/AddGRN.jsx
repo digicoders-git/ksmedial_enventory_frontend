@@ -702,6 +702,37 @@ const AddGRN = () => {
             return;
         }
 
+        // Qty Discrepancy Validation
+        const discrepancies = items.filter(item => Number(item.orderedQty) !== Number(item.receivedQty));
+        if (discrepancies.length > 0) {
+            const discrepancyList = discrepancies.map(item => {
+                 const diff = Number(item.receivedQty) - Number(item.orderedQty);
+                 const statusText = diff > 0 ? `<span class="text-blue-600 font-bold">Excess: +${diff}</span>` : `<span class="text-red-600 font-bold">Short: ${diff}</span>`;
+                 return `<div class="text-left py-1 border-b border-gray-100 last:border-0">
+                    <p class="font-bold text-xs uppercase">${item.name || 'Unnamed Item'}</p>
+                    <p class="text-[11px] text-gray-500">Ordered: ${item.orderedQty} | Received: ${item.receivedQty} (${statusText})</p>
+                 </div>`;
+            }).join('');
+
+            const discResult = await Swal.fire({
+                title: 'Quantity Discrepancy Detected',
+                html: `
+                    <div class="mb-4 text-sm text-gray-600">The following items have differences between ordered and received quantities:</div>
+                    <div class="max-h-48 overflow-y-auto bg-gray-50 p-3 rounded-lg border border-gray-200">${discrepancyList}</div>
+                    <div class="mt-4 font-bold text-sm">Are you sure you want to save with these differences?</div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#10b981',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, Save Anyway',
+                cancelButtonText: 'Review Items',
+                width: '500px'
+            });
+
+            if (!discResult.isConfirmed) return;
+        }
+
         const result = await Swal.fire({
             title: 'Confirm GRN Details?',
             text: "Are you sure you want to save this GRN? Items will be moved to Put Away Bucket.",

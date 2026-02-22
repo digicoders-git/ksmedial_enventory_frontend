@@ -511,7 +511,7 @@ Status: ${grn.status}
                                                 </button>
                                                 {grn.invoiceFile && (
                                                     <a 
-                                                        href={`${(import.meta.env.VITE_API_URL || 'http://localhost:5001/api').replace('/api', '')}${grn.invoiceFile}`} 
+                                                        href={`${(import.meta.env.VITE_API_URL || 'http://localhost:5001/api').replace('/api', '').replace(/\/$/, '')}${grn.invoiceFile.startsWith('/') ? '' : '/'}${grn.invoiceFile}`} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer"
                                                         className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded text-emerald-600 transition-all"

@@ -107,13 +107,6 @@ const ViewPurchaseReturn = () => {
     if(id) fetchReturn();
   }, [id]);
 
-  useEffect(() => {
-    if (!loading && returnNote && autoPrint) {
-        setTimeout(() => {
-            window.print();
-        }, 1000);
-    }
-  }, [loading, returnNote, autoPrint]);
 
   const handleDownloadPDF = async () => {
       const input = document.getElementById('debit-note-content');
