@@ -19,12 +19,11 @@ const PurchaseOrderList = () => {
     const fetchOrders = useCallback(async () => {
         try {
             setLoading(true);
-            const { data } = await api.get('/purchase-orders'); // Currently fetches all, client-side pagination for now if API doesn't support
-            // If API updates to support pagination, we update this.
-            // For now, let's filter client side or assume simple list.
-            setOrders(data);
+            const { data } = await api.get('/purchase-orders');
+            setOrders(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Failed to fetch orders", error);
+            setOrders([]);
         } finally {
             setLoading(false);
         }
