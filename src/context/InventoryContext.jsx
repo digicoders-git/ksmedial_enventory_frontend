@@ -394,6 +394,7 @@ export const InventoryProvider = ({ children }) => {
             const { data } = await api.delete(`/products/${id}`);
             if(data.success) {
                 await fetchInventory();
+                await fetchAllMedicines(); // Refresh master list too
                 return { success: true, message: "Item deleted" };
             }
             return { success: false, message: data.message };
@@ -407,6 +408,7 @@ export const InventoryProvider = ({ children }) => {
             const { data } = await api.delete('/products/clear-all');
             if (data.success) {
                 await fetchInventory();
+                await fetchAllMedicines();
                 return { success: true, message: "Inventory cleared" };
             }
             return { success: false, message: data.message };
