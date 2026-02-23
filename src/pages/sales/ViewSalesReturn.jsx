@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, Download } from 'lucide-react';
+import { ArrowLeft, Printer, Download, FileText } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import KS2Logo from '/KS2-Logo.png'; 
@@ -76,6 +76,7 @@ const ViewSalesReturn = () => {
                     totalGst: totalGst,
                     totalAmount: ret.totalAmount,
                     reason: ret.reason || 'N/A',
+                    invoiceFile: ret.invoiceFile,
                     shop: data.shop || {
                         shopName: 'KS Pharma Net Solutions Pvt. Ltd.',
                         address: '123, Health Avenue, Medical District',
@@ -144,6 +145,16 @@ const ViewSalesReturn = () => {
             <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow-sm text-sm">
                 <Printer size={16} /> Print
             </button>
+            {returnNote.invoiceFile && (
+                <a
+                    href={`${import.meta.env.VITE_API_URL?.replace('/api','') || 'http://localhost:5001'}${returnNote.invoiceFile}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow-sm text-sm"
+                >
+                    <FileText size={16} /> View Attachment
+                </a>
+            )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import api from '../../api/axios';
-import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, Printer, Eye, Calendar, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, Printer, Eye, Calendar, MoreVertical, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -69,6 +69,7 @@ const SalesReturn = () => {
     const [invoiceData, setInvoiceData] = useState(null);
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
+    const [returnInvoiceFile, setReturnInvoiceFile] = useState(null);
 
     // Fetch Suggestions for Invoice
     useEffect(() => {
@@ -168,6 +169,11 @@ const SalesReturn = () => {
             return;
         }
 
+        if (!returnInvoiceFile) {
+            Swal.fire('Invoice Required', 'Please upload the return invoice file before confirming the return.', 'error');
+            return;
+        }
+
         const finalReason = reason === 'Other' 
             ? document.getElementById('customReasonInput')?.value || 'Unspecified Other' 
             : reason;
@@ -185,22 +191,27 @@ const SalesReturn = () => {
             if (result.isConfirmed) {
                 try {
                     Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
-                    const payload = {
-                        saleId: invoiceData.dbId,
-                        items: returnItems.map(item => ({
-                            productId: item.productId,
-                            name: item.name,
-                            quantity: item.returnQty,
-                            price: item.price,
-                            tax: item.tax,
-                            subtotal: item.price * item.returnQty
-                        })),
-                        totalAmount: refundAmount,
-                        reason: finalReason,
-                        status: 'Putaway_Pending'
-                    };
 
-                    const { data } = await api.post('/sales/returns', payload);
+                    const formData = new FormData();
+                    formData.append('saleId', invoiceData.dbId);
+                    formData.append('items', JSON.stringify(returnItems.map(item => ({
+                        productId: item.productId,
+                        name: item.name,
+                        quantity: item.returnQty,
+                        price: item.price,
+                        tax: item.tax,
+                        subtotal: item.price * item.returnQty
+                    }))));
+                    formData.append('totalAmount', refundAmount);
+                    formData.append('reason', finalReason);
+                    formData.append('status', 'Putaway_Pending');
+                    if (returnInvoiceFile) {
+                        formData.append('invoiceFile', returnInvoiceFile);
+                    }
+
+                    const { data } = await api.post('/sales/returns', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
                     Swal.close();
 
                     if (data.success) {
@@ -210,6 +221,7 @@ const SalesReturn = () => {
                         setInvoiceSearch('');
                         setReturnItems([]);
                         setReason('');
+                        setReturnInvoiceFile(null);
                         setCurrentPage(1); 
                         fetchReturns();
                     }
@@ -511,6 +523,44 @@ const SalesReturn = () => {
                                      )}
                                  </div>
                              </div>
+                             <div className="w-full md:w-1/2">
+                                 {/* Invoice File Upload */}
+                                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">
+                                     Upload Return Invoice <span className="text-red-500">*</span>
+                                 </label>
+                                 <label className={`flex items-center gap-3 p-3 border-2 border-dashed rounded-xl cursor-pointer transition-all
+                                     ${ returnInvoiceFile
+                                         ? 'border-green-400 bg-green-50 dark:bg-green-900/20'
+                                         : 'border-gray-200 dark:border-gray-600 hover:border-red-400 dark:hover:border-red-500 bg-white dark:bg-gray-700'
+                                     }`}>
+                                     <input
+                                         type="file"
+                                         className="hidden"
+                                         accept="image/*,application/pdf,.doc,.docx"
+                                         onChange={(e) => setReturnInvoiceFile(e.target.files[0] || null)}
+                                     />
+                                     {returnInvoiceFile ? (
+                                         <>
+                                             <FileText size={20} className="text-green-500 flex-shrink-0" />
+                                             <div className="flex-1 min-w-0">
+                                                 <p className="text-xs font-bold text-green-700 dark:text-green-400 truncate">{returnInvoiceFile.name}</p>
+                                                 <p className="text-[10px] text-green-500">{(returnInvoiceFile.size / 1024).toFixed(1)} KB — Click to change</p>
+                                             </div>
+                                             <button type="button" onClick={(e) => { e.preventDefault(); setReturnInvoiceFile(null); }} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                                                 <X size={16} />
+                                             </button>
+                                         </>
+                                     ) : (
+                                         <>
+                                             <Upload size={20} className="text-gray-400 flex-shrink-0" />
+                                             <div>
+                                                 <p className="text-xs font-bold text-gray-600 dark:text-gray-300">Click to upload invoice</p>
+                                                 <p className="text-[10px] text-gray-400">PDF, Image or Document (max 50MB)</p>
+                                             </div>
+                                         </>
+                                     )}
+                                 </label>
+                             </div>
                              <div className="w-full md:w-auto text-right">
                                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Total Refund (Inc. Tax)</p>
                                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Rs. {calculateRefund().toFixed(2)}</h2>
@@ -620,6 +670,7 @@ const SalesReturn = () => {
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Products & SKU</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-center">Qty</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Refund</th>
+                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Invoice</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-center">Status</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Actions</th>
                             </tr>
@@ -651,6 +702,20 @@ const SalesReturn = () => {
                                     </td>
                                     <td className="px-6 py-5 text-center font-bold text-gray-700 dark:text-gray-300">{ret.items.length}</td>
                                     <td className="px-6 py-5 text-right font-black text-red-600 dark:text-red-400">Rs. {ret.totalAmount.toFixed(2)}</td>
+                                    <td className="px-6 py-5">
+                                        {ret.invoiceFile ? (
+                                            <a
+                                                href={`${import.meta.env.VITE_API_URL?.replace('/api','') || 'http://localhost:5001'}${ret.invoiceFile}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold text-[10px] uppercase bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md transition-all active:scale-95 w-fit"
+                                            >
+                                                <FileText size={12} /> View File
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-400 text-[10px] uppercase font-bold">No File</span>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-5 text-center">
                                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all
                                             ${ret.status === 'Refunded' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
@@ -680,7 +745,7 @@ const SalesReturn = () => {
                             ))}
                             {loading && (
                                 <tr>
-                                    <td colSpan="9" className="px-6 py-10 text-center">
+                                    <td colSpan="10" className="px-6 py-10 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="animate-spin rounded-full h-8 w-8 border-4 border-red-500 border-t-transparent"></div>
                                             <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching returns...</p>
@@ -690,7 +755,7 @@ const SalesReturn = () => {
                             )}
                             {!loading && paginatedReturns.length === 0 && (
                                 <tr>
-                                    <td colSpan="9" className="px-6 py-16 text-center">
+                                    <td colSpan="10" className="px-6 py-16 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center">
                                                 <Search size={32} className="text-gray-300 dark:text-gray-600" />
