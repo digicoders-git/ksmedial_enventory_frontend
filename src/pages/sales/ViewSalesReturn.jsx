@@ -147,7 +147,7 @@ const ViewSalesReturn = () => {
             </button>
             {returnNote.invoiceFile && (
                 <a
-                    href={`${import.meta.env.VITE_API_URL?.replace('/api','') || 'http://localhost:5001'}${returnNote.invoiceFile}`}
+                    href={`${api.defaults.baseURL?.replace('/api','') || ''}${returnNote.invoiceFile}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow-sm text-sm"

@@ -663,13 +663,11 @@ const SalesReturn = () => {
                     <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-gray-50/80 dark:bg-gray-750/80 border-b border-gray-100 dark:border-gray-700">
                             <tr>
-                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Return ID</th>
-                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ref Invoice</th>
+                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Return Number</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Date</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Customer</th>
-                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Products & SKU</th>
-                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-center">Qty</th>
-                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Refund</th>
+                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ref Invoice</th>
+                                <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Refund Amount</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Invoice</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-center">Status</th>
                                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Actions</th>
@@ -684,28 +682,20 @@ const SalesReturn = () => {
                                             <span className="font-bold text-gray-800 dark:text-gray-100 tracking-tight">{ret.returnNumber}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-5">
-                                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-[11px] font-bold text-gray-600 dark:text-gray-400 font-mono tracking-tighter transition-colors group-hover:bg-gray-200 dark:group-hover:bg-gray-600">
-                                            {ret.invoiceNumber}
-                                        </span>
-                                    </td>
                                     <td className="px-6 py-5 text-gray-500 dark:text-gray-400 font-medium">
                                         {new Date(ret.createdAt).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-5 font-bold text-gray-800 dark:text-gray-200">{ret.customerName || 'Walk-in'}</td>
                                     <td className="px-6 py-5">
-                                        <div className="flex flex-col gap-0.5 max-w-[200px]">
-                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">
-                                                {ret.items.map(i => i.name).join(', ')}
-                                            </span>
-                                        </div>
+                                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-[11px] font-bold text-gray-600 dark:text-gray-400 font-mono tracking-tighter">
+                                            {ret.invoiceNumber}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-5 text-center font-bold text-gray-700 dark:text-gray-300">{ret.items.length}</td>
-                                    <td className="px-6 py-5 text-right font-black text-red-600 dark:text-red-400">Rs. {ret.totalAmount.toFixed(2)}</td>
+                                    <td className="px-6 py-5 text-right font-black text-red-600 dark:text-red-400">₹{ret.totalAmount.toFixed(2)}</td>
                                     <td className="px-6 py-5">
                                         {ret.invoiceFile ? (
                                             <a
-                                                href={`${import.meta.env.VITE_API_URL?.replace('/api','') || 'http://localhost:5001'}${ret.invoiceFile}`}
+                                                href={`${api.defaults.baseURL?.replace('/api','') || ''}${ret.invoiceFile}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold text-[10px] uppercase bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md transition-all active:scale-95 w-fit"
@@ -745,7 +735,7 @@ const SalesReturn = () => {
                             ))}
                             {loading && (
                                 <tr>
-                                    <td colSpan="10" className="px-6 py-10 text-center">
+                                    <td colSpan="8" className="px-6 py-10 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="animate-spin rounded-full h-8 w-8 border-4 border-red-500 border-t-transparent"></div>
                                             <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching returns...</p>
@@ -755,7 +745,7 @@ const SalesReturn = () => {
                             )}
                             {!loading && paginatedReturns.length === 0 && (
                                 <tr>
-                                    <td colSpan="10" className="px-6 py-16 text-center">
+                                    <td colSpan="8" className="px-6 py-16 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center">
                                                 <Search size={32} className="text-gray-300 dark:text-gray-600" />
