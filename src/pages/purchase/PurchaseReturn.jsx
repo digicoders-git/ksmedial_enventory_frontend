@@ -12,6 +12,7 @@ const PurchaseReturn = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedReturn, setSelectedReturn] = useState(null);
     const [editFormData, setEditFormData] = useState(null);
+    const [editInvoiceFile, setEditInvoiceFile] = useState(null);
     
     // --- LIST STATE ---
     const [returnHistory, setReturnHistory] = useState([]);
@@ -283,10 +284,7 @@ const PurchaseReturn = () => {
             return;
         }
 
-        if (!returnInvoiceFile) {
-            Swal.fire('Invoice Required', 'Please upload the return invoice file before generating the Debit Note.', 'error');
-            return;
-        }
+        // returnInvoiceFile check removed to make it optional
 
         const totalValue = calculateRefund();
 
@@ -391,19 +389,28 @@ const PurchaseReturn = () => {
             reason: returnItem.reason
         });
         setSelectedReturn(returnItem);
+        setEditInvoiceFile(null); // Reset file selection
         setShowEditModal(true);
     };
 
     const handleEditSubmit = async (e) => {
         e.preventDefault();
         try {
-            const { data } = await api.put(`/purchase-returns/${selectedReturn._id}`, {
-                status: editFormData.status,
-                reason: editFormData.reason
+            const formData = new FormData();
+            formData.append('status', editFormData.status);
+            formData.append('reason', editFormData.reason);
+            
+            if (editInvoiceFile) {
+                formData.append('invoiceFile', editInvoiceFile);
+            }
+
+            const { data } = await api.put(`/purchase-returns/${selectedReturn._id}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
             if (data.success) {
                 setShowEditModal(false);
+                setEditInvoiceFile(null);
                 fetchReturns();
                 Swal.fire({
                     title: 'Updated!',
@@ -414,7 +421,8 @@ const PurchaseReturn = () => {
                 });
             }
         } catch (error) {
-            Swal.fire('Error', 'Failed to update debit note', 'error');
+            console.error("Update Error:", error);
+            Swal.fire('Error', error.response?.data?.message || 'Failed to update debit note', 'error');
         }
     };
 
@@ -954,7 +962,7 @@ const PurchaseReturn = () => {
                                             Reason for Return <span className="text-red-500">*</span>
                                         </label>
                                         <div className="space-y-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 gap-4">
                                                 <div className="space-y-2">
                                                     <select 
                                                         value={reason}
@@ -971,50 +979,6 @@ const PurchaseReturn = () => {
                                                             <option key={r} value={r}>{r}</option>
                                                         ))}
                                                     </select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <input 
-                                                        type="file"
-                                                        id="return-invoice-upload"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files[0];
-                                                            if (file && file.size > 50 * 1024 * 1024) {
-                                                                Swal.fire({
-                                                                    icon: 'error',
-                                                                    title: 'File Too Large',
-                                                                    text: 'Invoice file size must be less than 50MB',
-                                                                    confirmButtonColor: '#4F46E5'
-                                                                });
-                                                                e.target.value = null;
-                                                                return;
-                                                            }
-                                                            setReturnInvoiceFile(file);
-                                                        }}
-                                                    />
-                                                    <div className="flex gap-2">
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => document.getElementById('return-invoice-upload').click()}
-                                                            className={`flex-1 h-[52px] flex items-center justify-center gap-2 px-4 py-2 border rounded-2xl text-xs font-black uppercase transition-all shadow-sm ${
-                                                                returnInvoiceFile 
-                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                                                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700 hover:bg-gray-50'
-                                                            }`}
-                                                        >
-                                                            <Upload size={16} className={returnInvoiceFile ? 'text-emerald-500' : 'text-gray-400'} /> 
-                                                            {returnInvoiceFile ? returnInvoiceFile.name.substring(0, 20) + '...' : <>Upload Return Invoice <span className="text-red-500 ml-1">*</span></>}
-                                                        </button>
-                                                        {returnInvoiceFile && (
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => setReturnInvoiceFile(null)}
-                                                                className="h-[52px] w-[52px] flex items-center justify-center bg-red-50 text-red-500 rounded-2xl border border-red-100 hover:bg-red-100 shadow-sm"
-                                                            >
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             </div>
                                             
@@ -1185,7 +1149,7 @@ const PurchaseReturn = () => {
             {showEditModal && editFormData && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md animate-fade-in text-left">
                     <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl shadow-2xl transform transition-all animate-scale-up border border-white/20 dark:border-gray-700 overflow-hidden">
-                        <div className="px-8 py-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-750/50">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-750/50">
                             <div>
                                 <h3 className="font-black text-gray-900 dark:text-white text-xl uppercase tracking-tighter">Modify Debit Note</h3>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Ref: {selectedReturn.returnNumber}</p>
@@ -1194,15 +1158,15 @@ const PurchaseReturn = () => {
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="p-8">
-                             <form id="edit-return-form" onSubmit={handleEditSubmit} className="space-y-6 text-left">
-                                <div className="space-y-6">
+                        <div className="p-6">
+                             <form id="edit-return-form" onSubmit={handleEditSubmit} className="space-y-4 text-left">
+                                <div className="space-y-4">
                                      <div className="space-y-3">
                                         <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block ml-1">Current Status</label>
                                         <select 
                                             value={editFormData.status}
                                             onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
-                                            className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-sm text-gray-800 dark:text-white transition-all appearance-none cursor-pointer"
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-sm text-gray-800 dark:text-white transition-all appearance-none cursor-pointer"
                                         >
                                             <option value="Pending">🕒 Pending Review</option>
                                             <option value="Adjusted">✅ Adjusted in A/C</option>
@@ -1212,17 +1176,57 @@ const PurchaseReturn = () => {
                                     <div className="space-y-3">
                                         <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block ml-1">Update Reason</label>
                                         <textarea 
-                                            rows="4"
+                                            rows="3"
                                             placeholder="Update the return reason or add internal notes..."
                                             value={editFormData.reason}
                                             onChange={(e) => setEditFormData({...editFormData, reason: e.target.value})}
-                                            className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none font-bold text-sm text-gray-800 dark:text-white resize-none transition-all shadow-inner focus:ring-4 focus:ring-primary/10 placeholder:text-gray-400"
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-750 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none font-bold text-sm text-gray-800 dark:text-white resize-none transition-all shadow-inner focus:ring-4 focus:ring-primary/10 placeholder:text-gray-400"
                                         ></textarea>
+                                    </div>
+                                    <div className="space-y-3">
+                                         <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block ml-1">Upload Return Invoice <span className="text-[10px] lowercase font-normal">(Optional)</span></label>
+                                         <input 
+                                             type="file"
+                                             id="edit-invoice-upload"
+                                             className="hidden"
+                                             onChange={(e) => {
+                                                 const file = e.target.files[0];
+                                                 if (file && file.size > 50 * 1024 * 1024) {
+                                                     Swal.fire('File Too Large', 'Invoice file size must be less than 50MB', 'error');
+                                                     e.target.value = null;
+                                                     return;
+                                                 }
+                                                 setEditInvoiceFile(file);
+                                             }}
+                                         />
+                                         <div className="flex gap-2">
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => document.getElementById('edit-invoice-upload').click()}
+                                                 className={`flex-1 h-[46px] flex items-center justify-center gap-2 px-4 py-2 border rounded-2xl text-xs font-black uppercase transition-all shadow-sm ${
+                                                     editInvoiceFile 
+                                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700 hover:bg-gray-50'
+                                                 }`}
+                                             >
+                                                 <Upload size={16} className={editInvoiceFile ? 'text-emerald-500' : 'text-gray-400'} /> 
+                                                 {editInvoiceFile ? editInvoiceFile.name.substring(0, 25) + '...' : `Click to Upload Return Invoice`}
+                                             </button>
+                                             {editInvoiceFile && (
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => setEditInvoiceFile(null)}
+                                                     className="h-[46px] w-[46px] flex items-center justify-center bg-red-50 text-red-500 rounded-2xl border border-red-100 hover:bg-red-100 shadow-sm"
+                                                 >
+                                                     <Trash2 size={18} />
+                                                 </button>
+                                             )}
+                                         </div>
                                     </div>
                                 </div>
                              </form>
                         </div>
-                        <div className="p-8 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-750/50">
+                        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-750/50">
                             <button onClick={() => setShowEditModal(false)} className="px-6 py-3.5 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-500 font-bold hover:bg-white dark:hover:bg-gray-700 text-xs uppercase tracking-widest transition-all">Discard</button>
                             <button type="submit" form="edit-return-form" className="px-10 py-3.5 rounded-2xl bg-primary text-white font-black hover:bg-secondary shadow-xl shadow-primary/20 active:scale-95 transition-all text-xs uppercase tracking-widest">Submit Update</button>
                         </div>

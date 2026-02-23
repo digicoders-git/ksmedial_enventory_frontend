@@ -170,10 +170,7 @@ const SalesReturn = () => {
             return;
         }
 
-        if (!returnInvoiceFile) {
-            Swal.fire('Invoice Required', 'Please upload the return invoice file before confirming the return.', 'error');
-            return;
-        }
+        // returnInvoiceFile check removed to make it optional
 
         const finalReason = reason === 'Other' 
             ? document.getElementById('customReasonInput')?.value || 'Unspecified Other' 
@@ -530,7 +527,7 @@ const SalesReturn = () => {
                              <div className="w-full md:w-1/2">
                                  {/* Invoice File Upload */}
                                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">
-                                     Upload Return Invoice <span className="text-red-500">*</span>
+                                     Upload Return Invoice <span className="text-gray-400 text-[10px] font-medium">(Optional)</span>
                                  </label>
                                  <label className={`flex items-center gap-3 p-3 border-2 border-dashed rounded-xl cursor-pointer transition-all
                                      ${ returnInvoiceFile
