@@ -35,6 +35,7 @@ const PurchaseReturn = () => {
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
     const [returnInvoiceFile, setReturnInvoiceFile] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const [suppliers, setSuppliers] = useState([]);
     const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -298,6 +299,7 @@ const PurchaseReturn = () => {
             confirmButtonColor: '#4F46E5'
         }).then(async (result) => {
             if (result.isConfirmed) {
+                setIsSaving(true);
                 try {
                     const returnNumber = `DN-${Date.now().toString().slice(-6)}`;
                     const payload = {
@@ -367,6 +369,8 @@ const PurchaseReturn = () => {
                         html: errorDetails ? `${errorMsg}<br/><br/><small>${errorDetails.join('<br/>')}</small>` : errorMsg,
                         icon: 'error'
                     });
+                } finally {
+                    setIsSaving(false);
                 }
             }
         });
@@ -1023,10 +1027,19 @@ const PurchaseReturn = () => {
                                         <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-6">₹{calculateRefund().toLocaleString()}</h2>
                                         <button 
                                             onClick={processReturn}
-                                            disabled={returnItems.length === 0}
+                                            disabled={returnItems.length === 0 || isSaving}
                                             className="w-full md:w-auto px-10 py-4 bg-primary text-white font-black rounded-2xl hover:bg-secondary shadow-xl shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
                                         >
-                                            <RotateCcw size={20} /> Generate Debit Note
+                                            {isSaving ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <RotateCcw size={20} /> Generate Debit Note
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </div>

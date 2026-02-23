@@ -70,6 +70,7 @@ const SalesReturn = () => {
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
     const [returnInvoiceFile, setReturnInvoiceFile] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Fetch Suggestions for Invoice
     useEffect(() => {
@@ -189,6 +190,7 @@ const SalesReturn = () => {
             confirmButtonColor: '#dc2626'
         }).then(async (result) => {
             if (result.isConfirmed) {
+                setIsSaving(true);
                 try {
                     Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
 
@@ -228,6 +230,8 @@ const SalesReturn = () => {
                 } catch (error) {
                     Swal.close();
                     Swal.fire('Error', error.response?.data?.message || 'Failed to process return', 'error');
+                } finally {
+                    setIsSaving(false);
                 }
             }
         });
@@ -536,7 +540,6 @@ const SalesReturn = () => {
                                      <input
                                          type="file"
                                          className="hidden"
-                                         accept="image/*,application/pdf,.doc,.docx"
                                          onChange={(e) => setReturnInvoiceFile(e.target.files[0] || null)}
                                      />
                                      {returnInvoiceFile ? (
@@ -564,8 +567,17 @@ const SalesReturn = () => {
                              <div className="w-full md:w-auto text-right">
                                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Total Refund (Inc. Tax)</p>
                                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Rs. {calculateRefund().toFixed(2)}</h2>
-                                 <button onClick={processReturn} disabled={returnItems.length === 0} className="w-full md:w-auto px-8 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                                    <RotateCcw size={18} /> Confirm Return
+                                 <button onClick={processReturn} disabled={returnItems.length === 0 || isSaving} className="w-full md:w-auto px-8 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                     {isSaving ? (
+                                         <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                                            Processing...
+                                         </>
+                                     ) : (
+                                         <>
+                                            <RotateCcw size={18} /> Confirm Return
+                                         </>
+                                     )}
                                  </button>
                              </div>
                         </div>
