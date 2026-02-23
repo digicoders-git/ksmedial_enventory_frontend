@@ -599,7 +599,20 @@ const AddGRN = () => {
             return;
         }
 
-        // Validation 2: Invoice Date
+        // Validation 2: Invoice File (Mandatory)
+        if (!invoiceFile) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invoice File Required',
+                text: 'Please upload the invoice file before submitting',
+                confirmButtonColor: '#10b981'
+            });
+            // Scroll to top or to the upload section if needed
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        // Validation 3: Invoice Date
         if (!formData.invoiceDate) {
             Swal.fire({
                 icon: 'warning',
@@ -610,7 +623,7 @@ const AddGRN = () => {
             return;
         }
 
-        // Validation 3: Items
+        // Validation 4: Items
         if (items.length === 0) {
             Swal.fire({
                 icon: 'warning',
@@ -621,7 +634,7 @@ const AddGRN = () => {
             return;
         }
 
-        // Validation 4: Check each item for required fields
+        // Validation 5: Check each item for required fields
         const invalidItems = [];
         items.forEach((item, index) => {
             const errors = [];
@@ -874,7 +887,9 @@ const AddGRN = () => {
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Invoice Upload</label>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    Invoice Upload <span className="text-red-500">*</span>
+                                </label>
                                 <div className="flex gap-2">
                                     <input 
                                         type="file" 

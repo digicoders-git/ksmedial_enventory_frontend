@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, History, Filter, Download, Eye, MoreVertical, Calendar, Printer, Edit2, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { RotateCcw, Search, FileText, User, ArrowRight, CheckCircle, AlertOctagon, X, Plus, History, Filter, Download, Eye, MoreVertical, Calendar, Printer, Edit2, Trash2, ChevronLeft, ChevronRight, Clock, Upload } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
 
@@ -34,6 +34,7 @@ const PurchaseReturn = () => {
     const [searchResults, setSearchResults] = useState([]); // Store multiple search matches
     const [returnItems, setReturnItems] = useState([]);
     const [reason, setReason] = useState('');
+    const [returnInvoiceFile, setReturnInvoiceFile] = useState(null);
 
     const [suppliers, setSuppliers] = useState([]);
     const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -281,6 +282,11 @@ const PurchaseReturn = () => {
             return;
         }
 
+        if (!returnInvoiceFile) {
+            Swal.fire('Invoice Required', 'Please upload the return invoice file before generating the Debit Note.', 'error');
+            return;
+        }
+
         const totalValue = calculateRefund();
 
         Swal.fire({
@@ -309,7 +315,21 @@ const PurchaseReturn = () => {
                         returnNumber: returnNumber
                     };
 
-                    const { data } = await api.post('/purchase-returns', payload);
+                    const formData = new FormData();
+                    formData.append('purchaseId', payload.purchaseId);
+                    formData.append('supplierId', payload.supplierId);
+                    formData.append('items', JSON.stringify(payload.items));
+                    formData.append('totalAmount', payload.totalAmount);
+                    formData.append('reason', payload.reason);
+                    formData.append('returnNumber', payload.returnNumber);
+                    
+                    if (returnInvoiceFile) {
+                        formData.append('invoiceFile', returnInvoiceFile);
+                    }
+
+                    const { data } = await api.post('/purchase-returns', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
 
                     if (data.success) {
                         const newReturn = data.purchaseReturn || data.data; // Handle various response formats
@@ -332,6 +352,7 @@ const PurchaseReturn = () => {
                             setInvoiceSearch('');
                             setReturnItems([]);
                             setReason('');
+                            setReturnInvoiceFile(null);
                             setSelectedSupplier('');
                             fetchReturns();
                         }
@@ -582,6 +603,7 @@ const PurchaseReturn = () => {
                                             <th className="px-6 py-4">Supplier</th>
                                             <th className="px-6 py-4">Ref Invoice</th>
                                             <th className="px-6 py-4">Amount</th>
+                                            <th className="px-6 py-4">Invoice</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4 text-right">Actions</th>
                                         </tr>
@@ -604,6 +626,20 @@ const PurchaseReturn = () => {
                                                     <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">{item.supplierId?.name || 'Unknown'}</td>
                                                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">{item.purchaseId?.invoiceNumber || 'N/A'}</td>
                                                     <td className="px-6 py-4 font-black text-primary">₹{item.totalAmount.toLocaleString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        {item.invoiceFile ? (
+                                                            <a 
+                                                                href={`${api.defaults.baseURL || ''}${item.invoiceFile}`} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold text-[10px] uppercase bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md transition-all active:scale-95"
+                                                            >
+                                                                <FileText size={12} /> View File
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-[10px] uppercase font-bold">No File</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyle(item.status)}`}>
                                                             {item.status}
@@ -913,22 +949,70 @@ const PurchaseReturn = () => {
                                         <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-3">
                                             Reason for Return <span className="text-red-500">*</span>
                                         </label>
-                                        <div className="space-y-3">
-                                            <select 
-                                                value={reason}
-                                                onChange={(e) => setReason(e.target.value)}
-                                                className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold transition-all shadow-sm text-gray-800 dark:text-white"
-                                            >
-                                                <option value="">-- Select Reason --</option>
-                                                {[
-                                                    'Supply Damage', 'Expired SKU', 'Batch Mismatch', 'MRP Issue', 
-                                                    'Item Recalled', 'Non Moving', 'Out of PO', 'Pack Size Issue', 
-                                                    'Received Less Than Invoice', 'Temperature Issue', 'Wrong SKU', 
-                                                    'Wrong Rate', 'Wrong GST', 'Near Expiry', 'Manufacturing Defect'
-                                                ].map(r => (
-                                                    <option key={r} value={r}>{r}</option>
-                                                ))}
-                                            </select>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <select 
+                                                        value={reason}
+                                                        onChange={(e) => setReason(e.target.value)}
+                                                        className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-sm font-bold transition-all shadow-sm text-gray-800 dark:text-white"
+                                                    >
+                                                        <option value="">-- Select Reason --</option>
+                                                        {[
+                                                            'Supply Damage', 'Expired SKU', 'Batch Mismatch', 'MRP Issue', 
+                                                            'Item Recalled', 'Non Moving', 'Out of PO', 'Pack Size Issue', 
+                                                            'Received Less Than Invoice', 'Temperature Issue', 'Wrong SKU', 
+                                                            'Wrong Rate', 'Wrong GST', 'Near Expiry', 'Manufacturing Defect'
+                                                        ].map(r => (
+                                                            <option key={r} value={r}>{r}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <input 
+                                                        type="file"
+                                                        id="return-invoice-upload"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files[0];
+                                                            if (file && file.size > 50 * 1024 * 1024) {
+                                                                Swal.fire({
+                                                                    icon: 'error',
+                                                                    title: 'File Too Large',
+                                                                    text: 'Invoice file size must be less than 50MB',
+                                                                    confirmButtonColor: '#4F46E5'
+                                                                });
+                                                                e.target.value = null;
+                                                                return;
+                                                            }
+                                                            setReturnInvoiceFile(file);
+                                                        }}
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => document.getElementById('return-invoice-upload').click()}
+                                                            className={`flex-1 h-[52px] flex items-center justify-center gap-2 px-4 py-2 border rounded-2xl text-xs font-black uppercase transition-all shadow-sm ${
+                                                                returnInvoiceFile 
+                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700 hover:bg-gray-50'
+                                                            }`}
+                                                        >
+                                                            <Upload size={16} className={returnInvoiceFile ? 'text-emerald-500' : 'text-gray-400'} /> 
+                                                            {returnInvoiceFile ? returnInvoiceFile.name.substring(0, 20) + '...' : <>Upload Return Invoice <span className="text-red-500 ml-1">*</span></>}
+                                                        </button>
+                                                        {returnInvoiceFile && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setReturnInvoiceFile(null)}
+                                                                className="h-[52px] w-[52px] flex items-center justify-center bg-red-50 text-red-500 rounded-2xl border border-red-100 hover:bg-red-100 shadow-sm"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                             
                                             {/* Optional details box if needed, or just keep select */}
                                         </div>
@@ -1018,6 +1102,24 @@ const PurchaseReturn = () => {
                                         </div>
                                     </div>
                                 </section>
+
+                                {selectedReturn.invoiceFile && (
+                                    <section className="space-y-4">
+                                        <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-700 pb-2">Attachment</h4>
+                                        <a 
+                                            href={`${api.defaults.baseURL || ''}${selectedReturn.invoiceFile}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-4 p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-900/30 rounded-2xl group transition-all hover:shadow-md active:scale-95"
+                                        >
+                                            <div className="bg-blue-100 dark:bg-blue-900/40 p-3 rounded-xl text-blue-600 group-hover:scale-110 transition-transform"><FileText size={20} /></div>
+                                            <div>
+                                                <p className="text-sm font-black text-blue-700 dark:text-blue-400 uppercase tracking-wide">View Return Invoice</p>
+                                                <p className="text-[10px] text-blue-500 font-bold">Click to open in new tab</p>
+                                            </div>
+                                        </a>
+                                    </section>
+                                )}
                             </div>
 
                             {/* Itemized Table */}
