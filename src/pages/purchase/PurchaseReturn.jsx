@@ -396,17 +396,23 @@ const PurchaseReturn = () => {
     const handleEditSubmit = async (e) => {
         e.preventDefault();
         try {
-            const formData = new FormData();
-            formData.append('status', editFormData.status);
-            formData.append('reason', editFormData.reason);
-            
+            let payload;
+            let config = {};
+
             if (editInvoiceFile) {
-                formData.append('invoiceFile', editInvoiceFile);
+                payload = new FormData();
+                payload.append('status', editFormData.status);
+                payload.append('reason', editFormData.reason);
+                payload.append('invoiceFile', editInvoiceFile);
+                config = {}; // Let axios set multipart boundary automatically
+            } else {
+                payload = {
+                    status: editFormData.status,
+                    reason: editFormData.reason
+                };
             }
 
-            const { data } = await api.put(`/purchase-returns/${selectedReturn._id}`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const { data } = await api.put(`/purchase-returns/${selectedReturn._id}`, payload, config);
 
             if (data.success) {
                 setShowEditModal(false);
