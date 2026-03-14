@@ -18,6 +18,7 @@ const PrescriptionRequestList = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [processing, setProcessing] = useState(false);
     const [adminUploadImage, setAdminUploadImage] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -70,11 +71,8 @@ const PrescriptionRequestList = () => {
     const handleAdminImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setAdminUploadImage(reader.result);
-            };
-            reader.readAsDataURL(file);
+            setAdminUploadImage(file);
+            setPreviewUrl(URL.createObjectURL(file));
         }
     };
 
@@ -85,13 +83,18 @@ const PrescriptionRequestList = () => {
         }
         try {
             setUploading(true);
-            const { data } = await api.put(`/orders/prescription/requests/${selectedRequest._id}/upload`, { 
-                prescriptionImage: adminUploadImage 
+            const formData = new FormData();
+            formData.append('prescriptionImage', adminUploadImage);
+
+            const { data } = await api.put(`/orders/prescription/requests/${selectedRequest._id}/upload`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
+
             if (data.success) {
                 Swal.fire('Success', 'Prescription uploaded successfully', 'success');
-                setSelectedRequest({ ...selectedRequest, prescriptionImage: adminUploadImage });
+                setSelectedRequest({ ...selectedRequest, prescriptionImage: data.request.prescriptionImage });
                 setAdminUploadImage(null);
+                setPreviewUrl(null);
                 fetchRequests();
             }
         } catch (error) {
@@ -270,17 +273,21 @@ const PrescriptionRequestList = () => {
                                 <section className="space-y-3">
                                     <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><Eye size={14}/> Prescription Image</h3>
                                     <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 aspect-video flex items-center justify-center group relative">
-                                        {selectedRequest.prescriptionImage ? (
+                                        {previewUrl ? (
+                                            <img src={previewUrl} alt="New Preview" className="w-full h-full object-contain" />
+                                        ) : selectedRequest.prescriptionImage ? (
                                             <img src={selectedRequest.prescriptionImage} alt="Prescription" className="w-full h-full object-contain transition-transform group-hover:scale-105" />
                                         ) : (
                                             <div className="text-gray-500 text-[10px] font-bold uppercase">No Image Uploaded</div>
                                         )}
-                                        <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-[8px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">User Uploaded</div>
+                                        <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-[8px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {previewUrl ? 'New Selection' : 'Current Rx'}
+                                        </div>
                                     </div>
                                     
                                     {/* Admin Upload Option */}
                                     <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Upload Doctor Prescription</p>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Admin Panel: Prescription Upload</p>
                                         <div className="flex items-center gap-3">
                                             <input 
                                                 type="file" 
