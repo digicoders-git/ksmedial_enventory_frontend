@@ -17,6 +17,8 @@ const PrescriptionRequestList = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [processing, setProcessing] = useState(false);
+    const [adminUploadImage, setAdminUploadImage] = useState(null);
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         fetchRequests();
@@ -62,6 +64,41 @@ const PrescriptionRequestList = () => {
             Swal.fire('Error', error.response?.data?.message || 'Failed to approve request', 'error');
         } finally {
             setProcessing(false);
+        }
+    };
+
+    const handleAdminImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setAdminUploadImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleAdminUpload = async () => {
+        if (!adminUploadImage) {
+            Swal.fire('Error', 'Please select an image first', 'error');
+            return;
+        }
+        try {
+            setUploading(true);
+            const { data } = await api.put(`/orders/prescription/requests/${selectedRequest._id}/upload`, { 
+                prescriptionImage: adminUploadImage 
+            });
+            if (data.success) {
+                Swal.fire('Success', 'Prescription uploaded successfully', 'success');
+                setSelectedRequest({ ...selectedRequest, prescriptionImage: adminUploadImage });
+                setAdminUploadImage(null);
+                fetchRequests();
+            }
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', error.response?.data?.message || 'Upload failed', 'error');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -240,6 +277,36 @@ const PrescriptionRequestList = () => {
                                         )}
                                         <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-[8px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">User Uploaded</div>
                                     </div>
+                                    
+                                    {/* Admin Upload Option */}
+                                    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Upload Doctor Prescription</p>
+                                        <div className="flex items-center gap-3">
+                                            <input 
+                                                type="file" 
+                                                id="admin-rx-upload" 
+                                                className="hidden" 
+                                                accept="image/*"
+                                                onChange={handleAdminImageChange}
+                                            />
+                                            <label 
+                                                htmlFor="admin-rx-upload"
+                                                className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-[10px] font-bold text-gray-600 dark:text-gray-300 cursor-pointer hover:border-primary transition-all text-center"
+                                            >
+                                                {adminUploadImage ? 'Change Image' : 'Select Rx Image'}
+                                            </label>
+                                            
+                                            {adminUploadImage && (
+                                                <button 
+                                                    onClick={handleAdminUpload}
+                                                    disabled={uploading}
+                                                    className="px-4 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all disabled:opacity-50"
+                                                >
+                                                    {uploading ? '...' : 'Upload Now'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
                                 </section>
 
                                 <section className="space-y-3">
@@ -258,6 +325,7 @@ const PrescriptionRequestList = () => {
                                         </div>
                                     ))}
                                 </div>
+                                </section>
                             </div>
                         </div>
 
