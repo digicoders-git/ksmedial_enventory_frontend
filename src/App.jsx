@@ -34,6 +34,7 @@ import PrescriptionManagement from './pages/inventory/PrescriptionManagement';
 import OrderProcessing from './pages/order/OrderProcessing';
 import PickingOrders from './pages/order/PickingOrders';
 import ShippingList from './pages/order/ShippingList';
+import PrescriptionRequestList from './pages/order/PrescriptionRequestList';
 
 // Sales Pages
 import SalesEntry from './pages/sales/SalesEntry';
@@ -138,6 +139,7 @@ function App() {
           <Route path="order/processing" element={<OrderProcessing />} />
           <Route path="order/picking" element={<PickingOrders />} />
           <Route path="order/shipping" element={<ShippingList />} />
+          <Route path="order/prescriptions" element={<PrescriptionRequestList />} />
 
           {/* =======================
               4. SALES ROUTES 
