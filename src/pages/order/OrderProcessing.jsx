@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
+    Search, Filter, Calendar, RefreshCw, X, Download, 
     ChevronRight, Play, CheckCircle, AlertCircle, Truck, Package,
     Layers
 } from 'lucide-react';
@@ -163,7 +164,7 @@ const OrderProcessing = () => {
             });
 
             if (confirmed) {
-                const { data } = await api.post('/orders/bulk-status', {
+                const { data } = await api.put('/orders/bulk-status', {
                     orderIds: selectedIds,
                     status: newStatus
                 });
@@ -335,8 +336,15 @@ const OrderProcessing = () => {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300">
                             {loading ? <tr><td colSpan="10" className="p-10 text-center">Loading...</td></tr> : 
                              paginatedOrders.map(order => (
-                                <tr key={order._id} className="hover:bg-cyan-50/50 dark:hover:bg-gray-800">
-                                    <td className="p-3 text-center"><input type="checkbox" /></td>
+                                <tr key={order._id} className={`hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-colors ${selectedIds.includes(order._id) ? 'bg-cyan-50/30' : ''}`}>
+                                    <td className="p-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(order._id)}
+                                            onChange={() => toggleSelect(order._id)}
+                                            className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                        />
+                                    </td>
                                     <td className="p-3 font-bold text-cyan-600">{order._id.substr(-12).toUpperCase()}</td>
                                     <td className="p-3">{order.vendorId}</td>
                                     <td className="p-3">

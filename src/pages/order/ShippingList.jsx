@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Search, Calendar, Filter, Download, 
     ChevronRight, Upload, FileText, Anchor,
-    Camera, X, ShoppingCart, Eye, Image as ImageIcon
+    Camera, X, ShoppingCart, Eye, Image as ImageIcon,
+    Layers, Truck, CheckCircle
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
@@ -17,6 +18,7 @@ const ShippingList = () => {
     const [scanningOrder, setScanningOrder] = useState(null);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     
     // Filters State
     const [filters, setFilters] = useState({
@@ -92,6 +94,51 @@ const ShippingList = () => {
             setScanningOrder(null);
         }
     }, [fetchOrders]);
+
+    const handleBulkStatusUpdate = async (newStatus) => {
+        if (selectedIds.length === 0) return;
+
+        try {
+            const { value: confirmed } = await Swal.fire({
+                title: 'Bulk Update Status?',
+                text: `Are you sure you want to move ${selectedIds.length} orders to ${newStatus}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#003B5C',
+                confirmButtonText: 'Yes, Update All'
+            });
+
+            if (confirmed) {
+                const { data } = await api.put('/orders/bulk-status', {
+                    orderIds: selectedIds,
+                    status: newStatus
+                });
+
+                if (data.success) {
+                    Swal.fire('Success', `${selectedIds.length} orders updated successfully`, 'success');
+                    setSelectedIds([]);
+                    fetchOrders();
+                }
+            }
+        } catch (error) {
+            console.error("Bulk Update Error:", error);
+            Swal.fire('Error', 'Failed to update orders in bulk', 'error');
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === paginatedOrders.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(paginatedOrders.map(o => o._id));
+        }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
 
     const onScanSuccess = useCallback(async (decodedText, decodedResult) => {
         console.log(`Code matched = ${decodedText}`, decodedResult);
@@ -253,7 +300,14 @@ const ShippingList = () => {
                     <table className="w-full text-left">
                         <thead className="bg-[#003B5C] text-white text-[11px] font-bold uppercase">
                             <tr>
-                                <th className="p-3 w-8"><input type="checkbox" /></th>
+                                <th className="p-3 w-8">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedIds.length === paginatedOrders.length && paginatedOrders.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                    />
+                                </th>
                                 <th className="p-3">Order ID</th>
                                 <th className="p-3">Vendor ID</th>
                                 <th className="p-3">Status</th>
@@ -265,8 +319,15 @@ const ShippingList = () => {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300">
                             {loading ? <tr><td colSpan="6" className="p-10 text-center">Loading...</td></tr> : 
                              paginatedOrders.map(order => (
-                                <tr key={order._id} className="hover:bg-cyan-50/50 dark:hover:bg-gray-800">
-                                    <td className="p-3 text-center"><input type="checkbox" /></td>
+                                <tr key={order._id} className={`hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-colors ${selectedIds.includes(order._id) ? 'bg-cyan-50/30' : ''}`}>
+                                    <td className="p-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(order._id)}
+                                            onChange={() => toggleSelect(order._id)}
+                                            className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                        />
+                                    </td>
                                     <td className="p-3 font-bold text-cyan-600">{order._id.substr(-12).toUpperCase()}</td>
                                     <td className="p-3">{order.vendorId}</td>
                                     <td className="p-3">
@@ -388,6 +449,45 @@ const ShippingList = () => {
                     </div>
                 </div>,
                 document.body
+            )}
+            {/* Bulk Action Bar */}
+            {selectedIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#003B5C] text-white px-6 py-4 rounded-2xl shadow-2xl z-50 flex items-center gap-8 animate-scale-up border border-white/10 backdrop-blur-md w-fit whitespace-nowrap">
+                    <div className="flex items-center gap-3 border-r border-white/20 pr-8">
+                        <div className="bg-cyan-500 p-2 rounded-lg shadow-inner">
+                            <Layers size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Selected</p>
+                            <p className="text-sm font-black">{selectedIds.length} {selectedIds.length === 1 ? 'Order' : 'Orders'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bulk Move To:</p>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => handleBulkStatusUpdate('shipped')}
+                                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Truck size={14} /> Mark Shipped
+                            </button>
+                            <button 
+                                onClick={() => handleBulkStatusUpdate('delivered')}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <CheckCircle size={14} /> Delivered
+                            </button>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => setSelectedIds([])}
+                        className="text-white/40 hover:text-white transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
             )}
         </div>
     );
