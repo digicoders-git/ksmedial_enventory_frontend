@@ -228,9 +228,22 @@ const PrescriptionRequestList = () => {
                                 </section>
                             </div>
 
-                            {/* Items List */}
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><Package size={14}/> Items List</h3>
+                            {/* Prescription Image & Items List */}
+                            <div className="space-y-6">
+                                <section className="space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><Eye size={14}/> Prescription Image</h3>
+                                    <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 aspect-video flex items-center justify-center group relative">
+                                        {selectedRequest.prescriptionImage ? (
+                                            <img src={selectedRequest.prescriptionImage} alt="Prescription" className="w-full h-full object-contain transition-transform group-hover:scale-105" />
+                                        ) : (
+                                            <div className="text-gray-500 text-[10px] font-bold uppercase">No Image Uploaded</div>
+                                        )}
+                                        <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-[8px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">User Uploaded</div>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><Package size={14}/> Items List</h3>
                                 <div className="space-y-3">
                                     {selectedRequest.items.map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center bg-white dark:bg-gray-700 p-3 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
