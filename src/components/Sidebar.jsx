@@ -138,6 +138,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/order',
       subItems: [
         { label: 'Online Orders', path: '/sales/online-orders' },
+        { label: 'Picking Queue', path: '/order/picking' },
         { label: 'QC & Packing', path: '/order/processing' },
         { label: 'Shipping Listing', path: '/order/shipping' }
       ]

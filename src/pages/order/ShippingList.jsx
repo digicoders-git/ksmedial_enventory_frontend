@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Search, Calendar, Filter, Download, 
-    ChevronRight, Upload, FileText, Anchor
+    ChevronRight, Upload, FileText, Anchor,
+    Camera, X, ShoppingCart, Eye, Image as ImageIcon
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
 import Papa from 'papaparse';
+import { Html5Qrcode } from 'html5-qrcode';
+import { createPortal } from 'react-dom';
 
 const ShippingList = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [scanningOrder, setScanningOrder] = useState(null);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
     
     // Filters State
     const [filters, setFilters] = useState({
@@ -24,11 +30,7 @@ const ShippingList = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
-
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         try {
             setLoading(true);
             const { data } = await api.get('/orders');
@@ -49,7 +51,94 @@ const ShippingList = () => {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const handleMarkAsShipped = useCallback(async (orderId) => {
+        try {
+            let capturedImage = null;
+            
+            // Capture frame from video before closing
+            const video = document.querySelector('#reader video');
+            if (video) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                capturedImage = canvas.toDataURL('image/jpeg', 0.7);
+            }
+
+            setIsScannerOpen(false);
+            const { data } = await api.put(`/orders/${orderId}/status`, { 
+                status: 'shipped',
+                trackingUrl: 'Scanned via Camera',
+                dispatchProof: capturedImage
+            });
+            
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Order Shipped',
+                    text: 'Status updated with proof of dispatch',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                fetchOrders();
+            }
+        } catch (error) {
+            console.error("Update Status Error", error);
+            Swal.fire('Error', 'Failed to update status', 'error');
+        } finally {
+            setScanningOrder(null);
+        }
+    }, [fetchOrders]);
+
+    const onScanSuccess = useCallback(async (decodedText, decodedResult) => {
+        console.log(`Code matched = ${decodedText}`, decodedResult);
+        if (scanningOrder) {
+            handleMarkAsShipped(scanningOrder._id);
+        }
+    }, [scanningOrder, handleMarkAsShipped]);
+
+    const onScanFailure = () => {
+        // Silently ignore scan failures as they happen many times per second during normal operation
     };
+
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
+
+    useEffect(() => {
+        let html5QrCode = null;
+        if (isScannerOpen) {
+            // Give a tiny delay for the 'reader' element to be in DOM
+            const startTimer = setTimeout(() => {
+                html5QrCode = new Html5Qrcode("reader");
+                const config = { 
+                    fps: 20, 
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0 
+                };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    onScanSuccess, 
+                    onScanFailure
+                ).catch(err => {
+                    console.error("Direct Camera Start Error:", err);
+                });
+            }, 100);
+
+            return () => {
+                clearTimeout(startTimer);
+                if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().catch(err => console.error("Stop error", err));
+                }
+            };
+        }
+    }, [isScannerOpen, onScanSuccess]);
+
 
     const handleUpload = () => {
         Swal.fire({
@@ -170,6 +259,7 @@ const ShippingList = () => {
                                 <th className="p-3">Status</th>
                                 <th className="p-3">Order Type</th>
                                 <th className="p-3">Created On</th>
+                                <th className="p-3 text-center">Proof</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -179,9 +269,35 @@ const ShippingList = () => {
                                     <td className="p-3 text-center"><input type="checkbox" /></td>
                                     <td className="p-3 font-bold text-cyan-600">{order._id.substr(-12).toUpperCase()}</td>
                                     <td className="p-3">{order.vendorId}</td>
-                                    <td className="p-3"><span className="px-2 py-0.5 rounded border border-purple-200 bg-purple-50 text-purple-600 text-[10px] uppercase font-black">{order.status}</span></td>
+                                    <td className="p-3">
+                                        <span 
+                                            onClick={() => {
+                                                if(order.status === 'Scanned For Shipping') {
+                                                    setScanningOrder(order);
+                                                    setIsScannerOpen(true);
+                                                }
+                                            }}
+                                            className={`px-2 py-0.5 rounded border border-purple-200 bg-purple-50 text-purple-600 text-[10px] uppercase font-black transition-all ${order.status === 'Scanned For Shipping' ? 'cursor-pointer hover:bg-cyan-600 hover:text-white hover:border-cyan-500 shadow-sm flex items-center justify-center gap-1 w-fit' : ''}`}
+                                        >
+                                            {order.status === 'Scanned For Shipping' && <Camera size={10} />}
+                                            {order.status}
+                                        </span>
+                                    </td>
                                     <td className="p-3">{order.orderType}</td>
                                     <td className="p-3">{moment(order.createdAt).format('D MMM YYYY HH:mm')}</td>
+                                    <td className="p-3 text-center">
+                                        {order.dispatchProof ? (
+                                            <button 
+                                                onClick={() => setPreviewImage(order.dispatchProof)}
+                                                className="p-1.5 bg-cyan-50 text-cyan-600 rounded-lg hover:bg-cyan-100 transition-colors"
+                                                title="View Dispatch Proof"
+                                            >
+                                                <Eye size={14} />
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-400 text-[10px]">—</span>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -194,6 +310,85 @@ const ShippingList = () => {
                     <button disabled={currentPage>=totalPages} onClick={()=>setCurrentPage(c=>Math.min(totalPages,c+1))} className="p-1 rounded bg-gray-100 disabled:opacity-50"><ChevronRight size={16}/></button>
                 </div>
             </div>
+            {/* Scanner Modal */}
+            {isScannerOpen && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-scale-up border border-gray-100 dark:border-gray-800">
+                        <div className="p-4 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-[10px] font-black text-orange-600 uppercase tracking-[0.3em] flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div> Vision Dispatch
+                                </h3>
+                            </div>
+                            <button 
+                                onClick={() => { setIsScannerOpen(false); setScanningOrder(null); }} 
+                                className="text-gray-400 hover:text-red-500 transition-colors bg-gray-50 dark:bg-gray-800 p-1.5 rounded-full"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-5">
+                            <div className="relative rounded-3xl overflow-hidden border-2 border-orange-500/30 shadow-xl bg-black aspect-square max-w-[280px] mx-auto">
+                                <div id="reader" className="w-full h-full object-cover"></div>
+                                {/* Scanning Animation Overlay */}
+                                <div className="absolute inset-x-0 top-0 h-0.5 bg-orange-400 animate-scan z-10 shadow-[0_0_10px_rgba(251,146,60,1)]"></div>
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                    <div className="w-40 h-40 border border-white/20 rounded-2xl"></div>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-6 text-center space-y-4">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                        Order: {scanningOrder?._id.substr(-8).toUpperCase()}
+                                    </p>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleMarkAsShipped(scanningOrder?._id || orders[0]?._id)}
+                                    className="w-full py-4 bg-orange-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-orange-700 shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <ShoppingCart size={16} /> Confirm Shipped
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {/* Image Preview Modal */}
+            {previewImage && createPortal(
+                <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-scale-up border border-gray-700">
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                            <h3 className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                <ImageIcon size={16} className="text-cyan-500" /> Dispatch Proof
+                            </h3>
+                            <button 
+                                onClick={() => setPreviewImage(null)} 
+                                className="text-gray-400 hover:text-red-500 transition-colors bg-white dark:bg-gray-700 p-1.5 rounded-full shadow-sm"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-2">
+                            <div className="rounded-2xl overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-inner bg-black aspect-[4/3] flex items-center justify-center">
+                                <img src={previewImage} alt="Dispatch Proof" className="max-w-full max-h-full object-contain" />
+                            </div>
+                        </div>
+                        <div className="p-4 text-center">
+                            <button 
+                                onClick={() => setPreviewImage(null)}
+                                className="px-8 py-2.5 bg-gray-800 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all"
+                            >
+                                Close Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

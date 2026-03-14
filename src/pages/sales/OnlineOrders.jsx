@@ -42,6 +42,8 @@ const OnlineOrders = () => {
 
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkStatus, setBulkStatus] = useState('');
     const filterRef = useRef(null);
 
     useEffect(() => {
@@ -153,6 +155,59 @@ const OnlineOrders = () => {
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedIds(paginatedOrders.map(o => o._id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const handleSelectOne = (id) => {
+        setSelectedIds(prev => 
+            prev.includes(id) 
+                ? prev.filter(i => i !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleBulkStatusUpdate = async () => {
+        if (!bulkStatus) {
+            return Swal.fire('Wait', 'Please select a status to move orders to.', 'info');
+        }
+
+        const result = await Swal.fire({
+            title: `Update ${selectedIds.length} orders?`,
+            text: `Move all selected orders to ${bulkStatus}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Update All',
+            confirmButtonColor: '#06b6d4'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                setLoading(true);
+                const response = await api.put('/orders/bulk-status', {
+                    orderIds: selectedIds,
+                    status: bulkStatus
+                });
+
+                if (response.data.success) {
+                    Swal.fire('Updated!', response.data.message, 'success');
+                    setSelectedIds([]);
+                    setBulkStatus('');
+                    fetchOrders();
+                }
+            } catch (error) {
+                console.error("Bulk Update Error:", error);
+                Swal.fire('Error', 'Failed to update orders in bulk.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleExport = () => {
         const data = filteredOrders.map(o => ({
@@ -426,13 +481,57 @@ const OnlineOrders = () => {
                 </div>
             </div>
 
+            {/* Bulk Action Bar */}
+            {selectedIds.length > 0 && (
+                <div className="bg-cyan-600 text-white p-3 rounded-xl shadow-xl flex items-center justify-between animate-slide-up sticky top-4 z-40 border-2 border-cyan-400">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+                            {selectedIds.length} Selected
+                        </div>
+                        <div className="h-6 w-px bg-white/20"></div>
+                        <div className="flex items-center gap-2">
+                             <label className="text-[10px] font-black uppercase whitespace-nowrap">Move to Status:</label>
+                             <select 
+                                value={bulkStatus}
+                                onChange={(e) => setBulkStatus(e.target.value)}
+                                className="bg-cyan-800 border border-cyan-400 rounded px-2 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-white transition-all"
+                             >
+                                 <option value="">-- Choose Status --</option>
+                                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                             </select>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setSelectedIds([])}
+                            className="px-4 py-1.5 hover:bg-white/10 rounded-lg text-xs font-bold transition-all uppercase"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleBulkStatusUpdate}
+                            className="bg-white text-cyan-600 px-6 py-1.5 rounded-lg text-xs font-black uppercase hover:bg-cyan-50 shadow-lg active:scale-95 transition-all flex items-center gap-2"
+                        >
+                            <ArrowRight size={14} /> Update Selected
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Main Table */}
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 uppercase ">
                             <tr>
-                                <th className="px-5 py-4 w-12"><input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 focus:ring-accent" /></th>
+                                <th className="px-5 py-4 w-12">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-gray-300 dark:border-gray-600 focus:ring-accent" 
+                                        onChange={handleSelectAll}
+                                        checked={paginatedOrders.length > 0 && selectedIds.length === paginatedOrders.length}
+                                    />
+                                </th>
                                 <th className="px-5 py-4 whitespace-nowrap text-left">Order ID</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-left">Vendor ID</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
@@ -453,8 +552,15 @@ const OnlineOrders = () => {
                                 <tr><td colSpan="12" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No orders match your filters.</td></tr>
                             ) : (
                                 paginatedOrders.map((order) => (
-                                    <tr key={order._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
-                                        <td className="px-6 py-4 text-center"><input type="checkbox" className="rounded border-gray-300 dark:border-gray-600" /></td>
+                                    <tr key={order._id} className={`hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group ${selectedIds.includes(order._id) ? 'bg-cyan-50/30 dark:bg-cyan-900/20' : ''}`}>
+                                        <td className="px-6 py-4 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="rounded border-gray-300 dark:border-gray-600" 
+                                                checked={selectedIds.includes(order._id)}
+                                                onChange={() => handleSelectOne(order._id)}
+                                            />
+                                        </td>
                                         <td className="px-6 py-4 font-bold text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
                                             <a 
                                                 href="#" 
