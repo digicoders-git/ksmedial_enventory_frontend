@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Search, Filter, Calendar, RefreshCw, X, Download, 
-    ChevronRight, Play, CheckCircle, AlertCircle, Truck, Package 
+    ChevronRight, Play, CheckCircle, AlertCircle, Truck, Package,
+    Layers
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
@@ -30,6 +30,7 @@ const OrderProcessing = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [selectedIds, setSelectedIds] = useState([]);
 
     useEffect(() => {
         fetchOrders();
@@ -146,6 +147,51 @@ const OrderProcessing = () => {
             const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
             Swal.fire('Error', `Failed to update status: ${errorMsg}`, 'error');
         }
+    };
+
+    const handleBulkStatusUpdate = async (newStatus) => {
+        if (selectedIds.length === 0) return;
+
+        try {
+            const { value: confirmed } = await Swal.fire({
+                title: 'Bulk Update Status?',
+                text: `Are you sure you want to move ${selectedIds.length} orders to ${newStatus}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#003B5C',
+                confirmButtonText: 'Yes, Update All'
+            });
+
+            if (confirmed) {
+                const { data } = await api.post('/orders/bulk-status', {
+                    orderIds: selectedIds,
+                    status: newStatus
+                });
+
+                if (data.success) {
+                    Swal.fire('Success', `${selectedIds.length} orders updated successfully`, 'success');
+                    setSelectedIds([]);
+                    fetchOrders();
+                }
+            }
+        } catch (error) {
+            console.error("Bulk Update Error:", error);
+            Swal.fire('Error', 'Failed to update orders in bulk', 'error');
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === paginatedOrders.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(paginatedOrders.map(o => o._id));
+        }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
     };
 
     const handleFilterChange = (e) => {
@@ -267,7 +313,14 @@ const OrderProcessing = () => {
                     <table className="w-full text-left">
                         <thead className="bg-[#003B5C] text-white text-[11px] font-bold uppercase">
                             <tr>
-                                <th className="p-3 w-8"><input type="checkbox" /></th>
+                                <th className="p-3 w-8">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedIds.length === paginatedOrders.length && paginatedOrders.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                    />
+                                </th>
                                 <th className="p-3">Order ID</th>
                                 <th className="p-3">Vendor ID</th>
                                 <th className="p-3">Status</th>
@@ -420,6 +473,55 @@ const OrderProcessing = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            {/* Bulk Action Bar */}
+            {selectedIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#003B5C] text-white px-6 py-4 rounded-2xl shadow-2xl z-50 flex items-center gap-8 animate-scale-up border border-white/10 backdrop-blur-md">
+                    <div className="flex items-center gap-3 border-r border-white/20 pr-8">
+                        <div className="bg-cyan-500 p-2 rounded-lg shadow-inner">
+                            <Layers size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Selected</p>
+                            <p className="text-sm font-black">{selectedIds.length} {selectedIds.length === 1 ? 'Order' : 'Orders'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bulk Move To:</p>
+                        <div className="flex gap-2">
+                            {activeTab === 'qc' ? (
+                                <button 
+                                    onClick={() => handleBulkStatusUpdate('Packing')}
+                                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
+                                >
+                                    <CheckCircle size={14} /> Packing Stage
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={() => handleBulkStatusUpdate('Scanned For Shipping')}
+                                    className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2"
+                                >
+                                    <Truck size={14} /> Ready To Ship
+                                </button>
+                            )}
+                            
+                            <button 
+                                onClick={() => handleBulkStatusUpdate('Problem Queue')}
+                                className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                            >
+                                Problem Queue
+                            </button>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => setSelectedIds([])}
+                        className="text-white/40 hover:text-white transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
             )}
         </div>
