@@ -16,6 +16,7 @@ const MedicineMaster = () => {
   const isEditMode = !!editData && !isViewMode;
 
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [bulkData, setBulkData] = useState([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -117,6 +118,7 @@ const MedicineMaster = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -405,35 +407,42 @@ const MedicineMaster = () => {
          });
          return;
       }
+      const formDataObj = new FormData();
+      formDataObj.append('name', formData.name);
+      formDataObj.append('genericName', formData.genericName);
+      formDataObj.append('company', formData.company);
+      formDataObj.append('sku', formData.barcode);
+      formDataObj.append('unit', formData.unit);
+      formDataObj.append('packing', formData.packing);
+      formDataObj.append('hsnCode', formData.hsnCode);
+      formDataObj.append('tax', Number(formData.tax) || 0);
+      formDataObj.append('rackLocation', formData.rackLocation);
+      formDataObj.append('purchasePrice', Number(formData.purchasePrice) || 0);
+      formDataObj.append('sellingPrice', Number(formData.sellingPrice) || 0);
+      formDataObj.append('reorderLevel', Number(formData.minLevel) || 20);
+      formDataObj.append('status', formData.status);
+      formDataObj.append('isPrescriptionRequired', formData.isPrescriptionRequired);
+      formDataObj.append('group', formData.group);
+      formDataObj.append('category', formData.category);
+      formDataObj.append('batchNumber', formData.batchNumber);
+      formDataObj.append('manufacturingDate', formData.manufacturingDate || 'N/A');
+      formDataObj.append('expiryDate', formData.expiryDate);
 
-      const payload = {
-        name: formData.name,
-        genericName: formData.genericName,
-        company: formData.company,
-        sku: formData.barcode,
-        unit: formData.unit,
-        packing: formData.packing,
-        hsnCode: formData.hsnCode,
-        tax: Number(formData.tax) || 0,
-        rackLocation: formData.rackLocation,
-        purchasePrice: Number(formData.purchasePrice) || 0,
-        sellingPrice: Number(formData.sellingPrice) || 0,
-        reorderLevel: Number(formData.minLevel) || 20,
-        status: formData.status,
-        isPrescriptionRequired: formData.isPrescriptionRequired,
-        group: formData.group,
-        category: formData.category,
-        batchNumber: formData.batchNumber,
-        manufacturingDate: formData.manufacturingDate || 'N/A',
-        expiryDate: formData.expiryDate,
-        image: imagePreview
-      };
+      if (imageFile) {
+          formDataObj.append('image', imageFile);
+      } else if (imagePreview) {
+          formDataObj.append('image', imagePreview);
+      }
 
       let response;
       if (isEditMode) {
-          response = await api.put(`/products/${editData.id}`, payload);
+          response = await api.put(`/products/${editData.id}`, formDataObj, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
       } else {
-          response = await api.post('/products', payload);
+          response = await api.post('/products', formDataObj, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
       }
 
       const { data } = response;
