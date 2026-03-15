@@ -40,7 +40,12 @@ export const InventoryProvider = ({ children }) => {
                     isPrescriptionRequired: p.isPrescriptionRequired || false,
                     rackLocation: p.rackLocation || '',
                     createdAt: p.createdAt,
-                    isInventoryLive: p.isInventoryLive
+                    isInventoryLive: p.isInventoryLive,
+                    about: p.about || '',
+                    sideEffects: p.sideEffects || '',
+                    howToUse: p.howToUse || '',
+                    safetyAdvices: p.safetyAdvices || '',
+                    group: p.group || 'N/A'
                 }));
                 setInventory(mapped);
             }
@@ -72,7 +77,13 @@ export const InventoryProvider = ({ children }) => {
                     generic: p.genericName || 'N/A',
                     packing: p.packing || '',
                     rackLocation: p.rackLocation || '',
-                    isInventoryLive: p.isInventoryLive
+                    isInventoryLive: p.isInventoryLive,
+                    about: p.about || '',
+                    sideEffects: p.sideEffects || '',
+                    howToUse: p.howToUse || '',
+                    safetyAdvices: p.safetyAdvices || '',
+                    description: p.description || '',
+                    group: p.group || 'N/A'
                 }));
                 setAllMedicines(mapped);
             }

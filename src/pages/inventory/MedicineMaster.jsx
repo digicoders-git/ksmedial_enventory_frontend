@@ -41,9 +41,12 @@ const MedicineMaster = () => {
     category: '',
     batchNumber: '',
     manufacturingDate: '',
-    expiryDate: ''
+    expiryDate: '',
+    about: '',
+    sideEffects: '',
+    howToUse: '',
+    safetyAdvices: ''
   });
-
   const [groups, setGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -92,7 +95,11 @@ const MedicineMaster = () => {
         category: editData.category || '',
         batchNumber: editData.batch || '',
         manufacturingDate: editData.manufacturingDate || '',
-        expiryDate: editData.expiry || ''
+        expiryDate: editData.expiry || '',
+        about: editData.about || '',
+        sideEffects: editData.sideEffects || '',
+        howToUse: editData.howToUse || '',
+        safetyAdvices: editData.safetyAdvices || ''
       });
       if (editData.image) {
           setImagePreview(editData.image);
@@ -147,12 +154,17 @@ const MedicineMaster = () => {
       'Mfg Date',
       'Expiry Date',
       'Prescription Required (Yes/No)',
-      'Image Name'
+      'Description',
+      'Image Name',
+      'About',
+      'Side Effects',
+      'How to Use',
+      'Safety Advices'
     ];
 
     const sampleData = [
-      'Dolo 650,SKU-DOLO650,Paracetamol,15 Tabs,Analgesic,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,BN1234,2024-01-01,2026-01-01,No,dolo650.jpg',
-      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,10 Tabs,Antibiotic,Tablet,GSK,3004,12,Strip,R-02,150.00,200.00,20,BN9999,2024-02-01,2026-02-01,Yes,augmentin.png'
+      'Dolo 650,SKU-DOLO650,Paracetamol,15 Tabs,Analgesic,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,BN1234,2024-01-01,2026-01-01,No,Relieves pain and fever,dolo650.jpg,Common pain killer,Nausea,Take after food,Not for kids',
+      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,10 Tabs,Antibiotic,Tablet,GSK,3004,12,Strip,R-02,150.00,200.00,20,BN9999,2024-02-01,2026-02-01,Yes,Broad-spectrum antibiotic,augmentin.png,Strong antibiotic,Stomach pain,Complete course,Store in cool place'
     ];
 
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -212,9 +224,13 @@ const MedicineMaster = () => {
                 const batch = normalizedRow.batchnumber || normalizedRow.batch || normalizedRow.batchno || '';
                 const mfgDate = normalizedRow.mfgdate || normalizedRow.manufacturingdate || '';
                 const expDate = normalizedRow.expirydate || normalizedRow.expiry || normalizedRow.exp || '';
+                const safety = normalizedRow.safetyadvices || normalizedRow.safety || '';
+                const about = normalizedRow.about || '';
+                const effects = normalizedRow.sideeffects || normalizedRow.effects || '';
+                const usage = normalizedRow.howtouse || normalizedRow.usage || '';
 
                 return {
-                    id: index + 1,
+                    id: index + 1, // Keep id for internal tracking in bulkData
                     sku: String(sku).trim(),
                     name: String(name).trim(),
                     genericName: String(generic).trim(),
@@ -233,7 +249,13 @@ const MedicineMaster = () => {
                     isPrescriptionRequired: rx,
                     batchNumber: String(batch).trim(),
                     manufacturingDate: mfgDate,
-                    expiryDate: expDate
+                    expiryDate: expDate,
+                    description: normalizedRow.description || '',
+                    about: about,
+                    sideEffects: effects,
+                    howToUse: usage,
+                    safetyAdvices: safety,
+                    group: normalizedRow.medicinegroup || normalizedRow.group || ''
                 };
             }).filter(m => m.name); // Require name at least
             
@@ -427,6 +449,10 @@ const MedicineMaster = () => {
       formDataObj.append('batchNumber', formData.batchNumber);
       formDataObj.append('manufacturingDate', formData.manufacturingDate || 'N/A');
       formDataObj.append('expiryDate', formData.expiryDate);
+      formDataObj.append('about', formData.about);
+      formDataObj.append('sideEffects', formData.sideEffects);
+      formDataObj.append('howToUse', formData.howToUse);
+      formDataObj.append('safetyAdvices', formData.safetyAdvices);
 
       if (imageFile) {
           formDataObj.append('image', imageFile);
@@ -656,6 +682,19 @@ const MedicineMaster = () => {
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-base font-semibold text-gray-800 dark:text-white placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     />
                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Medicine Description</label>
+                     <textarea 
+                       name="description"
+                       value={formData.description}
+                       onChange={handleChange}
+                       readOnly={isViewMode}
+                       rows="1"
+                       placeholder="Short description for display..."
+                       className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none"
+                     />
+                  </div>
 
                  <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Generic Name <span className="text-red-500">*</span></label>
@@ -1043,11 +1082,66 @@ const MedicineMaster = () => {
                      />
                      <div>
                         <span className="block text-sm font-bold text-gray-700 dark:text-gray-200">Schedule H</span>
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Prescription Required</span>
+                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase leading-none">Rx Required</span>
                      </div>
                  </label>
                </div>
-           </div>
+            </div>
+
+            {/* Section: Extra Features */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary/70"></div>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2 uppercase tracking-wider">
+                  <FileText className="text-primary/70" size={16} /> Extra Medicine Features
+                </h3>
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">About Medicine</label>
+                        <textarea 
+                            name="about"
+                            value={formData.about}
+                            onChange={handleChange}
+                            readOnly={isViewMode}
+                            rows="2"
+                            placeholder="Brief description about the medicine..."
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Side Effects</label>
+                        <textarea 
+                            name="sideEffects"
+                            value={formData.sideEffects}
+                            onChange={handleChange}
+                            rows="2"
+                            placeholder="Potential side effects..."
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">How to Use</label>
+                        <textarea 
+                            name="howToUse"
+                            value={formData.howToUse}
+                            onChange={handleChange}
+                            rows="2"
+                            placeholder="Usage instructions..."
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Safety Advices</label>
+                        <textarea 
+                            name="safetyAdvices"
+                            value={formData.safetyAdvices}
+                            onChange={handleChange}
+                            rows="2"
+                            placeholder="Safety warnings & precautions..."
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm text-gray-800 dark:text-white resize-none"
+                        />
+                    </div>
+                </div>
+            </div>
 
            {/* Note */}
            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl border border-yellow-100 dark:border-yellow-900/30 flex gap-3">

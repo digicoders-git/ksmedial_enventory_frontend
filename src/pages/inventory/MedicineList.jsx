@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect  } from 'react';
-import { Plus, Search, Filter, MoreVertical, FileEdit, Trash2, Eye, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, FileEdit, Trash2, Eye, QrCode, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import QRCodeModal from '../../components/QRCodeModal';
@@ -16,8 +16,9 @@ const MedicineList = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+   const [currentPage, setCurrentPage] = useState(1);
+   const [itemsPerPage, setItemsPerPage] = useState(10);
+   const [expandedId, setExpandedId] = useState(null);
 
   const { filteredMedicines, totalPages, paginationInfo } = useMemo(() => {
     let filtered = medicines;
@@ -202,13 +203,14 @@ const MedicineList = () => {
               <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 uppercase font-semibold">
                 <tr>
                   <th className="px-6 py-4 w-12">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedItems.length === medicines.length}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 text-accent bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-accent focus:ring-2 cursor-pointer"
-                    />
-                  </th>
+                     <input 
+                       type="checkbox" 
+                       checked={selectedItems.length === medicines.length}
+                       onChange={toggleSelectAll}
+                       className="w-4 h-4 text-accent bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-accent focus:ring-2 cursor-pointer"
+                     />
+                   </th>
+                   <th className="px-6 py-4 w-10"></th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">Medicine Name</th>
                   <th className="px-6 py-4 whitespace-nowrap text-left">SKU / Barcode</th>
                   <th className="px-6 py-4 whitespace-nowrap text-center">Location</th>
@@ -223,15 +225,24 @@ const MedicineList = () => {
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {filteredMedicines.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
+                  <React.Fragment key={item.id}>
+                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
                     <td className="px-6 py-4">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedItems.includes(item.id)}
-                        onChange={() => toggleSelectItem(item.id)}
-                        className="w-4 h-4 text-accent bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-accent focus:ring-2 cursor-pointer"
-                      />
-                    </td>
+                       <input 
+                         type="checkbox" 
+                         checked={selectedItems.includes(item.id)}
+                         onChange={() => toggleSelectItem(item.id)}
+                         className="w-4 h-4 text-accent bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-accent focus:ring-2 cursor-pointer"
+                       />
+                     </td>
+                     <td className="px-4 py-4 text-center">
+                        <button 
+                          onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                          className={`p-1 rounded-full transition-all ${expandedId === item.id ? 'bg-accent/10 text-accent rotate-180' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                           <ChevronDown size={18} />
+                        </button>
+                     </td>
                     <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-200 whitespace-nowrap">{item.name}</td>
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600 uppercase tracking-tighter whitespace-nowrap inline-block shadow-sm">
@@ -248,11 +259,11 @@ const MedicineList = () => {
                        )}
                     </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.generic}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
-                        {item.category}
-                      </span>
-                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
+                         {item.group}
+                       </span>
+                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.company}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex flex-col items-end">
@@ -309,10 +320,86 @@ const MedicineList = () => {
                       </div>
                     </td>
                   </tr>
+                   {expandedId === item.id && (
+                     <tr className="bg-gray-50/80 dark:bg-gray-900/40 animate-fade-in border-l-4 border-l-accent">
+                        <td colSpan="12" className="px-6 py-8">
+                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                              {/* About */}
+                              <div className="space-y-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-accent flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-accent rounded-full"></div>
+                                    About Medicine
+                                 </h4>
+                                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm min-h-[80px]">
+                                    {item.about || 'No details added for this medicine.'}
+                                 </p>
+                              </div>
+
+                              {/* Side Effects */}
+                              <div className="space-y-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-red-500 flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-red-500 rounded-full"></div>
+                                    Side Effects
+                                 </h4>
+                                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm min-h-[80px]">
+                                    {item.sideEffects || 'No side effects listed.'}
+                                 </p>
+                              </div>
+
+                              {/* How to Use */}
+                              <div className="space-y-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
+                                    How to Use
+                                 </h4>
+                                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm min-h-[80px]">
+                                    {item.howToUse || 'No usage instructions specified.'}
+                                 </p>
+                              </div>
+
+                              {/* Safety Advices */}
+                              <div className="space-y-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-500 flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-orange-500 rounded-full"></div>
+                                    Safety Advices
+                                 </h4>
+                                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm min-h-[80px]">
+                                    {item.safetyAdvices || 'No safety warnings added.'}
+                                 </p>
+                              </div>
+
+                              {/* Description */}
+                              <div className="space-y-2 md:col-span-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-gray-500 rounded-full"></div>
+                                    General Description
+                                 </h4>
+                                 <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-100/50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200/50 dark:border-gray-700/50">
+                                    {item.description || 'No general description available.'}
+                                 </p>
+                              </div>
+
+                              {/* Category (moved to details) */}
+                              <div className="space-y-2">
+                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-teal-500 flex items-center gap-2">
+                                    <div className="w-1 h-3 bg-teal-500 rounded-full"></div>
+                                    Medical Category
+                                 </h4>
+                                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                    <span className="px-3 py-1.5 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 rounded-lg text-xs font-black uppercase tracking-wider border border-teal-100 dark:border-teal-900/30">
+                                        {item.category || 'N/A'}
+                                    </span>
+                                 </div>
+                              </div>
+                           </div>
+                        </td>
+                     </tr>
+                   )}
+                  </React.Fragment>
                 ))}
                 {filteredMedicines.length === 0 && (
                   <tr>
-                     <td colSpan="9" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                     <td colSpan="12" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                         No medicines found matching your search.
                      </td>
                   </tr>
