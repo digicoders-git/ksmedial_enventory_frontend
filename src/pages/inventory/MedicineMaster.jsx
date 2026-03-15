@@ -144,12 +144,13 @@ const MedicineMaster = () => {
       'Batch Number',
       'Mfg Date',
       'Expiry Date',
-      'Prescription Required (Yes/No)'
+      'Prescription Required (Yes/No)',
+      'Image Name'
     ];
 
     const sampleData = [
-      'Dolo 650,SKU-DOLO650,Paracetamol,15 Tabs,Analgesic,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,BN1234,2024-01-01,2026-01-01,No',
-      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,10 Tabs,Antibiotic,Tablet,GSK,3004,12,Strip,R-02,150.00,200.00,20,BN9999,2024-02-01,2026-02-01,Yes'
+      'Dolo 650,SKU-DOLO650,Paracetamol,15 Tabs,Analgesic,Tablet,Micro Labs,3004,12,Strip,R-01,20.50,30.00,50,BN1234,2024-01-01,2026-01-01,No,dolo650.jpg',
+      'Augmentin 625,SKU-AUG625,Amoxicillin + Clavulanic Acid,10 Tabs,Antibiotic,Tablet,GSK,3004,12,Strip,R-02,150.00,200.00,20,BN9999,2024-02-01,2026-02-01,Yes,augmentin.png'
     ];
 
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -203,7 +204,7 @@ const MedicineMaster = () => {
                 const buy = normalizedRow.purchaseprice || normalizedRow.rate || normalizedRow.buyprice || 0;
                 const sell = normalizedRow.sellingprice || normalizedRow.mrp || normalizedRow.sellprice || 0;
                 const min = normalizedRow.minlevel || normalizedRow.stocklevel || normalizedRow.reorderlevel || 20;
-                const img = normalizedRow.imageurl || normalizedRow.image || '';
+                const img = normalizedRow.imagename || normalizedRow.imageurl || normalizedRow.image || '';
                 const rx = (normalizedRow.prescriptionrequired || normalizedRow.rx || normalizedRow.schedh || '').toLowerCase().includes('yes') || normalizedRow.prescriptionrequired === '1';
                 
                 const batch = normalizedRow.batchnumber || normalizedRow.batch || normalizedRow.batchno || '';
