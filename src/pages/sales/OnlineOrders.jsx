@@ -172,54 +172,85 @@ const OnlineOrders = () => {
         );
     };
 
+    const getBulkValidation = (targetStatus) => {
+        if (!targetStatus || !selectedIds.length) return { isValid: true, reason: '' };
+
+        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+        const safetyStages = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'];
+        // What On Hold / Problem Queue orders are allowed to move to
+        const allowedFromSafety = ['Picking', 'Picklist Generated', 'Quality Check', 'Packing', ...safetyStages];
+        const selectedOrders = orders.filter(o => selectedIds.includes(o._id));
+
+        for (const order of selectedOrders) {
+            const currIdx = flow.indexOf(order.status);
+            const nextIdx = flow.indexOf(targetStatus);
+            const isSafetyStage = safetyStages.includes(targetStatus);
+            const isSafetyCurrent = ['On Hold', 'Problem Queue'].includes(order.status);
+            const isSelf = targetStatus === order.status;
+
+            // --- Special Rule for Safety-Stage Orders (On Hold / Problem Queue) ---
+            if (isSafetyCurrent) {
+                // Block pending/confirmed for held orders
+                if (targetStatus === 'pending' || targetStatus === 'confirmed') {
+                    return { isValid: false, reason: `Cannot move an "${order.status}" order back to "${targetStatus}".` };
+                }
+                // Block Scanned For Shipping / shipped / delivered — too far ahead
+                if (['Scanned For Shipping', 'shipped', 'delivered'].includes(targetStatus)) {
+                    return { isValid: false, reason: `Cannot move from "${order.status}" directly to "${targetStatus}". Please resume through Picking/Packing stages first.` };
+                }
+                // All other (Picking, QC, Packing, safety stages) = allowed
+                continue; // Skip flow-index checks for held orders
+            }
+
+            // --- Standard Flow Logic for Normal-Stage Orders ---
+            const isPicklistGenerated = targetStatus === 'Picklist Generated' && order.status === 'Picking';
+            const isQCFromPicking = targetStatus === 'Quality Check' && order.status === 'Picking';
+
+            // Block pending/confirmed if past picking stage
+            if (currIdx >= 2 && (targetStatus === 'pending' || targetStatus === 'confirmed')) {
+                return { isValid: false, reason: `Cannot move to "${targetStatus}" — order is already in the warehouse workflow.` };
+            }
+
+            // Block Skip Stages (strict step-by-step)
+            const isSkip = nextIdx > currIdx + 1 && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1;
+            if (isSkip && !isSafetyStage && !isSelf) {
+                return { isValid: false, reason: `Cannot skip from "${order.status}" to "${targetStatus}". Follow the step-by-step workflow.` };
+            }
+
+            // Block Reverse Flow
+            const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1 && !isSafetyStage;
+            if (isReverse && !isSelf) {
+                return { isValid: false, reason: `Cannot move "${order.status}" order backward to "${targetStatus}".` };
+            }
+        }
+        return { isValid: true, reason: '' };
+    };
+
     const handleBulkStatusUpdate = async () => {
         if (!bulkStatus) {
             return Swal.fire('Wait', 'Please select a status to move orders to.', 'info');
         }
 
-        // Check for Delivered/Cancelled in Bulk
         const terminalOrders = orders.filter(o => selectedIds.includes(o._id)).filter(o => o.status === 'delivered' || o.status === 'cancelled');
         if (terminalOrders.length > 0) {
-            return Swal.fire({
+            Swal.fire({
                 title: 'Operation Blocked',
-                text: 'Some selected orders are already "delivered" or "cancelled". Final statuses cannot be changed in bulk.',
+                text: 'Some selected orders are already "delivered" or "cancelled". Final statuses cannot be changed.',
                 icon: 'error',
                 customClass: { container: 'z-[100001]' }
             });
+            return;
         }
 
-        // Validate Workflow for Bulk (Forward Only & Safety)
-        const invalidOrders = orders.filter(o => selectedIds.includes(o._id)).filter(order => {
-            const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
-            const currIdx = flow.indexOf(order.status);
-            const nextIdx = flow.indexOf(bulkStatus);
-            
-            const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(bulkStatus);
-            const isSafetyCurrent = ['On Hold', 'Problem Queue'].includes(order.status);
-            const isSelf = bulkStatus === order.status;
-            const isPicklistGenerated = bulkStatus === 'Picklist Generated' && order.status === 'Picking';
-            const isQCFromPicking = bulkStatus === 'Quality Check' && order.status === 'Picking';
-            
-            // 1. Block 'pending'/'confirmed' if order is 'On Hold' or later
-            if ((isSafetyCurrent || currIdx >= 2) && (bulkStatus === 'pending' || bulkStatus === 'confirmed')) return true;
-            
-            // 2. Block Skip Stages
-            const isSkip = nextIdx > currIdx + 1 && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1;
-            
-            // 3. Block Reverse Flow
-            const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1;
-            
-            return (isSkip || isReverse) && !isSafetyStage && !isSelf;
-        });
-
-        if (invalidOrders.length > 0) {
-             Swal.fire({
-                title: 'Invalid Bulk Flow',
-                text: `${invalidOrders.length} selected orders cannot be moved to "${bulkStatus}" because you cannot skip stages or move orders backward.`,
+        const validation = getBulkValidation(bulkStatus);
+        if (!validation.isValid) {
+            Swal.fire({
+                title: 'Invalid Workflow',
+                text: validation.reason,
                 icon: 'error',
                 customClass: { container: 'z-[100001]' }
             });
-            return; 
+            return;
         }
 
         const result = await Swal.fire({
@@ -252,7 +283,6 @@ const OnlineOrders = () => {
                     fetchOrders();
                 }
             } catch (error) {
-                console.error("Bulk Update Error:", error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
@@ -615,7 +645,18 @@ const OnlineOrders = () => {
                                 className="bg-cyan-800 border border-cyan-400 rounded px-2 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-white transition-all"
                              >
                                  <option value="">-- Choose Status --</option>
-                                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                 {statusOptions.map(s => {
+                                     const validation = getBulkValidation(s);
+                                     return (
+                                        <option 
+                                            key={s} 
+                                            value={s} 
+                                            disabled={!validation.isValid}
+                                        >
+                                            {s}
+                                        </option>
+                                     );
+                                 })}
                              </select>
                         </div>
                     </div>
@@ -754,21 +795,38 @@ const OnlineOrders = () => {
                         <div className="p-6 overflow-y-auto custom-scrollbar">
                             {/* Detailed Info Grid */}
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                {/* Customer Details */}
                                 <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
                                     <h3 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">Customer Details</h3>
-                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || 'Guest'}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{selectedOrder.shippingAddress?.phone}</p>
-                                    <p className="text-xs text-gray-500">{selectedOrder.city}</p>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || selectedOrder.shippingAddress?.name || 'Guest'}</p>
+                                    {selectedOrder.userId?.email && <p className="text-xs text-gray-500 mt-1">{selectedOrder.userId.email}</p>}
+                                    {selectedOrder.shippingAddress?.phone && <p className="text-xs text-gray-500">📞 {selectedOrder.shippingAddress.phone}</p>}
+                                    <div className="mt-2 pt-2 border-t border-blue-100 dark:border-blue-800 text-xs text-gray-500 space-y-0.5">
+                                        {selectedOrder.shippingAddress?.address && <p>🏠 {selectedOrder.shippingAddress.address}</p>}
+                                        {selectedOrder.shippingAddress?.landmark && <p>📍 Near: {selectedOrder.shippingAddress.landmark}</p>}
+                                        <p>{[selectedOrder.shippingAddress?.city, selectedOrder.shippingAddress?.district, selectedOrder.shippingAddress?.state].filter(Boolean).join(', ')}</p>
+                                        {selectedOrder.shippingAddress?.pincode && <p>PIN: {selectedOrder.shippingAddress.pincode}</p>}
+                                    </div>
                                 </div>
+
+                                {/* Order Summary */}
                                 <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800">
                                     <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Order Summary</h3>
                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">Total: ₹{selectedOrder.total.toLocaleString()}</p>
-                                    <p className="text-xs text-gray-500 mt-1">Payment: {selectedOrder.paymentMethod}</p>
-                                    <p className="text-xs text-gray-500">Items: {selectedOrder.items.length}</p>
+                                    <p className="text-xs text-gray-500 mt-1">💳 Payment: {selectedOrder.paymentMethod}</p>
+                                    <p className="text-xs text-gray-500">📦 Items: {selectedOrder.items.length}</p>
+                                    <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-800 text-xs text-gray-500 space-y-0.5">
+                                        <p>🏷️ Vendor ID: <span className="font-mono font-bold text-gray-700 dark:text-gray-300">{selectedOrder.vendorId || 'N/A'}</span></p>
+                                        <p>📋 Type: {selectedOrder.orderType || 'N/A'}</p>
+                                        {selectedOrder.rapidOrderType && selectedOrder.rapidOrderType !== 'N/A' && <p>⚡ Rapid: {selectedOrder.rapidOrderType}</p>}
+                                        {selectedOrder.vendorRefId && selectedOrder.vendorRefId !== 'N/A' && <p>🔗 Vendor Ref: {selectedOrder.vendorRefId}</p>}
+                                        <p>🕐 Placed: {moment(selectedOrder.createdAt).format('DD MMM YYYY, hh:mm A')}</p>
+                                    </div>
                                 </div>
+
+                                {/* Workflow Status */}
                                 <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
                                     <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Workflow Status</h3>
-                                    
                                     <div className="flex flex-col gap-2">
                                         <select 
                                             value={selectedOrder.status}
@@ -804,7 +862,7 @@ const OnlineOrders = () => {
 
                                     <p className="text-xs text-gray-500 mt-2 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
                                         <span>Handover:</span>
-                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.expectedHandover).format('DD MMM')}</span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.expectedHandover).format('DD MMM YYYY')}</span>
                                     </p>
                                 </div>
                              </div>

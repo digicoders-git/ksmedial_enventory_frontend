@@ -72,11 +72,57 @@ const PickingOrders = () => {
     };
 
     const handleSelectOne = (id) => {
-        setSelectedIds(prev => 
-            prev.includes(id) 
+        setSelectedIds(prev =>
+            prev.includes(id)
                 ? prev.filter(i => i !== id)
                 : [...prev, id]
         );
+    };
+
+    const getBulkValidation = (targetStatus) => {
+        if (!targetStatus || !selectedIds.length) return { isValid: true, reason: '' };
+
+        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+        const safetyStages = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'];
+        const selectedOrders = orders.filter(o => selectedIds.includes(o._id));
+
+        for (const order of selectedOrders) {
+            const currIdx = flow.indexOf(order.status);
+            const nextIdx = flow.indexOf(targetStatus);
+            const isSafetyStage = safetyStages.includes(targetStatus);
+            const isSafetyCurrent = ['On Hold', 'Problem Queue'].includes(order.status);
+            const isSelf = targetStatus === order.status;
+
+            // --- Special Rule for Safety-Stage Orders (On Hold / Problem Queue) ---
+            if (isSafetyCurrent) {
+                if (targetStatus === 'pending' || targetStatus === 'confirmed') {
+                    return { isValid: false, reason: `Cannot move an "${order.status}" order back to "${targetStatus}".` };
+                }
+                if (['Scanned For Shipping', 'shipped', 'delivered'].includes(targetStatus)) {
+                    return { isValid: false, reason: `Cannot move from "${order.status}" directly to "${targetStatus}". Resume through Picking/Packing stages first.` };
+                }
+                continue; // Skip flow-index checks for held orders
+            }
+
+            // --- Standard Flow Logic ---
+            const isPicklistGenerated = targetStatus === 'Picklist Generated' && order.status === 'Picking';
+            const isQCFromPicking = targetStatus === 'Quality Check' && order.status === 'Picking';
+
+            if (currIdx >= 2 && (targetStatus === 'pending' || targetStatus === 'confirmed')) {
+                return { isValid: false, reason: `Cannot move to "${targetStatus}" — order is already in the warehouse workflow.` };
+            }
+
+            const isSkip = nextIdx > currIdx + 1 && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1;
+            if (isSkip && !isSafetyStage && !isSelf) {
+                return { isValid: false, reason: `Cannot skip from "${order.status}" to "${targetStatus}". Follow the step-by-step workflow.` };
+            }
+
+            const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1 && !isSafetyStage;
+            if (isReverse && !isSelf) {
+                return { isValid: false, reason: `Cannot move "${order.status}" order backward to "${targetStatus}".` };
+            }
+        }
+        return { isValid: true, reason: '' };
     };
 
     const handleBulkStatusUpdate = async () => {
@@ -84,54 +130,33 @@ const PickingOrders = () => {
             return Swal.fire('Wait', 'Please select a status to move orders to.', 'info');
         }
 
-        // Check for Delivered/Cancelled in Bulk
+        // Check terminal orders first
         const terminalOrders = orders.filter(o => selectedIds.includes(o._id)).filter(o => o.status === 'delivered' || o.status === 'cancelled');
         if (terminalOrders.length > 0) {
-            return Swal.fire({
+            Swal.fire({
                 title: 'Operation Blocked',
-                text: 'Some selected orders are already "delivered" or "cancelled". Final statuses cannot be changed in bulk.',
+                text: 'Some selected orders are already "delivered" or "cancelled". Final statuses cannot be changed.',
                 icon: 'error',
                 customClass: { container: 'z-[100001]' }
             });
+            return;
         }
 
-        // Validate Workflow for Bulk (Forward Only & Safety)
-        const invalidOrders = orders.filter(o => selectedIds.includes(o._id)).filter(order => {
-            const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
-            const currIdx = flow.indexOf(order.status);
-            const nextIdx = flow.indexOf(bulkStatus);
-            
-            const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(bulkStatus);
-            const isSafetyCurrent = ['On Hold', 'Problem Queue'].includes(order.status);
-            const isSelf = bulkStatus === order.status;
-            const isPicklistGenerated = bulkStatus === 'Picklist Generated' && order.status === 'Picking';
-            const isQCFromPicking = bulkStatus === 'Quality Check' && order.status === 'Picking';
-            
-            // 1. Block 'pending'/'confirmed' if order is 'On Hold' or later
-            if ((isSafetyCurrent || currIdx >= 2) && (bulkStatus === 'pending' || bulkStatus === 'confirmed')) return true;
-
-            // 2. Block Skip Stages
-            const isSkip = nextIdx > currIdx + 1 && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1;
-            
-            // 3. Block Reverse Flow
-            const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1;
-
-            return (isSkip || isReverse) && !isSafetyStage && !isSelf;
-        });
-
-        if (invalidOrders.length > 0) {
-             Swal.fire({
-                title: 'Invalid Bulk Flow',
-                text: `${invalidOrders.length} selected orders cannot be moved to "${bulkStatus}" because you cannot skip stages or move orders backward.`,
+        // Validate workflow for all selected orders
+        const validation = getBulkValidation(bulkStatus);
+        if (!validation.isValid) {
+            Swal.fire({
+                title: 'Invalid Workflow',
+                text: validation.reason,
                 icon: 'error',
                 customClass: { container: 'z-[100001]' }
             });
-            return; // STOP EXECUTION
+            return;
         }
 
         const result = await Swal.fire({
             title: `Update ${selectedIds.length} orders?`,
-            text: `Move all selected orders to ${bulkStatus}?`,
+            text: `Move all selected orders to "${bulkStatus}"?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Yes, Update All',
