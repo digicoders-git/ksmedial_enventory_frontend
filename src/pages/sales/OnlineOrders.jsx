@@ -177,13 +177,59 @@ const OnlineOrders = () => {
             return Swal.fire('Wait', 'Please select a status to move orders to.', 'info');
         }
 
+        // Check for Delivered/Cancelled in Bulk
+        const terminalOrders = orders.filter(o => selectedIds.includes(o._id)).filter(o => o.status === 'delivered' || o.status === 'cancelled');
+        if (terminalOrders.length > 0) {
+            return Swal.fire({
+                title: 'Operation Blocked',
+                text: 'Some selected orders are already "delivered" or "cancelled". Final statuses cannot be changed in bulk.',
+                icon: 'error',
+                customClass: { container: 'z-[100001]' }
+            });
+        }
+
+        // Validate Workflow for Bulk (Forward Only & Safety)
+        const invalidOrders = orders.filter(o => selectedIds.includes(o._id)).filter(order => {
+            const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+            const currIdx = flow.indexOf(order.status);
+            const nextIdx = flow.indexOf(bulkStatus);
+            
+            const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(bulkStatus);
+            const isSafetyCurrent = ['On Hold', 'Problem Queue'].includes(order.status);
+            const isSelf = bulkStatus === order.status;
+            const isPicklistGenerated = bulkStatus === 'Picklist Generated' && order.status === 'Picking';
+            const isQCFromPicking = bulkStatus === 'Quality Check' && order.status === 'Picking';
+            
+            // 1. Block 'pending'/'confirmed' if order is 'On Hold' or later
+            if ((isSafetyCurrent || currIdx >= 2) && (bulkStatus === 'pending' || bulkStatus === 'confirmed')) return true;
+            
+            // 2. Block Skip Stages
+            const isSkip = nextIdx > currIdx + 1 && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1;
+            
+            // 3. Block Reverse Flow
+            const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1;
+            
+            return (isSkip || isReverse) && !isSafetyStage && !isSelf;
+        });
+
+        if (invalidOrders.length > 0) {
+             Swal.fire({
+                title: 'Invalid Bulk Flow',
+                text: `${invalidOrders.length} selected orders cannot be moved to "${bulkStatus}" because you cannot skip stages or move orders backward.`,
+                icon: 'error',
+                customClass: { container: 'z-[100001]' }
+            });
+            return; 
+        }
+
         const result = await Swal.fire({
             title: `Update ${selectedIds.length} orders?`,
             text: `Move all selected orders to ${bulkStatus}?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Yes, Update All',
-            confirmButtonColor: '#06b6d4'
+            confirmButtonColor: '#06b6d4',
+            customClass: { container: 'z-[100001]' }
         });
 
         if (result.isConfirmed) {
@@ -195,14 +241,24 @@ const OnlineOrders = () => {
                 });
 
                 if (response.data.success) {
-                    Swal.fire('Updated!', response.data.message, 'success');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Updated!',
+                        text: response.data.message,
+                        customClass: { container: 'z-[100001]' }
+                    });
                     setSelectedIds([]);
                     setBulkStatus('');
                     fetchOrders();
                 }
             } catch (error) {
                 console.error("Bulk Update Error:", error);
-                Swal.fire('Error', 'Failed to update orders in bulk.', 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to update orders in bulk.',
+                    customClass: { container: 'z-[100001]' }
+                });
             } finally {
                 setLoading(false);
             }
@@ -265,8 +321,89 @@ const OnlineOrders = () => {
         }
     };
 
+    const getNextStatus = (currentStatus) => {
+        const flow = [
+            'pending', 'confirmed', 'Picking', 'Picklist Generated', 
+            'Quality Check', 'Packing', 'Scanned For Shipping', 
+            'shipped', 'delivered'
+        ];
+        const index = flow.indexOf(currentStatus);
+        if (index !== -1 && index < flow.length - 1) {
+            // Picking can go to Quality Check directly or Picklist Generated
+            if (currentStatus === 'Picking') return 'Quality Check';
+            return flow[index + 1];
+        }
+        return null;
+    };
+
     const handleStatusUpdate = async (newStatus) => {
         if (!selectedOrder) return;
+
+        // 1. BLOCK changes if order is already delivered or cancelled
+        if (selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled') {
+             Swal.fire({
+                title: 'Order Completed',
+                text: 'This order is already delivered or cancelled. Its status cannot be changed.',
+                icon: 'info',
+                customClass: { container: 'z-[100001]' }
+            });
+            return; // CRITICAL: Stop execution
+        }
+
+        // 2. SPECIAL RULE: 'pending' order MUST go to 'confirmed' first
+        if (selectedOrder.status === 'pending' && newStatus !== 'confirmed' && newStatus !== 'cancelled' && newStatus !== 'pending') {
+             Swal.fire({
+                title: 'Confirm First',
+                text: 'Fresh orders must be "confirmed" before they can enter the Picking/QC workflow.',
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return; // CRITICAL: Stop execution
+        }
+
+        // 3. Strict Status Flow Logic for jumps
+        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+        const currIdx = flow.indexOf(selectedOrder.status);
+        const nextIdx = flow.indexOf(newStatus);
+        
+        const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(newStatus);
+        const isSelf = newStatus === selectedOrder.status;
+        const isPicklistGenerated = newStatus === 'Picklist Generated' && selectedOrder.status === 'Picking';
+        const isQCFromPicking = newStatus === 'Quality Check' && selectedOrder.status === 'Picking';
+
+        // Block 'pending' and 'confirmed' if moving from 'On Hold' or later stages
+        if ((selectedOrder.status === 'On Hold' || selectedOrder.status === 'Problem Queue' || currIdx >= 2) && (newStatus === 'pending' || newStatus === 'confirmed')) {
+            Swal.fire({
+                title: 'Reverse Blocked',
+                text: `You cannot move an order back to "${newStatus}" once it has entered the warehouse workflow.`,
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return;
+        }
+
+        // Check for skipping stages (blocked if nextIdx > currIdx + 1)
+        if (nextIdx > currIdx + 1 && !isSafetyStage && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1) {
+             Swal.fire({
+                title: 'Invalid Flow',
+                text: `You cannot skip stages. Order must follow sequence: Picking -> QC -> Packing -> Shipping.`,
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return; // STOP execution
+        }
+
+        // 4. BLOCK REVERSE FLOW (Cannot go back to global sequence)
+        if (nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1 && !isSafetyStage) {
+            Swal.fire({
+                title: 'Reverse Blocked',
+                text: `You cannot move an order back to "${newStatus}" from "${selectedOrder.status}". The process only moves forward.`,
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return; // STOP execution
+        }
+
         try {
             const { data } = await api.put(`/orders/${selectedOrder._id}/status`, { status: newStatus });
             if (data.success) {
@@ -278,12 +415,22 @@ const OnlineOrders = () => {
                     title: 'Status Updated',
                     text: `Order marked as ${newStatus}`,
                     timer: 1000,
-                    showConfirmButton: false
+                    showConfirmButton: false,
+                    customClass: {
+                        container: 'z-[100001]'
+                    }
                 });
             }
         } catch (error) {
             console.error("Update Status Error", error);
-            Swal.fire('Error', 'Failed to update status', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to update status',
+                customClass: {
+                    container: 'z-[100001]'
+                }
+            });
         }
     };
 
@@ -593,7 +740,7 @@ const OnlineOrders = () => {
             </div>
             {/* Order Details Modal (Preserved & Styled) */}
             {showModal && selectedOrder && createPortal(
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
                          {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
@@ -625,12 +772,29 @@ const OnlineOrders = () => {
                                     <div className="flex flex-col gap-2">
                                         <select 
                                             value={selectedOrder.status}
+                                            disabled={selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled'}
                                             onChange={(e) => handleStatusUpdate(e.target.value)}
-                                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer shadow-sm hover:border-purple-300"
+                                            className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm ${selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled' ? 'opacity-50 cursor-not-allowed border-gray-300' : 'cursor-pointer hover:border-purple-300'}`}
                                         >
-                                            {statusOptions.map(option => (
-                                                <option key={option} value={option}>{option}</option>
-                                            ))}
+                                            {statusOptions.map(option => {
+                                                const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+                                                const currIdx = flow.indexOf(selectedOrder.status);
+                                                const optIdx = flow.indexOf(option);
+                                                
+                                                const isPastStage = (optIdx !== -1 && currIdx !== -1 && optIdx < currIdx);
+                                                const isEarlyStageOnHold = (selectedOrder.status === 'On Hold' || selectedOrder.status === 'Problem Queue') && (option === 'pending' || option === 'confirmed');
+                                                
+                                                return (
+                                                    <option 
+                                                        key={option} 
+                                                        value={option}
+                                                        disabled={isPastStage || isEarlyStageOnHold}
+                                                        className={isPastStage || isEarlyStageOnHold ? 'text-gray-400 bg-gray-100' : ''}
+                                                    >
+                                                        {option} {option === selectedOrder.status ? '(Current)' : ''}
+                                                    </option>
+                                                );
+                                            })}
                                         </select>
                                         <div className="flex items-center gap-1 text-[10px] text-purple-600/70 font-medium">
                                             <RefreshCw size={10} className="animate-spin-slow" />
