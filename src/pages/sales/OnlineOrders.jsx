@@ -295,36 +295,7 @@ const OnlineOrders = () => {
                     <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Sales Orders</h1>
                     <p className="text-sm text-gray-500 font-medium">Manage and process orders with detailed filtering.</p>
                 </div>
-                <button 
-                    onClick={async () => {
-                        const result = await Swal.fire({
-                            title: 'Generate Test Data?',
-                            text: 'This will create 5 random test orders.',
-                            icon: 'question',
-                            showCancelButton: true,
-                            confirmButtonText: 'Yes, Generate',
-                            confirmButtonColor: '#06b6d4'
-                        });
-
-                        if (result.isConfirmed) {
-                            try {
-                                setLoading(true);
-                                await api.post('/orders/seed');
-                                await fetchOrders();
-                                Swal.fire('Success', 'Test orders generated successfully!', 'success');
-                            } catch (error) {
-                                console.error(error); // Log full error
-                                const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
-                                Swal.fire('Error', `Failed to generate test data: ${errorMsg}`, 'error');
-                            } finally {
-                                setLoading(false);
-                            }
-                        }
-                    }}
-                    className="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg text-sm hover:bg-purple-700 shadow-lg shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-2"
-                >
-                    <Boxes size={18} /> Generate Test Data
-                </button>
+                
             </div>
 
             {/* Filter Bar */}

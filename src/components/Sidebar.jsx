@@ -125,8 +125,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       path: '/medicines',
       subItems: [
          { label: 'Medicine List', path: '/medicines/list' }, // Was inventory/medicines
-         { label: 'Add Medicine', path: '/medicines/add' },   // Was inventory/medicines/add
-         { label: 'Prescription Check', path: '/medicines/prescriptions' }
+         { label: 'Add Medicine', path: '/medicines/add' }   // Was inventory/medicines/add
       ]
     },
 

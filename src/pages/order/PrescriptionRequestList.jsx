@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
     Search, Filter, Calendar, CheckCircle, XCircle, 
     Eye, User, Phone, ClipboardList, RefreshCw,
-    Clock, Tag, Package
+    Clock, Tag, Package, FileText
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
+import PrescriptionManagement from '../inventory/PrescriptionManagement';
 
-const PrescriptionRequestList = () => {
+const OrderRequestsTab = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -355,6 +356,36 @@ const PrescriptionRequestList = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const PrescriptionRequestList = () => {
+    const [activeMainTab, setActiveMainTab] = React.useState('orders');
+
+    return (
+        <div className="relative animate-fade-in pb-10">
+            {/* Unified Top Tab Switcher */}
+            <div className="flex justify-center w-full mb-8">
+                <div className="bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row gap-2 w-full max-w-2xl">
+                    <button 
+                        onClick={() => setActiveMainTab('orders')}
+                        className={`flex-1 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${activeMainTab === 'orders' ? 'bg-primary text-white shadow-md' : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                        <ClipboardList size={18} /> Pending Online Orders (Action Required)
+                    </button>
+                    <button 
+                        onClick={() => setActiveMainTab('database')}
+                        className={`flex-1 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${activeMainTab === 'database' ? 'bg-primary text-white shadow-md' : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                        <FileText size={18} /> General Prescription DB
+                    </button>
+                </div>
+            </div>
+
+            <div className="">
+                {activeMainTab === 'orders' ? <OrderRequestsTab /> : <PrescriptionManagement />}
+            </div>
         </div>
     );
 };
