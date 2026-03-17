@@ -8,6 +8,7 @@ import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
 import Papa from 'papaparse';
+import { createPortal } from 'react-dom';
 
 const OrderProcessing = () => {
     const [activeTab, setActiveTab] = useState('qc'); // 'qc' or 'packing'
@@ -17,6 +18,7 @@ const OrderProcessing = () => {
     // Modal State
     const [showQCModal, setShowQCModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [processingQC, setProcessingQC] = useState(false);
 
     // Shared Filters State
@@ -249,6 +251,19 @@ const OrderProcessing = () => {
         a.click();
     };
 
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'Picking': return 'text-orange-600 bg-orange-50 border-orange-200';
+            case 'On Hold': return 'text-amber-600 bg-amber-50 border-amber-200';
+            case 'Packing': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
+            case 'Shipping': return 'text-purple-600 bg-purple-50 border-purple-200';
+            case 'Problem Queue': return 'text-rose-600 bg-rose-50 border-rose-200';
+            case 'delivered': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+            case 'cancelled': return 'text-gray-600 bg-gray-100 border-gray-200';
+            default: return 'text-blue-600 bg-blue-50 border-blue-200';
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -345,7 +360,14 @@ const OrderProcessing = () => {
                                             className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                                         />
                                     </td>
-                                    <td className="p-3 font-bold text-cyan-600">{order._id.substr(-12).toUpperCase()}</td>
+                                    <td className="p-3 font-bold text-cyan-600">
+                                        <button 
+                                            onClick={() => { setSelectedOrder(order); setShowDetailsModal(true); }}
+                                            className="hover:underline"
+                                        >
+                                            {order._id.substr(-12).toUpperCase()}
+                                        </button>
+                                    </td>
                                     <td className="p-3">{order.vendorId}</td>
                                     <td className="p-3">
                                         <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-black ${
@@ -531,6 +553,96 @@ const OrderProcessing = () => {
                         <X size={20} />
                     </button>
                 </div>
+            )}
+            {/* Order Details Modal (Mirroring OnlineOrders functionality) */}
+            {showDetailsModal && selectedOrder && createPortal(
+                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
+                         {/* Header */}
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Order #{selectedOrder._id.substr(-8).toUpperCase()}</h2>
+                                <p className="text-xs text-gray-500 font-medium mt-1">View complete details and items.</p>
+                            </div>
+                            <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            {/* Detailed Info Grid */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                {/* Customer Details */}
+                                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
+                                    <h3 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">Customer Details</h3>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || selectedOrder.shippingAddress?.name || 'Guest'}</p>
+                                    {selectedOrder.shippingAddress?.phone && <p className="text-xs text-gray-500 mt-1">📞 {selectedOrder.shippingAddress.phone}</p>}
+                                    <div className="mt-2 pt-2 border-t border-blue-100 dark:border-blue-800 text-xs text-gray-500 space-y-0.5">
+                                        <p>{[selectedOrder.shippingAddress?.city, selectedOrder.shippingAddress?.state].filter(Boolean).join(', ')}</p>
+                                        {selectedOrder.shippingAddress?.pincode && <p>PIN: {selectedOrder.shippingAddress.pincode}</p>}
+                                    </div>
+                                </div>
+
+                                {/* Order Summary */}
+                                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                                    <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Order Summary</h3>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">Total: ₹{typeof selectedOrder.total === 'number' ? selectedOrder.total.toLocaleString() : selectedOrder.collectibleAmount?.toLocaleString()}</p>
+                                    <p className="text-xs text-gray-500 mt-1">💳 Payment: {selectedOrder.paymentMethod}</p>
+                                    <p className="text-xs text-gray-500">📦 Items: {selectedOrder.items?.length || 0}</p>
+                                    <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-800 text-xs text-gray-500 space-y-0.5">
+                                        <p>🏷️ Vendor ID: <span className="font-mono font-bold text-gray-700 dark:text-gray-300">{selectedOrder.vendorId || 'N/A'}</span></p>
+                                        <p>📋 Type: {selectedOrder.orderType || 'N/A'}</p>
+                                        <p>🕐 Placed: {moment(selectedOrder.createdAt).format('DD MMM YYYY, hh:mm A')}</p>
+                                    </div>
+                                </div>
+
+                                {/* Current Status */}
+                                <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
+                                    <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Current Status</h3>
+                                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${getStatusColor(selectedOrder.status)}`}>
+                                        {selectedOrder.status}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-4 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
+                                        <span>Last Update:</span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.updatedAt || selectedOrder.createdAt).format('DD MMM YYYY')}</span>
+                                    </p>
+                                </div>
+                             </div>
+
+                             {/* Items Table */}
+                            <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-3">Order Items</h3>
+                            <div className="border border-gray-100 dark:border-gray-700 overflow-hidden rounded-lg">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 uppercase font-bold">
+                                        <tr>
+                                            <th className="p-3">Product Name</th>
+                                            <th className="p-3 text-center">Qty</th>
+                                            <th className="p-3 text-right">Price</th>
+                                            <th className="p-3 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                        {selectedOrder.items?.map((item, i) => (
+                                            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <td className="p-3 font-medium text-gray-800 dark:text-gray-200">{item.productName}</td>
+                                                <td className="p-3 text-center text-gray-600 dark:text-gray-400">{item.quantity}</td>
+                                                <td className="p-3 text-right text-gray-600 dark:text-gray-400">₹{Number(item.productPrice || item.price || 0).toFixed(2)}</td>
+                                                <td className="p-3 text-right font-bold text-gray-800 dark:text-gray-200">₹{(Number(item.productPrice || item.price || 0) * item.quantity).toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-end">
+                            <button 
+                                onClick={() => setShowDetailsModal(false)}
+                                className="px-8 py-2.5 bg-gray-800 dark:bg-gray-700 text-white text-xs font-black uppercase rounded-xl hover:bg-gray-700 transition-all active:scale-95 shadow-lg"
+                            >
+                                Close Detail
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

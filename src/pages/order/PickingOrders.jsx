@@ -212,7 +212,7 @@ const PickingOrders = () => {
         return null; // End of chain or not in standard flow
     };
 
-    const handleStatusUpdate = async (newStatus) => {
+    const handleStatusUpdate = async (newStatus, triggerPrint = false) => {
         if (!selectedOrder) return;
 
         // 1. BLOCK changes if order is already delivered or cancelled
@@ -283,14 +283,11 @@ const PickingOrders = () => {
         try {
             const { data } = await api.put(`/orders/${selectedOrder._id}/status`, { status: newStatus });
             if (data.success) {
-                // Trigger print ONLY if the button clicked was 'Print Picklist'
-                if (newStatus === 'Picklist Generated') {
+                if (triggerPrint) {
                     window.print();
-                    setOrders(prev => prev.map(o => o._id === selectedOrder._id ? { ...o, status: newStatus } : o));
-                    setSelectedOrder(prev => ({ ...prev, status: newStatus }));
                 }
-                // If moving outside Picking/Picklist Generated cycle, remove it from list
-                else if (newStatus !== 'Picking' && newStatus !== 'Picklist Generated') {
+
+                if (newStatus !== 'Picking' && newStatus !== 'Picklist Generated') {
                     setOrders(prev => prev.filter(o => o._id !== selectedOrder._id));
                     setShowModal(false);
                 } else {
@@ -557,7 +554,7 @@ const PickingOrders = () => {
                                     <select 
                                         value={selectedOrder.status}
                                         disabled={selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled'}
-                                        onChange={(e) => handleStatusUpdate(e.target.value)}
+                                        onChange={(e) => handleStatusUpdate(e.target.value, false)}
                                         className={`w-full bg-white dark:bg-gray-800 border-2 border-orange-200 dark:border-orange-800 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow-sm ${selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled' ? 'opacity-50 cursor-not-allowed border-gray-300' : 'cursor-pointer hover:border-orange-400'}`}
                                     >
                                         {statusOptions.map(option => {
@@ -627,7 +624,7 @@ const PickingOrders = () => {
                             
                             <div className="flex justify-end gap-3 mt-4 border-t border-gray-100 pt-6 dark:border-gray-800">
                                 <button 
-                                    onClick={() => handleStatusUpdate('Picklist Generated')}
+                                    onClick={() => handleStatusUpdate('Picklist Generated', true)}
                                     className="px-6 py-2 bg-gray-800 text-white rounded-lg text-xs font-black uppercase hover:bg-gray-900 transition-all flex items-center gap-2"
                                 >
                                     <FileText size={16} /> Print Picklist
