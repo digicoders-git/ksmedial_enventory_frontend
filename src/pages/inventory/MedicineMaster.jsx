@@ -1041,7 +1041,7 @@ const MedicineMaster = () => {
                        <UploadCloud size={32} />
                     </div>
                   )}
-                  <input type="file" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
+                  <input type="file" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                </div>
                <p className="text-xs text-gray-400 font-medium">Click to upload medicine image</p>
            </div>

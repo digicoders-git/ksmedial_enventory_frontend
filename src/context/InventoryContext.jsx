@@ -83,7 +83,8 @@ export const InventoryProvider = ({ children }) => {
                     howToUse: p.howToUse || '',
                     safetyAdvices: p.safetyAdvices || '',
                     description: p.description || '',
-                    group: p.group || 'N/A'
+                    group: p.group || 'N/A',
+                    image: p.image || null
                 }));
                 setAllMedicines(mapped);
             }
