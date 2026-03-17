@@ -65,7 +65,7 @@ const AddGRN = () => {
             const date = new Date(dateStr);
             if (isNaN(date.getTime())) return '';
             return date.toISOString().split('T')[0];
-        } catch (e) {
+        } catch {
             return '';
         }
     };
@@ -88,7 +88,7 @@ const AddGRN = () => {
                     return {
                         productId: product?._id || prodId || '',
                         productName: item.medicineName || product?.name || '',
-                        supplierSkuId: '',
+                        supplierSkuId: product?.sku || item.product?.sku || '',
                         skuId: product?.sku || item.product?.sku || '',
                         pack: product?.packing || product?.packSize || '',
                         batchNumber: (product?.batchNumber && product?.batchNumber !== 'N/A') ? product?.batchNumber : (product?.batchNo || product?.batch || ''),
@@ -208,7 +208,7 @@ const AddGRN = () => {
                         return {
                             productId: product?._id || item.product || '',
                             productName: item.medicineName || product?.name || '',
-                            supplierSkuId: '',
+                            supplierSkuId: product?.sku || '',
                             skuId: product?.sku || '',
                             pack: product?.packSize || '',
                             batchNumber: '',
@@ -291,7 +291,7 @@ const AddGRN = () => {
                     Swal.fire('Success', `Loaded details for Invoice ${entry.invoiceNumber}`, 'success');
                 }
             }
-        } catch (error) {
+        } catch {
             Swal.fire('Error', 'Physical Validation ID not found', 'error');
         } finally {
             setLoading(false);
@@ -360,7 +360,7 @@ const AddGRN = () => {
                         productId: product?._id || '',
                         productName: name,
                         skuId: product?.sku || row['SKU'] || '',
-                        supplierSkuId: row['Supplier SKU'] || '',
+                        supplierSkuId: row['Supplier SKU'] || row['Supplier SKU ID'] || product?.sku || row['SKU'] || '',
                         pack: row['Pack'] || row['Packing'] || '',
                         batchNumber: row['Batch'] || row['Batch Number'] || '',
                         expiryDate: row['Expiry'] || row['Expiry Date'] || '',
@@ -411,7 +411,7 @@ const AddGRN = () => {
         try {
             const { data } = await api.get('/suppliers');
             if (data.success) setSuppliers(data.suppliers);
-        } catch (error) {
+        } catch {
             console.error("Failed to fetch suppliers");
         }
     };
@@ -420,7 +420,7 @@ const AddGRN = () => {
         try {
             const { data } = await api.get('/products');
             if (data.success) setProducts(data.products);
-        } catch (error) {
+        } catch {
             console.error("Failed to fetch products");
         }
     };
@@ -454,7 +454,7 @@ const AddGRN = () => {
         const newItem = {
             productId: product._id,
             productName: product.name,
-            supplierSkuId: '',
+            supplierSkuId: product.sku || '',
             skuId: product.sku || '',
             pack: product.packing || product.packSize || '',
             // Fallback keys for batch and dates with robust formatting
