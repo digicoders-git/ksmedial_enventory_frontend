@@ -42,6 +42,10 @@ const OrderRequestsTab = () => {
     };
 
     const handleApprove = async (id) => {
+        if (!selectedRequest?.prescriptionImage) {
+            Swal.fire('Image Required', 'Please upload a prescription image before approving this order.', 'warning');
+            return;
+        }
         try {
             const result = await Swal.fire({
                 title: 'Approve Prescription?',
