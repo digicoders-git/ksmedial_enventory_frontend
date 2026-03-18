@@ -69,6 +69,38 @@ const OrderRequestsTab = () => {
         }
     };
 
+    const handleReject = async (id) => {
+        try {
+            const result = await Swal.fire({
+                title: 'Reject Prescription Request?',
+                input: 'textarea',
+                inputLabel: 'Reason for rejection (optional)',
+                inputPlaceholder: 'Enter reason...',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#EF4444',
+                confirmButtonText: 'Yes, Reject'
+            });
+
+            if (result.isConfirmed) {
+                setProcessing(true);
+                const { data } = await api.put(`/orders/prescription/requests/${id}/reject`, {
+                    rejectionReason: result.value || 'Rejected by admin'
+                });
+                if (data.success) {
+                    Swal.fire('Rejected', 'Prescription request has been rejected.', 'info');
+                    setShowModal(false);
+                    fetchRequests();
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', error.response?.data?.message || 'Failed to reject request', 'error');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const handleAdminImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -339,10 +371,12 @@ const OrderRequestsTab = () => {
 
                         <div className="p-8 pt-0 flex gap-4">
                             <button 
-                                onClick={() => setShowModal(false)}
-                                className="flex-1 py-4 rounded-2xl border border-gray-200 dark:border-gray-700 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all active:scale-95"
+                                onClick={() => handleReject(selectedRequest._id)}
+                                disabled={processing}
+                                className="flex-1 py-4 rounded-2xl border border-red-200 text-red-500 font-black uppercase text-[10px] tracking-widest hover:bg-red-50 transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
-                                Not Clear
+                                {processing ? <RefreshCw className="animate-spin" size={16} /> : <XCircle size={16} />}
+                                Reject
                             </button>
                             <button 
                                 onClick={() => handleApprove(selectedRequest._id)}

@@ -127,11 +127,18 @@ const MedicineMaster = () => {
     if (file) {
       setImageFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
+      reader.onload = (event) => {
+        setImagePreview(event.target.result);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('data:')) return url;
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001';
+    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const downloadSampleCSV = () => {
@@ -1033,9 +1040,9 @@ const MedicineMaster = () => {
            
            {/* Image Upload */}
            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center text-center">
-               <div className="mb-4 relative w-32 h-32 rounded-full border-4 border-gray-50 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-700 group cursor-pointer shadow-inner">
+                <div className="mb-4 relative w-32 h-32 rounded-full border-4 border-gray-50 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-700 group cursor-pointer shadow-inner">
                   {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <img src={getImageUrl(imagePreview)} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-500">
                        <UploadCloud size={32} />

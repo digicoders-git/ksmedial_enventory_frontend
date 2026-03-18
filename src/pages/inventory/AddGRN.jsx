@@ -88,8 +88,8 @@ const AddGRN = () => {
                     return {
                         productId: product?._id || prodId || '',
                         productName: item.medicineName || product?.name || '',
-                        supplierSkuId: product?.sku || item.product?.sku || '',
-                        skuId: product?.sku || item.product?.sku || '',
+                        supplierSkuId: product?.sku || item.product?.sku || item.sku || '',
+                        skuId: product?.sku || item.product?.sku || item.sku || '',
                         pack: product?.packing || product?.packSize || '',
                         batchNumber: (product?.batchNumber && product?.batchNumber !== 'N/A') ? product?.batchNumber : (product?.batchNo || product?.batch || ''),
                         expiryDate: formatDateForInput(product?.expiryDate || product?.expiry || product?.exp),
@@ -208,8 +208,8 @@ const AddGRN = () => {
                         return {
                             productId: product?._id || item.product || '',
                             productName: item.medicineName || product?.name || '',
-                            supplierSkuId: product?.sku || '',
-                            skuId: product?.sku || '',
+                            supplierSkuId: product?.sku || item.product?.sku || item.sku || '',
+                            skuId: product?.sku || item.product?.sku || item.sku || '',
                             pack: product?.packSize || '',
                             batchNumber: '',
                             expiryDate: '',
@@ -454,8 +454,8 @@ const AddGRN = () => {
         const newItem = {
             productId: product._id,
             productName: product.name,
-            supplierSkuId: product.sku || '',
-            skuId: product.sku || '',
+            supplierSkuId: product.sku || product.skuId || product.SKU || product.barcode || '',
+            skuId: product.sku || product.skuId || product.SKU || product.barcode || '',
             pack: product.packing || product.packSize || '',
             // Fallback keys for batch and dates with robust formatting
             batchNumber: (product.batchNumber && product.batchNumber !== 'N/A') ? product.batchNumber : (product.batchNo || product.batch || ''),
