@@ -118,18 +118,25 @@ const OrderRequestsTab = () => {
             Swal.fire('Error', 'Please select an image first', 'error');
             return;
         }
+        const confirm = await Swal.fire({
+            title: 'Upload & Confirm Order?',
+            text: 'This will upload the prescription and confirm the order immediately.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10B981',
+            confirmButtonText: 'Yes, Upload & Confirm'
+        });
+        if (!confirm.isConfirmed) return;
         try {
             setUploading(true);
             const formData = new FormData();
             formData.append('prescriptionImage', adminUploadImage);
-
             const { data } = await api.put(`/orders/prescription/requests/${selectedRequest._id}/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
             if (data.success) {
-                Swal.fire('Success', 'Prescription uploaded successfully', 'success');
-                setSelectedRequest({ ...selectedRequest, prescriptionImage: data.request.prescriptionImage });
+                await Swal.fire('Done!', 'Prescription uploaded and order confirmed successfully.', 'success');
+                setShowModal(false);
                 setAdminUploadImage(null);
                 setPreviewUrl(null);
                 fetchRequests();
