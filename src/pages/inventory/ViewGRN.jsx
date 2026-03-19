@@ -137,7 +137,7 @@ Status: ${purchase.status}
                         <h3 className="text-sm font-bold text-primary uppercase border-b border-gray-200 pb-2 mb-3">Receiving Details</h3>
                         <div className="grid grid-cols-[120px_1fr] gap-y-2 text-sm text-gray-700">
                              <span className="font-semibold text-gray-500">Received By:</span>
-                             <span className="font-medium text-gray-900">{purchase.receivedBy?.name || 'Admin'}</span>
+                             <span className="font-medium text-gray-900">{purchase.physicalReceivingId?.validatedBy || purchase.receivedBy?.name || 'Admin'}</span>
                              
                              <span className="font-semibold text-gray-500">Receiving Date:</span>
                              <span className="font-medium text-gray-900">{new Date(purchase.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>

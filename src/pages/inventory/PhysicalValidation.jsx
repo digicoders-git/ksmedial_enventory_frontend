@@ -12,7 +12,8 @@ import {
   Package, 
   X,
   Download,
-  AlertCircle
+  AlertCircle,
+  Printer
 } from 'lucide-react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
@@ -48,6 +49,7 @@ const PhysicalValidation = () => {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEntryModal, setShowEntryModal] = useState(false);
+  const [allPickers, setAllPickers] = useState([]);
   const [filters, setFilters] = useState({
     supplier: '',
     status: '',
@@ -113,7 +115,16 @@ const PhysicalValidation = () => {
             console.error("Failed to fetch dispatched POs", error);
         }
     };
+    const fetchPickers = async () => {
+        try {
+            const { data } = await api.get('/pickers');
+            if (data.success) {
+                setAllPickers((data.pickers || []).map(p => p.name));
+            }
+        } catch (error) {}
+    };
     fetchDispatchedPOs();
+    fetchPickers();
   }, [location.state]);
 
   // Auto-fill logic when PO ID is typed or scanned
@@ -333,26 +344,61 @@ const PhysicalValidation = () => {
   const handleValidate = async (id, currentStatus) => {
       if (currentStatus === 'Done') return;
 
-      const { value: name } = await Swal.fire({
+      const pickersOptions = allPickers.map(p => `<option value="${p}">${p}</option>`).join('');
+
+      const result = await Swal.fire({
           title: 'Mark as Validated',
-          input: 'text',
-          inputLabel: 'Enter your name/Staff ID',
-          inputPlaceholder: 'e.g. John Doe',
+          html: `
+              <div class="text-left text-sm mt-4">
+                  <label class="block font-bold mb-1">Select Validating Staff</label>
+                  <select id="swal-select-picker" class="w-full border p-2 rounded outline-none mb-3">
+                      <option value="">-- Choose Existing Staff --</option>
+                      ${pickersOptions}
+                  </select>
+                  <div class="flex items-center gap-2 mb-1">
+                     <hr class="flex-1 border-gray-300"/> <span class="text-[10px] text-gray-400 font-black uppercase">OR</span> <hr class="flex-1 border-gray-300"/>
+                  </div>
+                  <label class="block font-bold mb-1">Add New Staff</label>
+                  <input id="swal-input-picker" placeholder="Type new staff name..." class="w-full border p-2 rounded outline-none" />
+              </div>
+          `,
           showCancelButton: true,
           confirmButtonText: 'Mark Done',
           confirmButtonColor: '#10b981',
-          inputValidator: (value) => {
-              if (!value) {
-                  return 'You need to write your name!'
+          preConfirm: async () => {
+              const selected = document.getElementById('swal-select-picker').value;
+              const typed = document.getElementById('swal-input-picker').value;
+              const finalName = typed.trim() || selected;
+              
+              if (!finalName) {
+                  Swal.showValidationMessage('You need to select or write the staff name!');
+                  return false;
               }
+              
+              if (typed.trim() && !allPickers.includes(typed.trim())) {
+                  try {
+                      await api.post('/pickers', { name: typed.trim(), status: 'Active' });
+                      setAllPickers(prev => [...prev, typed.trim()]);
+                  } catch (e) {
+                      console.error("Failed to auto-add new picker");
+                  }
+              }
+              return finalName;
           }
       });
 
-      if (name) {
+      if (result.isConfirmed && result.value) {
           try {
-              const { data } = await api.put(`/physical-receiving/${id}/validate`, { validatedBy: name });
+              const { data } = await api.put(`/physical-receiving/${id}/validate`, { validatedBy: result.value });
               if (data.success) {
-                  Swal.fire('Success', 'Physical validation marked as done.', 'success');
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Physical validation marked as done.',
+                    showConfirmButton: false,
+                    timer: 2000
+                  });
                   fetchEntries();
               }
           } catch (error) {
@@ -596,6 +642,7 @@ const PhysicalValidation = () => {
                                        </button>
                                    ) : (
                                        <div className="flex gap-2 justify-end">
+                                            
                                             {entry.grnStatus !== 'Done' ? (
                                                 <button 
                                                     onClick={() => navigate('/purchase/grn/add', { 

@@ -201,14 +201,14 @@ const StockHistory = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {item.adjustedBy ? (
+                                            {(item.adjustedBy || item.adjustedByName) ? (
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shrink-0 text-xs font-bold border border-blue-100">
-                                                        {item.adjustedBy.name ? item.adjustedBy.name.charAt(0) : <User size={14} />}
+                                                    <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shrink-0 text-xs font-bold border border-blue-100 uppercase">
+                                                        {(item.adjustedBy?.name || item.adjustedByName) ? (item.adjustedBy?.name || item.adjustedByName).charAt(0) : <User size={14} />}
                                                     </div>
                                                     <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{item.adjustedBy.name || 'Unknown'}</span>
-                                                        <span className="text-[10px] text-gray-400">{item.adjustedBy.email}</span>
+                                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{item.adjustedBy?.name || item.adjustedByName || 'Unknown'}</span>
+                                                        <span className="text-[10px] text-gray-400">{item.adjustedBy?.email || item.adjustedByEmail}</span>
                                                     </div>
                                                 </div>
                                             ) : (

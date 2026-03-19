@@ -325,6 +325,7 @@ const PicklistGenerated = () => {
                                 </th>
                                 <th className="p-3">Order ID</th>
                                 <th className="p-3">Vendor ID</th>
+                                <th className="p-3">Picker</th>
                                 <th className="p-3">Status</th>
                                 <th className="p-3">Order Type</th>
                                 <th className="p-3 text-center">SKU Count</th>
@@ -362,6 +363,14 @@ const PicklistGenerated = () => {
                                             </button>
                                         </td>
                                         <td className="p-3">{order.vendorId}</td>
+                                        <td className="p-3">
+                                            <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
+                                                <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400">
+                                                    <Package size={10} />
+                                                </div>
+                                                {order.pickerName || 'Unassigned'}
+                                            </div>
+                                        </td>
                                         <td className="p-3">
                                             <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-black ${getStatusColor(order.status)}`}>
                                                 {order.status}
@@ -449,11 +458,23 @@ const PicklistGenerated = () => {
                                         <p>🕐 Placed: {moment(selectedOrder.createdAt).format('DD MMM YYYY, hh:mm A')}</p>
                                     </div>
                                 </div>
-
+                                {/* Current Status & Picker */}
                                 <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
-                                    <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Current Status</h3>
-                                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${getStatusColor(selectedOrder.status)}`}>
-                                        {selectedOrder.status}
+                                    <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Processing Info</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Status</p>
+                                            <div className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${getStatusColor(selectedOrder.status)}`}>
+                                                {selectedOrder.status}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Picker</p>
+                                            <p className="text-xs font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight flex items-center gap-1.5">
+                                                <Layers size={14} className="text-purple-400" />
+                                                {selectedOrder.pickerName || 'No Picker assigned'}
+                                            </p>
+                                        </div>
                                     </div>
                                     <p className="text-xs text-gray-500 mt-4 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
                                         <span>Last Update:</span>

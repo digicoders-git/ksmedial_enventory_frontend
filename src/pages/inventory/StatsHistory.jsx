@@ -152,9 +152,9 @@ const StatsHistory = () => {
                 quantity: item.qty || item.quantity,
                 amount: tx.totalAmount,
                 batch: item.batch || 'N/A',
-                user: tx.adjustedBy?.name || tx.user || 'System',
-                userEmail: tx.adjustedBy?.email,
-                userMobile: tx.adjustedBy?.mobile,
+                user: tx.adjustedBy?.name || tx.adjustedByName || tx.user || 'System',
+                userEmail: tx.adjustedBy?.email || tx.adjustedByEmail,
+                userMobile: tx.adjustedBy?.mobile || tx.adjustedByMobile,
                 reference: tx.reference || (tx.id ? `TXN-${tx.id.slice(-6).toUpperCase()}` : `TXN-${1000 + idx}`),
                 details: `${tx.reason || (tx.type === 'IN' ? 'Restocked' : 'Dispatched')} - ${item.qty || item.quantity} units ${tx.reference ? '[Ref: '+tx.reference+']' : ''}`
               });

@@ -44,6 +44,7 @@ const OnlineOrders = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkStatus, setBulkStatus] = useState('');
+    const [allPickers, setAllPickers] = useState([]);
     const filterRef = useRef(null);
 
     useEffect(() => {
@@ -62,10 +63,19 @@ const OnlineOrders = () => {
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const { data } = await api.get('/orders');
-            if (data.success) {
+            const [ordersRes, pickersRes] = await Promise.all([
+                api.get('/orders'),
+                api.get('/pickers').catch(() => ({ data: { success: true, pickers: [] } }))
+            ]);
+            
+            if (ordersRes.data.success) {
                 // Map/Enrich data with real backend fields
-                const enrichedOrders = data.orders.map(order => ({
+                const dbPickers = (pickersRes.data.pickers || []).map(p => p.name);
+                const orderPickers = ordersRes.data.orders.map(o => o.pickerName).filter(Boolean);
+                const combinedPickers = [...new Set([...dbPickers, ...orderPickers])];
+                setAllPickers(combinedPickers);
+                
+                const enrichedOrders = ordersRes.data.orders.map(order => ({
                     ...order,
                     // Use real data or fallbacks if not yet populated in older records
                     vendorId: order.vendorId || 'N/A',
@@ -222,6 +232,13 @@ const OnlineOrders = () => {
             if (isReverse && !isSelf) {
                 return { isValid: false, reason: `Cannot move "${order.status}" order backward to "${targetStatus}".` };
             }
+
+            // --- Picker Requirement Check ---
+            // If order is at Picking or beyond, it MUST have a picker assigned to move forward
+            const movingPastPicking = nextIdx > flow.indexOf('Picking');
+            if (movingPastPicking && !order.pickerName) {
+                return { isValid: false, reason: `Order ${order._id.substr(-6)}: Picker assignment is required to move past Picking stage.` };
+            }
         }
         return { isValid: true, reason: '' };
     };
@@ -365,7 +382,6 @@ const OnlineOrders = () => {
         }
         return null;
     };
-
     const handleStatusUpdate = async (newStatus) => {
         if (!selectedOrder) return;
 
@@ -380,6 +396,21 @@ const OnlineOrders = () => {
             return; // CRITICAL: Stop execution
         }
 
+        // 1.5. PICKER REQUIREMENT CHECK
+        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
+        const nextIdx = flow.indexOf(newStatus);
+        const movingPastPicking = nextIdx > flow.indexOf('Picking');
+        
+        if (movingPastPicking && !selectedOrder.pickerName) {
+            Swal.fire({
+                title: 'Picker Assignment Required',
+                text: 'Please assign a picker to this order before moving it forward from Picking stage.',
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return;
+        }
+
         // 2. SPECIAL RULE: 'pending' order MUST go to 'confirmed' first
         if (selectedOrder.status === 'pending' && newStatus !== 'confirmed' && newStatus !== 'cancelled' && newStatus !== 'pending') {
              Swal.fire({
@@ -392,9 +423,7 @@ const OnlineOrders = () => {
         }
 
         // 3. Strict Status Flow Logic for jumps
-        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
         const currIdx = flow.indexOf(selectedOrder.status);
-        const nextIdx = flow.indexOf(newStatus);
         
         const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(newStatus);
         const isSelf = newStatus === selectedOrder.status;
@@ -812,20 +841,44 @@ const OnlineOrders = () => {
                                 {/* Order Summary */}
                                 <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800">
                                     <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Order Summary</h3>
-                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">Total: ₹{selectedOrder.total.toLocaleString()}</p>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">Total: ₹{typeof selectedOrder.total === 'number' ? selectedOrder.total.toLocaleString() : selectedOrder.collectibleAmount?.toLocaleString()}</p>
                                     <p className="text-xs text-gray-500 mt-1">💳 Payment: {selectedOrder.paymentMethod}</p>
-                                    <p className="text-xs text-gray-500">📦 Items: {selectedOrder.items.length}</p>
+                                    <p className="text-xs text-gray-500">📦 Items: {selectedOrder.items?.length || 0}</p>
                                     <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-800 text-xs text-gray-500 space-y-0.5">
                                         <p>🏷️ Vendor ID: <span className="font-mono font-bold text-gray-700 dark:text-gray-300">{selectedOrder.vendorId || 'N/A'}</span></p>
                                         <p>📋 Type: {selectedOrder.orderType || 'N/A'}</p>
-                                        {selectedOrder.rapidOrderType && selectedOrder.rapidOrderType !== 'N/A' && <p>⚡ Rapid: {selectedOrder.rapidOrderType}</p>}
-                                        {selectedOrder.vendorRefId && selectedOrder.vendorRefId !== 'N/A' && <p>🔗 Vendor Ref: {selectedOrder.vendorRefId}</p>}
-                                        <p>🕐 Placed: {moment(selectedOrder.createdAt).format('DD MMM YYYY, hh:mm A')}</p>
+                                        {selectedOrder.createdAt && <p>🕐 Placed: {new Date(selectedOrder.createdAt).toLocaleString('en-IN')}</p>}
                                     </div>
                                 </div>
 
-
-                             </div>
+                                {/* Picker details */}
+                                <div className="p-4 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-800">
+                                    <h3 className="text-[10px] font-black uppercase text-orange-600 mb-2 tracking-widest flex items-center gap-2">
+                                        <UserIcon size={12} /> Picker Assignment
+                                    </h3>
+                                    <select 
+                                        value={selectedOrder.pickerName || ''}
+                                        onChange={async (e) => {
+                                            const val = e.target.value;
+                                            try {
+                                                const res = await api.put(`/orders/${selectedOrder._id}/status`, { pickerName: val });
+                                                if (res.data.success) {
+                                                    setSelectedOrder(prev => ({ ...prev, pickerName: val }));
+                                                    setOrders(prev => prev.map(o => o._id === selectedOrder._id ? { ...o, pickerName: val } : o));
+                                                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Picker assigned: ${val}`, timer: 2000, showConfirmButton: false });
+                                                }
+                                            } catch (err) {
+                                                Swal.fire('Error', 'Failed to assign picker', 'error');
+                                            }
+                                        }}
+                                        className="w-full bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 p-2 rounded text-xs font-bold outline-none focus:ring-1 focus:ring-orange-500"
+                                    >
+                                        <option value="">-- No Picker Assigned --</option>
+                                        {allPickers.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                    <p className="text-[9px] text-gray-500 mt-2 italic">* Required to move order past Picking stage</p>
+                                </div>
+                            </div>
 
                              {/* Items Table */}
                             <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-3">Order Items</h3>

@@ -31,7 +31,6 @@ const PickingOrders = () => {
     const [batches, setBatches] = useState({});
     const [selectedBatches, setSelectedBatches] = useState({});
     const [loadingBatches, setLoadingBatches] = useState(false);
-    const [batchModalData, setBatchModalData] = useState(null); // { batchData, autoSelected }
 
     // QR Detail Modal State
     const [showQRModal, setShowQRModal] = useState(false);
@@ -46,6 +45,8 @@ const PickingOrders = () => {
         'shipped', 'delivered', 'cancelled', 'Unallocated', 'Billing'
     ];
 
+    const [allPickers, setAllPickers] = useState([]);
+
     useEffect(() => {
         fetchOrders();
     }, []);
@@ -53,10 +54,20 @@ const PickingOrders = () => {
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const { data } = await api.get('/orders');
-            if (data.success) {
-                // Filter for ONLY 'Picking' status orders (not Picklist Generated)
-                const pickingOrders = data.orders
+            const [ordersRes, pickersRes] = await Promise.all([
+                api.get('/orders'),
+                api.get('/pickers')
+            ]);
+            
+            if (ordersRes.data.success) {
+                // Combine pickers from DB and existing orders for full list
+                const dbPickers = (pickersRes.data.pickers || []).map(p => p.name);
+                const orderPickers = ordersRes.data.orders.map(o => o.pickerName).filter(Boolean);
+                const combinedPickers = [...new Set([...dbPickers, ...orderPickers])];
+                setAllPickers(combinedPickers);
+
+                // Filter for ONLY 'Picking' status orders
+                const pickingOrders = ordersRes.data.orders
                     .filter(o => o.status === 'Picking')
                     .map(order => ({
                         ...order,
@@ -135,6 +146,13 @@ const PickingOrders = () => {
             const isReverse = nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1 && !isSafetyStage;
             if (isReverse && !isSelf) {
                 return { isValid: false, reason: `Cannot move "${order.status}" order backward to "${targetStatus}".` };
+            }
+
+            // --- Picker Requirement Check ---
+            // Requirement for Picklist Generated or Quality Check
+            const movingPastPickingOnly = nextIdx > flow.indexOf('Picking');
+            if (movingPastPickingOnly && !order.pickerName) {
+                return { isValid: false, reason: `Order ${order._id.substr(-6)}: Picker assignment is required to move past Picking stage.` };
             }
         }
         return { isValid: true, reason: '' };
@@ -360,12 +378,6 @@ const PickingOrders = () => {
                 availableQty: batchInfo?.quantity || 0,
             };
         });
-
-        // Calculate all items have single batch
-        const isAllSingle = selectedOrder.items.every(item => {
-            const pid = String(item.product?._id || item.product);
-            return (bd[pid] || []).length === 1;
-        });
         
         // ONLY skip if skipFlowConfirm is true (system auto-confirm)
         // Otherwise, ALWAYS open QR scanner to follow the manual picking process
@@ -394,6 +406,16 @@ const PickingOrders = () => {
     };
 
     const handleMarkAsPicked = async () => {
+        if (!selectedOrder?.pickerName) {
+            Swal.fire({
+                title: 'Picker Assignment Required',
+                text: 'Please assign a picker to this order before proceeding.',
+                icon: 'warning',
+                customClass: { container: 'z-[100001]' }
+            });
+            return;
+        }
+
         setLoadingBatches(true);
         // Force a fresh fetch if we are not 100% sure we have all items
         const result = await fetchBatchesForOrder();
@@ -472,101 +494,7 @@ const PickingOrders = () => {
         }
     };
 
-    const handleStatusUpdate = async (newStatus) => {
-        if (!selectedOrder) return;
 
-        // 1. BLOCK changes if order is already delivered or cancelled
-        if (selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled') {
-             Swal.fire({
-                title: 'Order Completed',
-                text: 'This order is already delivered or cancelled. Its status cannot be changed.',
-                icon: 'info',
-                customClass: { container: 'z-[100001]' }
-            });
-            return; // STOP EXECUTION
-        }
-
-        // 2. SPECIAL RULE: 'pending' order MUST go to 'confirmed' first
-        if (selectedOrder.status === 'pending' && newStatus !== 'confirmed' && newStatus !== 'cancelled' && newStatus !== 'pending') {
-             Swal.fire({
-                title: 'Confirm First',
-                text: 'Fresh orders must be "confirmed" before they can enter the Picking/QC workflow.',
-                icon: 'warning',
-                customClass: { container: 'z-[100001]' }
-            });
-            return; // STOP EXECUTION
-        }
-
-        // 3. Strict Status Flow Logic for jumps
-        const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
-        const currIdx = flow.indexOf(selectedOrder.status);
-        const nextIdx = flow.indexOf(newStatus);
-        
-        const isSafetyStage = ['On Hold', 'Problem Queue', 'Unallocated', 'Billing', 'cancelled'].includes(newStatus);
-        const isSelf = newStatus === selectedOrder.status;
-        const isPicklistGenerated = newStatus === 'Picklist Generated' && selectedOrder.status === 'Picking';
-        const isQCFromPicking = newStatus === 'Quality Check' && selectedOrder.status === 'Picking';
-
-        // Block 'pending' and 'confirmed' if moving from 'On Hold' or later stages
-        if ((selectedOrder.status === 'On Hold' || selectedOrder.status === 'Problem Queue' || currIdx >= 2) && (newStatus === 'pending' || newStatus === 'confirmed')) {
-            Swal.fire({
-                title: 'Reverse Blocked',
-                text: `You cannot move an order back to "${newStatus}" once it has entered the warehouse workflow.`,
-                icon: 'warning',
-                customClass: { container: 'z-[100001]' }
-            });
-            return;
-        }
-
-        // Check for skipping stages (blocked if nextIdx > currIdx + 1)
-        if (nextIdx > currIdx + 1 && !isSafetyStage && !isQCFromPicking && !isPicklistGenerated && currIdx !== -1 && nextIdx !== -1) {
-             Swal.fire({
-                title: 'Invalid Flow',
-                text: `You cannot skip to "${newStatus}". Order must follow sequence: Picking -> QC -> Packing -> Shipping.`,
-                icon: 'warning',
-                customClass: { container: 'z-[100001]' }
-            });
-            return; // STOP EXECUTION
-        }
-
-        // 4. BLOCK REVERSE FLOW
-        if (nextIdx < currIdx && nextIdx !== -1 && currIdx !== -1 && !isSafetyStage) {
-            Swal.fire({
-                title: 'Reverse Blocked',
-                text: `You cannot move an order back to "${newStatus}". The process only moves forward.`,
-                icon: 'warning',
-                customClass: { container: 'z-[100001]' }
-            });
-            return; // STOP EXECUTION
-        }
-
-        try {
-            const { data } = await api.put(`/orders/${selectedOrder._id}/status`, { status: newStatus });
-            if (data.success) {
-                // Remove order from list if moving away from Picking status
-                if (newStatus !== 'Picking') {
-                    setOrders(prev => prev.filter(o => o._id !== selectedOrder._id));
-                    setShowModal(false);
-                } else {
-                    setOrders(prev => prev.map(o => o._id === selectedOrder._id ? { ...o, status: newStatus } : o));
-                    setSelectedOrder(prev => ({ ...prev, status: newStatus }));
-                }
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Status Updated',
-                    text: `Order marked as ${newStatus}`,
-                    timer: 1000,
-                    showConfirmButton: false,
-                    customClass: {
-                        container: 'z-[100001]'
-                    }
-                });
-            }
-        } catch (error) {
-            console.error("Update Status Error", error);
-            Swal.fire('Error', 'Failed to update status', 'error');
-        }
-    };
 
     const totalPages = Math.ceil(orders.length / itemsPerPage);
     const paginatedOrders = orders.slice(
@@ -655,6 +583,7 @@ const PickingOrders = () => {
                                 </th>
                                 <th className="px-5 py-4 whitespace-nowrap text-left">Order ID</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-left">Vendor ID</th>
+                                <th className="px-5 py-4 whitespace-nowrap text-left">Picker</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-left">Type</th>
                                 <th className="px-5 py-4 whitespace-nowrap text-right">Amount</th>
@@ -666,9 +595,9 @@ const PickingOrders = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700 text-sm">
                             {loading ? (
-                                <tr><td colSpan="10" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">Loading Picking Queue...</td></tr>
+                                <tr><td colSpan="11" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">Loading Picking Queue...</td></tr>
                             ) : paginatedOrders.length === 0 ? (
-                                <tr><td colSpan="10" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No orders currently in picking stage.</td></tr>
+                                <tr><td colSpan="11" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No orders currently in picking stage.</td></tr>
                             ) : (
                                 paginatedOrders.map((order) => (
                                     <tr key={order._id} className={`hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group ${selectedIds.includes(order._id) ? 'bg-orange-50/30 dark:bg-orange-900/20' : ''}`}>
@@ -695,6 +624,88 @@ const PickingOrders = () => {
                                             </button>
                                         </td>
                                         <td className="px-6 py-4 text-gray-800 dark:text-gray-200 whitespace-nowrap font-mono text-xs">{order.vendorId}</td>
+                                        
+                                        {/* Dynamic Picker Section */}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-2 group/picker min-w-[140px]">
+                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 group-hover/picker:bg-orange-100 group-hover/picker:text-orange-500 transition-colors">
+                                                    <UserIcon size={12} />
+                                                </div>
+                                                <select 
+                                                    value={order.pickerName || ''}
+                                                    onChange={async (e) => {
+                                                        const val = e.target.value;
+                                                        if (val === 'ADD_NEW_PICKER') {
+                                                            const { value: newPicker } = await Swal.fire({
+                                                                title: 'Add New Picker',
+                                                                input: 'text',
+                                                                inputLabel: 'Staff Name',
+                                                                placeholder: 'Enter picker name...',
+                                                                showCancelButton: true
+                                                            });
+                                                            
+                                                            if (newPicker && newPicker.trim()) {
+                                                                try {
+                                                                    // 1. Add to Picker DB for persistence
+                                                                    await api.post('/pickers', { name: newPicker.trim() });
+                                                                    
+                                                                    // 2. Assign to order
+                                                                    await api.put(`/orders/${order._id}/status`, { pickerName: newPicker.trim() });
+                                                                    
+                                                                    // 3. Update local state
+                                                                    order.pickerName = newPicker.trim();
+                                                                    setAllPickers(prev => [...new Set([...prev, newPicker.trim()])]);
+                                                                    
+                                                                    Swal.fire({
+                                                                        toast: true,
+                                                                        position: 'top-end',
+                                                                        icon: 'success',
+                                                                        title: 'Picker added & assigned',
+                                                                        showConfirmButton: false,
+                                                                        timer: 1500
+                                                                    });
+                                                                } catch (err) {
+                                                                    console.error('Failed to add picker:', err);
+                                                                    // Even if adding to DB fails (e.g. already exists), try assigning to order
+                                                                    try {
+                                                                        await api.put(`/orders/${order._id}/status`, { pickerName: newPicker.trim() });
+                                                                        order.pickerName = newPicker.trim();
+                                                                        setAllPickers(prev => [...new Set([...prev, newPicker.trim()])]);
+                                                                    } catch (innerErr) {
+                                                                        Swal.fire('Error', 'Failed to assign picker', 'error');
+                                                                    }
+                                                                }
+                                                            }
+                                                            return;
+                                                        }
+                                                        
+                                                        try {
+                                                            await api.put(`/orders/${order._id}/status`, { pickerName: val });
+                                                            order.pickerName = val; 
+                                                            setSelectedOrder(prev => prev && prev._id === order._id ? { ...prev, pickerName: val } : prev);
+                                                            Swal.fire({
+                                                                toast: true,
+                                                                position: 'top-end',
+                                                                icon: 'success',
+                                                                title: 'Picker assigned',
+                                                                showConfirmButton: false,
+                                                                timer: 1500
+                                                            });
+                                                        } catch (err) {
+                                                            console.error('Failed to update picker:', err);
+                                                        }
+                                                    }}
+                                                    className="bg-transparent border-none focus:ring-0 py-1 px-1 text-[11px] font-bold text-gray-700 dark:text-gray-200 w-full cursor-pointer hover:text-orange-600 transition-all outline-none"
+                                                >
+                                                    <option value="">-- Assign --</option>
+                                                    {allPickers.map(p => (
+                                                        <option key={p} value={p}>{p}</option>
+                                                    ))}
+                                                    <option value="ADD_NEW_PICKER" className="font-bold text-orange-600">+ Add New Picker...</option>
+                                                </select>
+                                            </div>
+                                        </td>
+
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(order.status)}`}>
                                                 {order.status}
@@ -705,6 +716,7 @@ const PickingOrders = () => {
                                         <td className="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{moment(order.createdAt).format('D MMM, HH:mm')}</td>
                                         <td className="px-6 py-4 dark:text-gray-400 whitespace-nowrap text-xs text-orange-600 font-bold">{moment(order.expectedHandover).format('D MMM')}</td>
                                         <td className="px-6 py-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{order.city}</td>
+
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
                                             <button 
                                                 onClick={() => { 
@@ -751,47 +763,23 @@ const PickingOrders = () => {
                 <>
                 <style>{`
                     @media print {
-                        /* 1. Hide EVERY existing element on the page */
-                        body * {
-                            display: none !important;
-                        }
-
-                        /* 2. Show only our printable picklist and its inner content */
-                        #printable-picklist, 
-                        #printable-picklist * {
-                            display: block !important;
-                        }
-
-                        /* 3. Force the picklist to the top-left for printing */
+                        #root { display: none !important; }
+                        .print\\:hidden { display: none !important; }
                         #printable-picklist {
                             display: block !important;
-                            position: absolute !important;
-                            left: 0 !important;
-                            top: 0 !important;
-                            width: 100% !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 20px !important;
-                            background: white !important;
-                            z-index: 9999999 !important;
+                            position: absolute;
+                            left: 0;
+                            top: 0;
+                            width: 100%;
+                            padding: 20px;
+                            background-color: white !important;
                         }
 
-                        /* 4. Support table structures in print */
-                        #printable-picklist table {
-                            display: table !important;
+                        * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
                         }
-                        #printable-picklist thead {
-                            display: table-header-group !important;
-                        }
-                        #printable-picklist tr {
-                            display: table-row !important;
-                        }
-                        #printable-picklist th, 
-                        #printable-picklist td {
-                            display: table-cell !important;
-                        }
-
-                        /* 5. Clean up page headers/footers */
+                        
                         @page {
                             size: portrait;
                             margin: 10mm;
@@ -812,7 +800,7 @@ const PickingOrders = () => {
                         </div>
                         
                         <div className="p-6 overflow-y-auto">
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                                 <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
                                     <h3 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">Customer</h3>
                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || 'Guest'}</p>
@@ -822,6 +810,14 @@ const PickingOrders = () => {
                                     <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Handover Target</h3>
                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{moment(selectedOrder.expectedHandover).format('DD MMM YYYY')}</p>
                                     <p className="text-[10px] text-emerald-600 mt-1 font-bold italic tracking-tighter">Must pick before 6:00 PM</p>
+                                </div>
+                                <div className="p-4 bg-slate-50/50 dark:bg-slate-900/10 rounded-lg border border-slate-100 dark:border-slate-800">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-600 mb-2 tracking-widest">Assigned Picker</h3>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm flex items-center gap-1.5">
+                                        <UserIcon size={14} className="text-slate-400" />
+                                        {selectedOrder.pickerName || 'No Picker Assigned'}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 mt-1 italic">Assign from the main table</p>
                                 </div>
                              </div>
 
@@ -937,92 +933,100 @@ const PickingOrders = () => {
                     </div>
                 </div>
 
-                {/* 2. PRINTABLE PICKLIST (HIDDEN ON SCREEN, VISIBLE IN PRINT ONLY) */}
-                <div id="printable-picklist" className="hidden print:block bg-white text-black p-4 font-sans" style={{ color: '#000', backgroundColor: '#fff', minHeight: '100vh' }}>
-                    {/* Professional Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '4px solid #000', paddingBottom: '10px', marginBottom: '20px' }}>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ backgroundColor: '#000', color: '#fff', padding: '5px 12px', fontWeight: '900', fontSize: '24px' }}>KS</div>
-                                <h1 style={{ fontSize: '28px', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>WAREHOUSE PICKLIST</h1>
-                            </div>
-                            <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '5px 0 0 0', color: '#666' }}>OFFICIAL INTERNAL DOCUMENT</p>
+                {/* 2. PRINTABLE PICKLIST (LOGIWA STYLE DESIGN) */}
+                <div id="printable-picklist" className="hidden print:block bg-white text-black p-4 font-sans" style={{ color: '#000', backgroundColor: '#fff', minHeight: '100vh', width: '100%', padding: '20px' }}>
+                    {/* Top Header Section */}
+                    <div style={{ display: 'flex', border: '1px solid #000', marginBottom: '-1px' }}>
+                        <div style={{ width: '50%', padding: '15px', borderRight: '1px solid #000', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                             <div style={{ backgroundColor: '#005bb5', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontWeight: 'bold', fontSize: '20px' }}><span style={{ margin: 'auto' }}>KS</span></div>
+                             <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#005bb5', letterSpacing: '-1px' }}>KS Medial</span>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '12px', fontWeight: 'bold', margin: 0 }}>ORDER ID:</p>
-                            <p style={{ fontSize: '24px', fontWeight: '900', margin: 0 }}>#{selectedOrder._id.substr(-8).toUpperCase()}</p>
+                        <div style={{ width: '50%', padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <h1 style={{ fontSize: '42px', fontWeight: '900', margin: 0, letterSpacing: '2px' }}>PICK LIST</h1>
                         </div>
                     </div>
 
-                    {/* Meta Information Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ border: '2px solid #000', padding: '10px' }}>
-                            <p style={{ fontSize: '10px', fontWeight: '900', margin: '0 0 5px 0', borderBottom: '1px solid #000', display: 'inline-block' }}>CUSTOMER</p>
-                            <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{selectedOrder.userId?.name || 'Guest'}</p>
-                            <p style={{ fontSize: '12px', margin: '2px 0 0 0' }}>{selectedOrder.city}</p>
+                    {/* Meta Data Table Section */}
+                    <div style={{ border: '1px solid #000' }}>
+                        {/* Row 1: Name & Order No */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid #000' }}>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Customer Name :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', fontSize: '13px' }}>{selectedOrder.userId?.name || 'Guest'}</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Order Number :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', fontSize: '13px', textAlign: 'center', fontWeight: 'bold' }}>{selectedOrder.orderNumber || selectedOrder._id.substr(-8).toUpperCase()}</div>
                         </div>
-                        <div style={{ border: '2px solid #000', padding: '10px' }}>
-                            <p style={{ fontSize: '10px', fontWeight: '900', margin: '0 0 5px 0', borderBottom: '1px solid #000', display: 'inline-block' }}>ORDER SCHEDULE</p>
-                            <p style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>Date: {moment(selectedOrder.createdAt).format('DD MMM YYYY')}</p>
-                            <p style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>Time: {moment(selectedOrder.createdAt).format('HH:mm')}</p>
+                        
+                        {/* Row 2: Address & Date */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid #000' }}>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Customer Address :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', fontSize: '13px' }}>{selectedOrder.city}, {selectedOrder.state || 'India'}</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Order Date :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', fontSize: '13px', textAlign: 'center' }}>{moment(selectedOrder.createdAt).format('DD/MM/YYYY')}</div>
                         </div>
-                        <div style={{ border: '2px solid #000', padding: '10px', backgroundColor: '#f0f0f0' }}>
-                            <p style={{ fontSize: '10px', fontWeight: '900', margin: '0 0 5px 0', borderBottom: '1px solid #000', display: 'inline-block' }}>PICKING TARGET</p>
-                            <p style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>{moment(selectedOrder.expectedHandover).format('DD MMM YYYY')}</p>
+
+                        {/* Row 3: Picker Details (User Requested) */}
+                        <div style={{ display: 'flex' }}>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Assigned Picker :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', fontSize: '13px', fontWeight: '900', color: '#005bb5' }}>{selectedOrder.pickerName || 'NOT ASSIGNED'}</div>
+                            <div style={{ width: '25%', padding: '8px 12px', borderRight: '1px solid #000', backgroundColor: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Picking Deadline :</div>
+                            <div style={{ width: '25%', padding: '8px 12px', fontSize: '13px', textAlign: 'center', color: '#d97706', fontWeight: 'bold' }}>{moment(selectedOrder.expectedHandover).format('DD/MM/YYYY')}</div>
                         </div>
                     </div>
 
-                    {/* Master Items Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '3px solid #000', tableLayout: 'fixed' }}>
+                    {/* Extra Notes Placeholder Section */}
+                    <div style={{ border: '1px solid #000', borderTop: 'none', padding: '15px', textAlign: 'center', backgroundColor: '#fff' }}>
+                        <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>Extra Notes</p>
+                    </div>
+
+                    {/* Master Items Table Section */}
+                    <table style={{ 
+                        width: '100%', 
+                        borderCollapse: 'collapse', 
+                        border: '1px solid #000',
+                    }}>
                         <thead>
-                            <tr style={{ backgroundColor: '#f0f0f0' }}>
-                                <th style={{ border: '2px solid #000', padding: '8px', fontSize: '11px', fontWeight: '900', width: '40px', textAlign: 'center' }}>#</th>
-                                <th style={{ border: '2px solid #000', padding: '8px', fontSize: '11px', fontWeight: '900', textAlign: 'left' }}>PRODUCT DESCRIPTION & SKU</th>
-                                <th style={{ border: '2px solid #000', padding: '8px', fontSize: '11px', fontWeight: '900', width: '120px', textAlign: 'center' }}>LOCATION</th>
-                                <th style={{ border: '2px solid #000', padding: '8px', fontSize: '11px', fontWeight: '900', width: '60px', textAlign: 'center' }}>QTY</th>
-                                <th style={{ border: '2px solid #000', padding: '8px', fontSize: '11px', fontWeight: '900', width: '60px', textAlign: 'center' }}>OK?</th>
+                            <tr style={{ backgroundColor: '#cccccc', color: '#000' }}>
+                                <th style={{ border: '1px solid #000', padding: '8px 5px', fontSize: '14px', textAlign: 'center', width: '40px' }}>No</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 12px', fontSize: '14px', textAlign: 'left', width: '120px' }}>Location</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 12px', fontSize: '14px', textAlign: 'left', width: '80px' }}>Pallet</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 12px', fontSize: '14px', textAlign: 'left', width: '150px' }}>SKU</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 12px', fontSize: '14px', textAlign: 'left' }}>Item Name</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 8px', fontSize: '14px', textAlign: 'center', width: '80px' }}>Qty To Pick</th>
+                                <th style={{ border: '1px solid #000', padding: '8px 8px', fontSize: '14px', textAlign: 'center', width: '80px' }}>Picked Qty</th>
                             </tr>
                         </thead>
                         <tbody>
                             {selectedOrder.items.map((item, i) => (
-                                <tr key={i}>
-                                    <td style={{ border: '2px solid #000', padding: '10px 5px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-                                        {i + 1}
-                                    </td>
-                                    <td style={{ border: '2px solid #000', padding: '10px' }}>
-                                        <p style={{ fontSize: '14px', fontWeight: '900', margin: 0, textTransform: 'uppercase', lineHeight: '1.2' }}>{item.productName}</p>
-                                        <p style={{ fontSize: '10px', margin: '4px 0 0 0', fontFamily: 'monospace', fontWeight: 'bold', color: '#333' }}>SKU: {item.product?.sku || 'N/A'}</p>
-                                    </td>
-                                    <td style={{ border: '2px solid #000', padding: '10px', textAlign: 'center', fontWeight: '900', fontSize: '16px' }}>
-                                        {item.product?.rackLocation || 'TBD'}
-                                    </td>
-                                    <td style={{ border: '2px solid #000', padding: '10px', textAlign: 'center', fontWeight: '900', fontSize: '24px' }}>
-                                        {item.quantity}
-                                    </td>
-                                    <td style={{ border: '2px solid #000', padding: '10px', textAlign: 'center' }}>
-                                        <div style={{ width: '22px', height: '22px', border: '3px solid #000', margin: '0 auto' }}></div>
-                                    </td>
+                                <tr key={i} style={{ height: '45px' }}>
+                                    <td style={{ border: '1px solid #000', padding: '8px 5px', textAlign: 'center', fontSize: '13px' }}>{i + 1}</td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 'bold' }}>{item.product?.rackLocation || '---'}</td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 12px', textAlign: 'left', fontSize: '13px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 'bold' }}>{item.product?.sku || item.sku || 'N/A'}</td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 12px', textAlign: 'left', fontSize: '13px' }}>{item.productName}</td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 8px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold' }}>{item.quantity}</td>
+                                    <td style={{ border: '1px solid #000', padding: '8px 8px', textAlign: 'center', fontSize: '13px' }}></td>
+                                </tr>
+                            ))}
+                            {/* Empty rows if necessary, filler for visual matching */}
+                            {selectedOrder.items.length < 5 && [1,2,3,4,5].slice(selectedOrder.items.length).map((_, i) => (
+                                <tr key={`empty-${i}`} style={{ height: '35px' }}>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '8px' }}></td>
+                                    <td style={{ border: '1px solid #000', padding: '1px' }}></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
 
-                    {/* Summary Footer */}
-                    <div style={{ marginTop: '30px', borderTop: '2px solid #000', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
-                            <p style={{ margin: '0 0 5px 0', fontSize: '14px' }}>TOTAL ITEMS: {selectedOrder.items.length}</p>
-                            <p style={{ margin: 0, color: '#444' }}>PRINTED AT: {moment().format('DD/MM/YYYY HH:mm:ss')}</p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '40px' }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ width: '130px', borderBottom: '2px solid #000', marginBottom: '5px', height: '30px' }}></div>
-                                <p style={{ fontSize: '10px', fontWeight: '900', margin: 0 }}>PICKER SIGN</p>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ width: '130px', borderBottom: '2px solid #000', marginBottom: '5px', height: '30px' }}></div>
-                                <p style={{ fontSize: '10px', fontWeight: '900', margin: 0 }}>CHECKER SIGN</p>
-                            </div>
-                        </div>
+                    {/* Footer Info */}
+                    <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#666' }}>
+                        <p>Printed By: System Admin</p>
+                        <p>Page 1 of 1</p>
+                        <p>Print Time: {moment().format('DD/MM/YYYY HH:mm:ss')}</p>
                     </div>
                 </div>
                 </>,
@@ -1048,7 +1052,7 @@ const PickingOrders = () => {
                                 <div className="space-y-6">
                                     {selectedOrder.items.map((item, idx) => {
                                         const pid = String(item.product?._id || item.product);
-                                        const bd = batchModalData?.batchData || batches;
+                                        const bd = batches;
                                         const productBatches = bd[pid] || [];
                                         const isSingleBatch = productBatches.length === 1;
                                         const autoBatch = isSingleBatch ? productBatches[0] : null;
