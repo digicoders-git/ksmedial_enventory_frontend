@@ -309,8 +309,9 @@ const PickingOrders = () => {
     };
 
 
-    const handleBatchAssignment = async (bdOverride, skipFlowConfirm = false) => {
-        const bd = bdOverride || batches;
+    const handleBatchAssignment = async (bdArg, skipFlowConfirm = false) => {
+        // Handle case where it's called as an event listener (first arg is the event)
+        const bd = (bdArg && bdArg.nativeEvent) ? batches : (bdArg || batches);
         const currentSelected = selectedBatches;
         
         // Final sanity check on items and their batches
@@ -365,9 +366,10 @@ const PickingOrders = () => {
             const pid = String(item.product?._id || item.product);
             return (bd[pid] || []).length === 1;
         });
-
-        // Direct Execution if skipFlowConfirm or if user is in "Direct" mode
-        if (skipFlowConfirm || isAllSingle) {
+        
+        // ONLY skip if skipFlowConfirm is true (system auto-confirm)
+        // Otherwise, ALWAYS open QR scanner to follow the manual picking process
+        if (skipFlowConfirm) {
             const batchAssignments = batchDetails.map((b, idx) => ({
                 itemIndex: idx,
                 batchId: b.batchId,
@@ -410,8 +412,10 @@ const PickingOrders = () => {
         });
 
         if (isFullySelected) {
-            await handleBatchAssignment(bd, true);
+            // Even if fully selected, we don't 'skip' - we want the QR to open for confirmation
+            await handleBatchAssignment(bd, false);
         } else {
+            // Open modal to select the remaining ones
             setShowBatchModal(true);
         }
         setLoadingBatches(false);
