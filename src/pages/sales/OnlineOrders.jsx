@@ -723,7 +723,7 @@ const OnlineOrders = () => {
                                         <td className="px-6 py-4 font-bold text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
                                             <a 
                                                 href="#" 
-                                                onClick={(e) => { e.preventDefault(); setSelectedOrder(order); setShowModal(true); }}
+                                                onClick={async (e) => { e.preventDefault(); setSelectedOrder(order); setShowModal(true); try { const { data } = await api.get(`/orders/${order._id}`); if (data.success) setSelectedOrder(prev => ({ ...prev, items: data.order.items })); } catch {} }}
                                                 className="hover:underline"
                                             >
                                                 {order._id.substr(-12).toUpperCase()}
@@ -824,47 +824,7 @@ const OnlineOrders = () => {
                                     </div>
                                 </div>
 
-                                {/* Workflow Status */}
-                                <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
-                                    <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Workflow Status</h3>
-                                    <div className="flex flex-col gap-2">
-                                        <select 
-                                            value={selectedOrder.status}
-                                            disabled={selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled'}
-                                            onChange={(e) => handleStatusUpdate(e.target.value)}
-                                            className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm ${selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled' ? 'opacity-50 cursor-not-allowed border-gray-300' : 'cursor-pointer hover:border-purple-300'}`}
-                                        >
-                                            {statusOptions.map(option => {
-                                                const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
-                                                const currIdx = flow.indexOf(selectedOrder.status);
-                                                const optIdx = flow.indexOf(option);
-                                                
-                                                const isPastStage = (optIdx !== -1 && currIdx !== -1 && optIdx < currIdx);
-                                                const isEarlyStageOnHold = (selectedOrder.status === 'On Hold' || selectedOrder.status === 'Problem Queue') && (option === 'pending' || option === 'confirmed');
-                                                
-                                                return (
-                                                    <option 
-                                                        key={option} 
-                                                        value={option}
-                                                        disabled={isPastStage || isEarlyStageOnHold}
-                                                        className={isPastStage || isEarlyStageOnHold ? 'text-gray-400 bg-gray-100' : ''}
-                                                    >
-                                                        {option} {option === selectedOrder.status ? '(Current)' : ''}
-                                                    </option>
-                                                );
-                                            })}
-                                        </select>
-                                        <div className="flex items-center gap-1 text-[10px] text-purple-600/70 font-medium">
-                                            <RefreshCw size={10} className="animate-spin-slow" />
-                                            <span>Update instantly</span>
-                                        </div>
-                                    </div>
 
-                                    <p className="text-xs text-gray-500 mt-2 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
-                                        <span>Handover:</span>
-                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.expectedHandover).format('DD MMM YYYY')}</span>
-                                    </p>
-                                </div>
                              </div>
 
                              {/* Items Table */}
@@ -873,6 +833,7 @@ const OnlineOrders = () => {
                                 <thead className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 uppercase">
                                     <tr>
                                         <th className="p-3">Product Name</th>
+                                        <th className="p-3 text-center">Prescription</th>
                                         <th className="p-3 text-center">Qty</th>
                                         <th className="p-3 text-right">Price</th>
                                         <th className="p-3 text-right">Total</th>
@@ -882,6 +843,12 @@ const OnlineOrders = () => {
                                     {selectedOrder.items.map((item, i) => (
                                         <tr key={i}>
                                             <td className="p-3 font-medium">{item.productName}</td>
+                                            <td className="p-3 text-center">
+                                                {item.product?.isPrescriptionRequired
+                                                    ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
+                                                    : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
+                                                }
+                                            </td>
                                             <td className="p-3 text-center">{item.quantity}</td>
                                             <td className="p-3 text-right">₹{item.productPrice}</td>
                                             <td className="p-3 text-right font-bold">₹{(item.productPrice * item.quantity).toFixed(2)}</td>

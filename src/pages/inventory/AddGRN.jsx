@@ -1214,16 +1214,35 @@ const AddGRN = () => {
                                                 />
                                             </td>
                                             <td className="py-2 px-3">
-                                                <input 
-                                                    type="text" 
-                                                    value={item.batchNumber} 
-                                                    onChange={(e) => updateItem(index, 'batchNumber', e.target.value)} 
-                                                    className={`w-20 px-2 py-1 border rounded text-xs ${
-                                                        !item.batchNumber ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                                                    }`}
-                                                    placeholder="Required"
-                                                    required
-                                                />
+                                                <div className="flex gap-1">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.batchNumber} 
+                                                        onChange={(e) => updateItem(index, 'batchNumber', e.target.value)} 
+                                                        className={`flex-1 px-2 py-1 border rounded text-xs ${
+                                                            !item.batchNumber ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                                                        }`}
+                                                        placeholder="Required"
+                                                        required
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const product = products.find(p => p._id === item.productId);
+                                                            const sku = product?.sku || item.skuId || 'SKU';
+                                                            const date = new Date();
+                                                            const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+                                                            const year = date.getFullYear();
+                                                            const random = Math.floor(1000 + Math.random() * 9000);
+                                                            const autoBatch = `${sku}-${month}${year}-${random}`;
+                                                            updateItem(index, 'batchNumber', autoBatch);
+                                                        }}
+                                                        className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold transition-all active:scale-95"
+                                                        title="Auto-generate batch number"
+                                                    >
+                                                        AUTO
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className="py-2 px-3">
                                                 <input 

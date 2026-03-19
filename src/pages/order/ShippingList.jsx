@@ -571,6 +571,7 @@ const ShippingList = () => {
                                     <thead className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 uppercase font-bold">
                                         <tr>
                                             <th className="p-3">Product Name</th>
+                                            <th className="p-3 text-center">Prescription</th>
                                             <th className="p-3 text-center">Qty</th>
                                             <th className="p-3 text-right">Price</th>
                                             <th className="p-3 text-right">Total</th>
@@ -580,6 +581,12 @@ const ShippingList = () => {
                                         {selectedOrder.items?.map((item, i) => (
                                             <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                 <td className="p-3 font-medium text-gray-800 dark:text-gray-200">{item.productName}</td>
+                                                <td className="p-3 text-center">
+                                                    {item.product?.isPrescriptionRequired
+                                                        ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
+                                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
+                                                    }
+                                                </td>
                                                 <td className="p-3 text-center text-gray-600 dark:text-gray-400">{item.quantity}</td>
                                                 <td className="p-3 text-right text-gray-600 dark:text-gray-400">₹{Number(item.productPrice || item.price || 0).toFixed(2)}</td>
                                                 <td className="p-3 text-right font-bold text-gray-800 dark:text-gray-200">₹{(Number(item.productPrice || item.price || 0) * item.quantity).toFixed(2)}</td>

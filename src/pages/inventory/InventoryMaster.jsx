@@ -4,7 +4,7 @@ import {
     FileText, Download, Edit2, History, 
     ChevronLeft, ChevronRight, RefreshCw,
     Plus, AlertTriangle, ArrowRightLeft,
-    X, User, Shield, ArrowDownCircle, ArrowUpCircle, Save
+    X, User, Shield, ArrowDownCircle, ArrowUpCircle, Save, Boxes
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +22,12 @@ const InventoryMaster = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [limit, setLimit] = useState(25);
+    
+    // Batch Modal State
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [selectedProductBatches, setSelectedProductBatches] = useState([]);
+    const [loadingBatches, setLoadingBatches] = useState(false);
+    const [batchCounts, setBatchCounts] = useState({});
 
     // Filters
     const [filters, setFilters] = useState({
@@ -64,12 +70,49 @@ const InventoryMaster = () => {
                 setProducts(data.products);
                 setTotal(data.total);
                 setTotalPages(data.pages);
+                
+                // Fetch batch counts for all products
+                fetchBatchCounts(data.products);
             }
         } catch (error) {
             console.error("Error fetching inventory:", error);
             Swal.fire('Error', 'Failed to fetch inventory data', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+    
+    const fetchBatchCounts = async (productList) => {
+        try {
+            const counts = {};
+            for (const product of productList) {
+                const { data } = await api.get(`/batches/product/${product._id}`);
+                if (data.success) {
+                    counts[product._id] = data.batches.length;
+                }
+            }
+            setBatchCounts(counts);
+        } catch (error) {
+            console.error('Error fetching batch counts:', error);
+        }
+    };
+    
+    const handleViewBatches = async (product) => {
+        setLoadingBatches(true);
+        setShowBatchModal(true);
+        try {
+            const { data } = await api.get(`/batches/product/${product._id}`);
+            if (data.success) {
+                setSelectedProductBatches({
+                    product: product,
+                    batches: data.batches
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching batches:', error);
+            Swal.fire('Error', 'Failed to load batch details', 'error');
+        } finally {
+            setLoadingBatches(false);
         }
     };
 
@@ -482,6 +525,7 @@ const InventoryMaster = () => {
                                 <th className="p-3">Schedule</th>
                                 <th className="p-3">Manufacturer</th>
                                 <th className="p-3">Batch</th>
+                                <th className="p-3 text-center">Batch Count</th>
                                 <th className="p-3">Location</th>
                                 <th className="p-3">Category</th>
                                 <th className="p-3 text-right">Qty</th>
@@ -496,14 +540,14 @@ const InventoryMaster = () => {
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="15" className="p-8 text-center text-gray-500">
+                                    <td colSpan="16" className="p-8 text-center text-gray-500">
                                         <div className="inline-block w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-2"></div>
                                         <p className="text-xs">Loading Inventory...</p>
                                     </td>
                                 </tr>
                             ) : products.length === 0 ? (
                                 <tr>
-                                    <td colSpan="15" className="p-8 text-center text-gray-500 text-xs font-medium uppercase">
+                                    <td colSpan="16" className="p-8 text-center text-gray-500 text-xs font-medium uppercase">
                                         No Records Found
                                     </td>
                                 </tr>
@@ -516,6 +560,26 @@ const InventoryMaster = () => {
                                         <td className="p-3">{product.schedule || 'H'}</td>
                                         <td className="p-3">{product.company || product.brand || 'N/A'}</td>
                                         <td className="p-3 font-mono">{product.batchNumber || 'N/A'}</td>
+                                        <td className="p-3 text-center">
+                                            {batchCounts[product._id] === undefined ? (
+                                                <span className="inline-block w-3 h-3 border border-gray-300 border-t-orange-400 rounded-full animate-spin" />
+                                            ) : batchCounts[product._id] > 0 ? (
+                                                <button
+                                                    onClick={() => handleViewBatches(product)}
+                                                    title="View all batches"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-400 text-[10px] font-black uppercase tracking-wide hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                                                >
+                                                    <Boxes size={11} strokeWidth={2.5} />
+                                                    <span>{batchCounts[product._id]}</span>
+                                                    <span className="text-orange-400 dark:text-orange-600">batch{batchCounts[product._id] > 1 ? 'es' : ''}</span>
+                                                </button>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-600 font-medium">
+                                                    <Boxes size={11} strokeWidth={1.5} />
+                                                    No batch
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="p-3">{product.rackLocation || '-'}</td>
                                         <td className="p-3">{product.category || 'General'}</td>
                                         <td className={`p-3 text-right font-bold ${product.quantity === 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
@@ -758,6 +822,127 @@ const InventoryMaster = () => {
                         </form>
                     </div>
                 </div>, 
+                document.body
+            )}
+            
+            {/* Batch Details Modal */}
+            {showBatchModal && selectedProductBatches && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-5xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                                    <Boxes size={24} className="text-orange-600" />
+                                    Batch Details
+                                </h2>
+                                <p className="text-xs text-gray-500 font-medium mt-1">
+                                    {selectedProductBatches.product?.name} ({selectedProductBatches.product?.sku})
+                                </p>
+                            </div>
+                            <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto">
+                            {loadingBatches ? (
+                                <div className="text-center py-10 text-gray-500">
+                                    <div className="inline-block w-8 h-8 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin mb-2"></div>
+                                    <p className="text-sm">Loading batches...</p>
+                                </div>
+                            ) : selectedProductBatches.batches?.length > 0 ? (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase">Total Batches</p>
+                                            <p className="text-2xl font-black text-gray-800 dark:text-white">{selectedProductBatches.batches.length}</p>
+                                        </div>
+                                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                            <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase">Total Stock</p>
+                                            <p className="text-2xl font-black text-gray-800 dark:text-white">
+                                                {selectedProductBatches.batches.reduce((sum, b) => sum + b.quantity, 0)} Units
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase">Active Batches</p>
+                                            <p className="text-2xl font-black text-gray-800 dark:text-white">
+                                                {selectedProductBatches.batches.filter(b => b.status === 'Active').length}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        {selectedProductBatches.batches.map((batch, idx) => (
+                                            <div key={batch._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center text-white font-black text-sm">
+                                                            #{idx + 1}
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-mono text-sm font-bold text-gray-800 dark:text-white">{batch.batchNumber}</h3>
+                                                            <p className="text-xs text-gray-500">Batch ID: {batch._id.slice(-8).toUpperCase()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                        batch.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                                        batch.status === 'Expired' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                                    }`}>
+                                                        {batch.status}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold">Stock Quantity</p>
+                                                        <p className="text-lg font-black text-gray-800 dark:text-white">{batch.quantity}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold">Expiry Date</p>
+                                                        <p className="text-sm font-bold text-gray-800 dark:text-white">
+                                                            {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold">MRP</p>
+                                                        <p className="text-sm font-bold text-gray-800 dark:text-white">₹{batch.mrp || batch.sellingPrice || 0}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold">Location</p>
+                                                        <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{batch.rackLocation || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                {batch.manufacturingDate && (
+                                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                                        <p className="text-xs text-gray-500">
+                                                            <span className="font-bold">Mfg Date:</span> {new Date(batch.manufacturingDate).toLocaleDateString('en-GB')}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-10 text-gray-500">
+                                    <Boxes size={48} className="mx-auto mb-3 text-gray-300" />
+                                    <p className="text-sm font-medium">No batches found for this product</p>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end bg-gray-50 dark:bg-gray-800">
+                            <button 
+                                onClick={() => setShowBatchModal(false)}
+                                className="px-6 py-2 bg-gray-800 text-white rounded-lg text-xs font-black uppercase hover:bg-gray-900 transition-all"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>,
                 document.body
             )}
         </div>

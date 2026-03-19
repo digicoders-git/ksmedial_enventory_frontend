@@ -7,6 +7,9 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      gridTemplateColumns: {
+        '15': 'repeat(15, minmax(0, 1fr))',
+      },
       colors: {
         primary: "var(--color-primary)",
         secondary: "var(--color-secondary)",
@@ -21,7 +24,7 @@ export default {
         inter: ['Inter', 'sans-serif'],
         poppins: ['Poppins', 'sans-serif'],
         roboto: ['Roboto', 'sans-serif'],
-        sans: ['"Source Sans Pro"', 'sans-serif'], // Default fallback
+        sans: ['"Source Sans Pro"', 'sans-serif'],
         montserrat: ['Montserrat', 'sans-serif'],
         'open-sans': ['"Open Sans"', 'sans-serif'],
         nunito: ['Nunito', 'sans-serif'],

@@ -33,6 +33,7 @@ import PrescriptionManagement from './pages/inventory/PrescriptionManagement';
 // Order Pages
 import OrderProcessing from './pages/order/OrderProcessing';
 import PickingOrders from './pages/order/PickingOrders';
+import PicklistGenerated from './pages/order/PicklistGenerated';
 import ShippingList from './pages/order/ShippingList';
 import PrescriptionRequestList from './pages/order/PrescriptionRequestList';
 
@@ -138,6 +139,7 @@ function App() {
              ======================= */}
           <Route path="order/processing" element={<OrderProcessing />} />
           <Route path="order/picking" element={<PickingOrders />} />
+          <Route path="order/picklist-generated" element={<PicklistGenerated />} />
           <Route path="order/shipping" element={<ShippingList />} />
           <Route path="order/prescriptions" element={<PrescriptionRequestList />} />
 

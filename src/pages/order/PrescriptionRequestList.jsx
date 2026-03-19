@@ -365,9 +365,15 @@ const OrderRequestsTab = () => {
                                 <div className="space-y-3">
                                     {selectedRequest.items.map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center bg-white dark:bg-gray-700 p-3 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                                            <div>
+                                            <div className="flex-1">
                                                 <p className="text-xs font-black text-gray-800 dark:text-white uppercase truncate max-w-[150px]">{item.productName}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold">₹{item.productPrice} per unit</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <p className="text-[10px] text-gray-400 font-bold">₹{item.productPrice} per unit</p>
+                                                    {item.product?.isPrescriptionRequired
+                                                        ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[9px] font-black uppercase">Rx</span>
+                                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[9px] font-black uppercase">No Rx</span>
+                                                    }
+                                                </div>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-xs font-black text-primary">x{item.quantity}</p>

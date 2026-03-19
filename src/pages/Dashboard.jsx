@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     ShieldCheck, Banknote, BriefcaseMedical, AlertTriangle, 
     ChevronRight, Download, LayoutDashboard, Truck, 
     Clock, Package, FileText, ArrowRight, AlertCircle,
-    Boxes, ShoppingCart, History, TrendingUp, Box, Activity
+    Boxes, ShoppingCart, History, TrendingUp, Box, Activity,
+    CheckCircle2, XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,52 +76,61 @@ const Dashboard = () => {
         }
     });
 
-  const chartOptions = {
-    chart: {
-      type: 'spline',
-      backgroundColor: 'transparent',
-      height: 280,
-    },
-    title: {
-      text: null
-    },
-    xAxis: {
-      categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-      lineColor: 'transparent',
-      tickColor: 'transparent',
-    },
-    yAxis: {
-      title: {
-        text: 'Revenue (₹)'
-      },
-      gridLineDashStyle: 'Dash',
-      gridLineColor: '#E5E7EB',
-    },
-    tooltip: {
-      shared: true,
-      backgroundColor: '#fff',
-      borderColor: '#f0f0f0',
-      shadow: true,
-    },
-    plotOptions: {
-      spline: {
-        marker: {
-          radius: 4,
-          lineColor: '#0D9488',
-          lineWidth: 2,
-          fillColor: '#fff'
-        },
-        lineWidth: 3,
-        color: '#0D9488'
-      }
-    },
-    credits: {
-      enabled: false
-    },
-    series: [{
-      name: 'Revenue',
-      data: stats?.monthlyRevenue || []
-    }]
+  const reportRef = useRef(null);
+
+  const handleDownloadReport = () => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyData = stats?.monthlyRevenue || [];
+    const totalRevenue = monthlyData.reduce((a, b) => a + b, 0);
+    const shopName = JSON.parse(localStorage.getItem('ks_shop_info') || '{}')?.name || 'KS Medical';
+    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const rows = months.map((m, i) => `
+      <tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:8px 16px;font-weight:600;color:#374151">${m}</td>
+        <td style="padding:8px 16px;text-align:right;font-weight:700;color:${monthlyData[i] > 0 ? '#059669' : '#9CA3AF'}">
+          ₹${(monthlyData[i] || 0).toLocaleString('en-IN')}
+        </td>
+      </tr>`).join('');
+
+    const html = `
+      <html><head><title>Monthly Revenue Report</title></head>
+      <body style="font-family:Arial,sans-serif;margin:0;padding:32px;background:#f9fafb">
+        <div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+          <div style="background:#007242;padding:24px 32px">
+            <h1 style="margin:0;color:#fff;font-size:22px">${shopName}</h1>
+            <p style="margin:4px 0 0;color:#a7f3d0;font-size:13px">Monthly Revenue Report &mdash; Generated on ${today}</p>
+          </div>
+          <div style="padding:24px 32px">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#f3f4f6">
+                  <th style="padding:10px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:#6B7280;letter-spacing:1px">Month</th>
+                  <th style="padding:10px 16px;text-align:right;font-size:11px;text-transform:uppercase;color:#6B7280;letter-spacing:1px">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+              <tfoot>
+                <tr style="background:#f0fdf4">
+                  <td style="padding:12px 16px;font-weight:800;color:#065f46;font-size:15px">Total (Yearly)</td>
+                  <td style="padding:12px 16px;text-align:right;font-weight:800;color:#065f46;font-size:15px">₹${totalRevenue.toLocaleString('en-IN')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb">
+            <p style="margin:0;font-size:11px;color:#9CA3AF">This report is auto-generated. For queries contact your administrator.</p>
+          </div>
+        </div>
+      </body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Revenue_Report_${new Date().getFullYear()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading || !stats) {
@@ -146,13 +156,13 @@ const Dashboard = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1.5 opacity-90">Real-time inventory & order analytics.</p>
           </div>
         </div>
-        <button className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+        <button onClick={handleDownloadReport} className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-black uppercase tracking-widest text-[11px] rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
           <Download size={18} strokeWidth={3} /> Download Report
         </button>
       </div>
 
       {/* 1. Top Cards Grid (Restored) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Card 1: Inventory Status */}
         <div 
           onClick={() => navigate('/inventory/stats-history', { state: { type: 'critical_stock', title: 'Critical Stock Alerts', threshold: stats.alertThreshold } })}
@@ -164,20 +174,6 @@ const Dashboard = () => {
             </div>
             <h3 className="text-2xl font-black text-gray-800 dark:text-white">{stats.inventoryStatus}</h3>
             <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Inventory Status</p>
-          </div>
-        </div>
-
-        {/* Card 2: Revenue */}
-        <div 
-          onClick={() => navigate('/inventory/stats-history', { state: { type: 'value', title: 'Revenue History' } })}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
-        >
-          <div className="p-6 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-2xl border border-amber-100 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 mb-4 group-hover:scale-110 transition-transform">
-              <Banknote size={28} strokeWidth={2.5} />
-            </div>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white">₹{stats.totalRevenue.toLocaleString()}</h3>
-            <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Monthly Revenue</p>
           </div>
         </div>
 
@@ -233,32 +229,48 @@ const Dashboard = () => {
         </div>
       </div>
 
-     {/* 2. Order Workflow Bar (Restored) */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 overflow-x-auto no-scrollbar">
-        <div className="flex items-center min-w-max gap-1">
-            <div className="px-4 py-2 border-r border-gray-100 dark:border-gray-700">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Total Orders</p>
-                <div className="flex items-center gap-2">
-                    <ShoppingCart size={14} className="text-blue-500" />
-                    <span className="text-sm font-black text-gray-800 dark:text-white">{stats.orderWorkflow.total}</span>
-                </div>
-            </div>
+     {/* 2. Order Workflow Grid */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+        <h2 className="text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+          <ShoppingCart size={16} /> Order Status Overview
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 gap-4">
             {[
-                { label: 'Picking', count: stats.orderWorkflow.picking, icon: Boxes, color: 'text-emerald-500' },
-                { label: 'On Hold', count: stats.orderWorkflow.onHold, icon: Clock, color: 'text-amber-500' },
-                { label: 'Billing', count: stats.orderWorkflow.billing, icon: FileText, color: 'text-blue-500' },
-                { label: 'Packing', count: stats.orderWorkflow.packing, icon: Package, color: 'text-indigo-500' },
-                { label: 'Shipping', count: stats.orderWorkflow.shipping, icon: Truck, color: 'text-purple-500' },
-                { label: 'Problem IQ', count: stats.orderWorkflow.problemQueue, icon: AlertCircle, color: 'text-rose-500' }
+                { label: 'Pending',            count: stats.orderWorkflow.pending,            icon: Clock,         border: 'border-l-gray-400',    bg: 'bg-gray-50 dark:bg-gray-700/30',       num: 'text-gray-700 dark:text-gray-100',    icon_c: 'text-gray-400' },
+                { label: 'Confirmed',          count: stats.orderWorkflow.confirmed,          icon: CheckCircle2,  border: 'border-l-blue-500',    bg: 'bg-blue-50 dark:bg-blue-900/20',       num: 'text-blue-700 dark:text-blue-300',    icon_c: 'text-blue-500' },
+                { label: 'Unallocated',        count: stats.orderWorkflow.unallocated,        icon: AlertCircle,   border: 'border-l-orange-400',  bg: 'bg-orange-50 dark:bg-orange-900/20',   num: 'text-orange-600 dark:text-orange-300',icon_c: 'text-orange-400' },
+                { label: 'Picking',            count: stats.orderWorkflow.picking,            icon: Boxes,         border: 'border-l-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20', num: 'text-emerald-700 dark:text-emerald-300',icon_c: 'text-emerald-500' },
+                { label: 'Picklist Generated', count: stats.orderWorkflow.picklistGenerated,  icon: FileText,      border: 'border-l-teal-500',    bg: 'bg-teal-50 dark:bg-teal-900/20',       num: 'text-teal-700 dark:text-teal-300',    icon_c: 'text-teal-500' },
+                { label: 'Quality Check',      count: stats.orderWorkflow.qualityCheck,       icon: ShieldCheck,   border: 'border-l-cyan-500',    bg: 'bg-cyan-50 dark:bg-cyan-900/20',       num: 'text-cyan-700 dark:text-cyan-300',    icon_c: 'text-cyan-500' },
+                { label: 'Billing',            count: stats.orderWorkflow.billing,            icon: FileText,      border: 'border-l-sky-500',     bg: 'bg-sky-50 dark:bg-sky-900/20',         num: 'text-sky-700 dark:text-sky-300',      icon_c: 'text-sky-500' },
+                { label: 'Packing',            count: stats.orderWorkflow.packing,            icon: Package,       border: 'border-l-indigo-500',  bg: 'bg-indigo-50 dark:bg-indigo-900/20',   num: 'text-indigo-700 dark:text-indigo-300',icon_c: 'text-indigo-500' },
+                { label: 'Scan & Ship',        count: stats.orderWorkflow.scannedForShipping, icon: Activity,      border: 'border-l-violet-500',  bg: 'bg-violet-50 dark:bg-violet-900/20',   num: 'text-violet-700 dark:text-violet-300',icon_c: 'text-violet-500' },
+                { label: 'Shipped',            count: stats.orderWorkflow.shipping,           icon: Truck,         border: 'border-l-purple-500',  bg: 'bg-purple-50 dark:bg-purple-900/20',   num: 'text-purple-700 dark:text-purple-300',icon_c: 'text-purple-500' },
+                { label: 'Delivered',          count: stats.orderWorkflow.delivered,          icon: CheckCircle2,  border: 'border-l-green-500',   bg: 'bg-green-50 dark:bg-green-900/20',     num: 'text-green-700 dark:text-green-300',  icon_c: 'text-green-500' },
+                { label: 'On Hold',            count: stats.orderWorkflow.onHold,             icon: Clock,         border: 'border-l-amber-500',   bg: 'bg-amber-50 dark:bg-amber-900/20',     num: 'text-amber-700 dark:text-amber-300',  icon_c: 'text-amber-500' },
+                { label: 'Problem Queue',      count: stats.orderWorkflow.problemQueue,       icon: AlertCircle,   border: 'border-l-rose-500',    bg: 'bg-rose-50 dark:bg-rose-900/20',       num: 'text-rose-700 dark:text-rose-300',    icon_c: 'text-rose-500' },
+                { label: 'Cancelled',          count: stats.orderWorkflow.cancelled,          icon: XCircle,       border: 'border-l-red-500',     bg: 'bg-red-50 dark:bg-red-900/20',         num: 'text-red-700 dark:text-red-300',      icon_c: 'text-red-500' },
             ].map((step, idx) => (
-                <div key={idx} className="px-4 py-2 border-r last:border-0 border-gray-100 dark:border-gray-700">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{step.label}</p>
-                    <div className="flex items-center gap-2">
-                        <step.icon size={14} className={step.color} />
-                        <span className="text-sm font-black text-gray-800 dark:text-white">{step.count}</span>
+                <div key={idx} className={`${step.bg} ${step.border} border-l-4 rounded-xl p-4 flex items-center gap-4`}>
+                    <div className={`p-2.5 rounded-lg bg-white dark:bg-gray-800 shadow-sm`}>
+                        <step.icon size={22} className={step.icon_c} />
+                    </div>
+                    <div>
+                        <p className={`text-3xl font-black leading-none ${step.num}`}>{step.count}</p>
+                        <p className="text-xs font-bold text-gray-400 mt-1 leading-tight">{step.label}</p>
                     </div>
                 </div>
             ))}
+            {/* Total Orders - Last */}
+            <div className="bg-primary/10 dark:bg-primary/20 border-l-4 border-l-primary rounded-xl p-4 flex items-center gap-4">
+                <div className="p-2.5 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+                    <ShoppingCart size={22} className="text-primary" />
+                </div>
+                <div>
+                    <p className="text-3xl font-black leading-none text-primary">{stats.orderWorkflow.total}</p>
+                    <p className="text-xs font-bold text-primary/60 mt-1 leading-tight">Total Orders</p>
+                </div>
+            </div>
         </div>
       </div>
 
@@ -517,23 +529,8 @@ const Dashboard = () => {
             </div>
       </div>
 
-      {/* 6. Original Revenue & GRN Analytics (Restored at bottom) */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-20">
-            {/* Revenue Analytics Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-gray-800 dark:text-white">Revenue Analytics</h3>
-                <select className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 outline-none">
-                  <option>Yearly</option>
-                  <option>Monthly</option>
-                  <option>Weekly</option>
-                </select>
-              </div>
-              <div className="w-full">
-                <HighchartsReact highcharts={Highcharts} options={chartOptions} />
-              </div>
-            </div>
-
+      {/* 6. GRN Analytics */}
+      <div className="pb-20">
             {/* GRN Ageing Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full">
                 <div className="flex justify-between items-center mb-6 border-b border-gray-50 dark:border-gray-700 pb-4">

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Search, Filter, Eye, Truck, CheckCircle, 
     XCircle, Clock, Package, Boxes, AlertCircle,
     ArrowRight, MapPin, Phone, User as UserIcon,
     Download, ChevronRight, FileText, ShoppingCart,
-    ChevronDown, Calendar, RefreshCw, X
+    ChevronDown, Calendar, RefreshCw, X, QrCode, ScanLine
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
@@ -24,6 +25,19 @@ const PickingOrders = () => {
 
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    
+    // Batch Selection State
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batches, setBatches] = useState({});
+    const [selectedBatches, setSelectedBatches] = useState({});
+    const [loadingBatches, setLoadingBatches] = useState(false);
+
+    // QR Detail Modal State
+    const [showQRModal, setShowQRModal] = useState(false);
+    const [qrModalData, setQrModalData] = useState(null); // { order, batchDetails[] }
+    const [scanInput, setScanInput] = useState('');
+    const [scanSuccess, setScanSuccess] = useState(false);
+    const scanInputRef = useRef(null);
 
     const statusOptions = [
         'pending', 'confirmed', 'On Hold', 'Picking', 'Picklist Generated', 
@@ -40,9 +54,9 @@ const PickingOrders = () => {
             setLoading(true);
             const { data } = await api.get('/orders');
             if (data.success) {
-                // Filter for 'Picking' by default for this page
+                // Filter for ONLY 'Picking' status orders (not Picklist Generated)
                 const pickingOrders = data.orders
-                    .filter(o => o.status === 'Picking' || o.status === 'Picklist Generated')
+                    .filter(o => o.status === 'Picking')
                     .map(order => ({
                         ...order,
                         vendorId: order.vendorId || 'N/A',
@@ -130,6 +144,17 @@ const PickingOrders = () => {
             return Swal.fire('Wait', 'Please select a status to move orders to.', 'info');
         }
 
+        // BLOCK Quality Check in bulk - must use individual batch selection
+        if (bulkStatus === 'Quality Check') {
+            Swal.fire({
+                title: 'Batch Selection Required',
+                text: 'To move orders to Quality Check, please open each order individually and select batches.',
+                icon: 'info',
+                customClass: { container: 'z-[100001]' }
+            });
+            return;
+        }
+
         // Check terminal orders first
         const terminalOrders = orders.filter(o => selectedIds.includes(o._id)).filter(o => o.status === 'delivered' || o.status === 'cancelled');
         if (terminalOrders.length > 0) {
@@ -197,22 +222,154 @@ const PickingOrders = () => {
         }
     };
 
-    const getNextStatus = (currentStatus) => {
-        const flow = [
-            'pending', 'confirmed', 'Picking', 'Picklist Generated', 
-            'Quality Check', 'Packing', 'Scanned For Shipping', 
-            'shipped', 'delivered'
-        ];
-        const index = flow.indexOf(currentStatus);
-        if (index !== -1 && index < flow.length - 1) {
-            // Picking can go to Quality Check directly or Picklist Generated
-            if (currentStatus === 'Picking') return 'Quality Check';
-            return flow[index + 1];
-        }
-        return null; // End of chain or not in standard flow
+    const handlePrintPicklist = () => {
+        // Just trigger print without changing status
+        window.print();
     };
 
-    const handleStatusUpdate = async (newStatus, triggerPrint = false) => {
+    const fetchBatchesForOrder = async () => {
+        if (!selectedOrder) return;
+        setLoadingBatches(true);
+        try {
+            const batchData = {};
+            for (const item of selectedOrder.items) {
+                const { data } = await api.get(`/batches/product/${item.product._id}`);
+                if (data.success) {
+                    batchData[item.product._id] = data.batches;
+                }
+            }
+            setBatches(batchData);
+        } catch (error) {
+            console.error('Failed to fetch batches:', error);
+            Swal.fire('Error', 'Failed to load batch information', 'error');
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+
+    const handleMarkAsPicked = () => {
+        // Open batch selection modal
+        fetchBatchesForOrder();
+        setShowBatchModal(true);
+    };
+
+    const handleBatchAssignment = async () => {
+        // Validate all items have batch selected
+        const missingBatches = selectedOrder.items.filter(item => !selectedBatches[item.product._id]);
+        if (missingBatches.length > 0) {
+            Swal.fire('Incomplete', 'Please select batch for all items', 'warning');
+            return;
+        }
+
+        // Build QR modal data from selected batches
+        const batchDetails = selectedOrder.items.map(item => {
+            const batchId = selectedBatches[item.product._id];
+            const batchInfo = batches[item.product._id]?.find(b => b._id === batchId);
+            return {
+                productId: item.product._id,
+                productName: item.productName,
+                sku: item.product?.sku || 'N/A',
+                quantity: item.quantity,
+                batchId,
+                batchNumber: batchInfo?.batchNumber || 'N/A',
+                expiryDate: batchInfo?.expiryDate,
+                mrp: batchInfo?.mrp || 0,
+                rackLocation: batchInfo?.rackLocation || 'N/A',
+                availableQty: batchInfo?.quantity || 0,
+            };
+        });
+
+        // QR code payload - scan karne par yahi data milega
+        const qrPayload = JSON.stringify({
+            orderId: selectedOrder._id,
+            action: 'MOVE_TO_QC',
+            batches: batchDetails.map(b => ({ productId: b.productId, batchId: b.batchId, qty: b.quantity }))
+        });
+
+        setQrModalData({ order: selectedOrder, batchDetails, qrPayload });
+        setShowBatchModal(false);
+        setScanInput('');
+        setScanSuccess(false);
+        setShowQRModal(true);
+        setTimeout(() => scanInputRef.current?.focus(), 300);
+    };
+
+    const handleMoveToQC = async () => {
+        if (!qrModalData) return;
+        try {
+            setLoadingBatches(true);
+            const batchAssignments = qrModalData.batchDetails.map(b => ({
+                productId: b.productId,
+                batchId: b.batchId,
+                quantity: b.quantity
+            }));
+            await api.post(`/orders/${qrModalData.order._id}/assign-batches`, { batches: batchAssignments });
+            await api.put(`/orders/${qrModalData.order._id}/status`, { status: 'Quality Check' });
+            
+            setOrders(prev => prev.filter(o => o._id !== qrModalData.order._id));
+            setShowQRModal(false);
+            setShowModal(false);
+            setQrModalData(null);
+            setSelectedBatches({});
+            setScanSuccess(false);
+            Swal.fire({
+                icon: 'success',
+                title: 'Moved to Quality Check!',
+                text: 'Order successfully moved to QC stage.',
+                timer: 1500,
+                showConfirmButton: false,
+                customClass: { container: 'z-[100001]' }
+            });
+        } catch (error) {
+            console.error('Move to QC failed:', error);
+            Swal.fire('Error', error.response?.data?.message || 'Failed to move to QC', 'error');
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+
+    // QR scan handler - jab scanner se scan ho
+    const handleScanInput = (e) => {
+        const val = e.target.value;
+        // Scanner Enter key bhejta hai end mein
+        if (val.endsWith('\n') || e.nativeEvent?.inputType === 'insertLineBreak') {
+            try {
+                const parsed = JSON.parse(val.trim());
+                if (parsed.action === 'MOVE_TO_QC' && parsed.orderId === qrModalData?.order._id) {
+                    setScanSuccess(true);
+                    setScanInput('');
+                    setTimeout(() => handleMoveToQC(), 800);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Invalid QR', text: 'This QR does not match the current order.', timer: 2000, showConfirmButton: false });
+                    setScanInput('');
+                }
+            } catch {
+                setScanInput('');
+            }
+        } else {
+            setScanInput(val);
+        }
+    };
+
+    const handleScanKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            try {
+                const parsed = JSON.parse(scanInput.trim());
+                if (parsed.action === 'MOVE_TO_QC' && parsed.orderId === qrModalData?.order._id) {
+                    setScanSuccess(true);
+                    setScanInput('');
+                    setTimeout(() => handleMoveToQC(), 800);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Invalid QR', text: 'This QR does not match the current order.', timer: 2000, showConfirmButton: false });
+                    setScanInput('');
+                }
+            } catch {
+                setScanInput('');
+            }
+        }
+    };
+
+    const handleStatusUpdate = async (newStatus) => {
         if (!selectedOrder) return;
 
         // 1. BLOCK changes if order is already delivered or cancelled
@@ -283,11 +440,8 @@ const PickingOrders = () => {
         try {
             const { data } = await api.put(`/orders/${selectedOrder._id}/status`, { status: newStatus });
             if (data.success) {
-                if (triggerPrint) {
-                    window.print();
-                }
-
-                if (newStatus !== 'Picking' && newStatus !== 'Picklist Generated') {
+                // Remove order from list if moving away from Picking status
+                if (newStatus !== 'Picking') {
                     setOrders(prev => prev.filter(o => o._id !== selectedOrder._id));
                     setShowModal(false);
                 } else {
@@ -301,7 +455,7 @@ const PickingOrders = () => {
                     timer: 1000,
                     showConfirmButton: false,
                     customClass: {
-                        container: 'z-[100001]' // Ensures it's above the modal's 10000
+                        container: 'z-[100001]'
                     }
                 });
             }
@@ -543,43 +697,11 @@ const PickingOrders = () => {
                         </div>
                         
                         <div className="p-6 overflow-y-auto">
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
                                     <h3 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">Customer</h3>
                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || 'Guest'}</p>
                                     <p className="text-xs text-gray-500 mt-1">{selectedOrder.city}</p>
-                                </div>
-                                <div className="p-4 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-800">
-                                    <h3 className="text-[10px] font-black uppercase text-orange-600 mb-2 tracking-widest">Move to Stage</h3>
-                                    <select 
-                                        value={selectedOrder.status}
-                                        disabled={selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled'}
-                                        onChange={(e) => handleStatusUpdate(e.target.value, false)}
-                                        className={`w-full bg-white dark:bg-gray-800 border-2 border-orange-200 dark:border-orange-800 text-gray-700 dark:text-gray-200 text-xs rounded-lg p-2 font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow-sm ${selectedOrder.status === 'delivered' || selectedOrder.status === 'cancelled' ? 'opacity-50 cursor-not-allowed border-gray-300' : 'cursor-pointer hover:border-orange-400'}`}
-                                    >
-                                        {statusOptions.map(option => {
-                                            const flow = ['pending', 'confirmed', 'Picking', 'Picklist Generated', 'Quality Check', 'Packing', 'Scanned For Shipping', 'shipped', 'delivered'];
-                                            const currIdx = flow.indexOf(selectedOrder.status);
-                                            const optIdx = flow.indexOf(option);
-                                            
-                                            // Disable if:
-                                            // 1. It's 'pending' or 'confirmed' and current is 'On Hold' or later
-                                            // 2. It's logically before current status in flow
-                                            const isPastStage = (optIdx !== -1 && currIdx !== -1 && optIdx < currIdx);
-                                            const isEarlyStageOnHold = (selectedOrder.status === 'On Hold' || selectedOrder.status === 'Problem Queue') && (option === 'pending' || option === 'confirmed');
-                                            
-                                            return (
-                                                <option 
-                                                    key={option} 
-                                                    value={option}
-                                                    disabled={isPastStage || isEarlyStageOnHold}
-                                                    className={isPastStage || isEarlyStageOnHold ? 'text-gray-400 bg-gray-100' : ''}
-                                                >
-                                                    {option} {option === selectedOrder.status ? '(Current)' : ''}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
                                 </div>
                                 <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800">
                                     <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Handover Target</h3>
@@ -588,7 +710,7 @@ const PickingOrders = () => {
                                 </div>
                              </div>
 
-                             {/* Items Table - CRITICAL FOR PICKING */}
+                             {/* Items Table */}
                             <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-3 flex items-center gap-2">
                                 <Package size={14} /> Items to Pick
                             </h3>
@@ -596,6 +718,7 @@ const PickingOrders = () => {
                                 <thead className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 uppercase">
                                     <tr>
                                         <th className="p-3">Product Name</th>
+                                        <th className="p-3 text-center">Prescription</th>
                                         <th className="p-3 text-center">Required Qty</th>
                                         <th className="p-3">Bin Location</th>
                                     </tr>
@@ -606,6 +729,12 @@ const PickingOrders = () => {
                                             <td className="p-3 font-medium">
                                                 <p className="text-gray-800 dark:text-gray-200">{item.productName}</p>
                                                 <p className="text-[10px] text-gray-400">SKU: {item.product?.sku || 'N/A'}</p>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {item.product?.isPrescriptionRequired
+                                                    ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
+                                                    : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
+                                                }
                                             </td>
                                             <td className="p-3 text-center">
                                                 <span className="bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-800 dark:text-gray-200 rounded-full font-black text-lg">
@@ -624,13 +753,13 @@ const PickingOrders = () => {
                             
                             <div className="flex justify-end gap-3 mt-4 border-t border-gray-100 pt-6 dark:border-gray-800">
                                 <button 
-                                    onClick={() => handleStatusUpdate('Picklist Generated', true)}
+                                    onClick={handlePrintPicklist}
                                     className="px-6 py-2 bg-gray-800 text-white rounded-lg text-xs font-black uppercase hover:bg-gray-900 transition-all flex items-center gap-2"
                                 >
                                     <FileText size={16} /> Print Picklist
                                 </button>
                                 <button 
-                                    onClick={() => handleStatusUpdate('Quality Check')}
+                                    onClick={handleMarkAsPicked}
                                     className="px-6 py-2 bg-orange-600 text-white rounded-lg text-xs font-black uppercase hover:bg-orange-700 shadow-lg shadow-orange-500/30 active:scale-95 transition-all flex items-center gap-2"
                                 >
                                     <CheckCircle size={16} /> Mark as Picked
@@ -729,6 +858,242 @@ const PickingOrders = () => {
                     </div>
                 </div>
                 </>,
+                document.body
+            )}
+
+            {/* Batch Selection Modal */}
+            {showBatchModal && selectedOrder && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-5xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Select Batches</h2>
+                                <p className="text-xs text-gray-500 font-medium mt-1">Choose batch for each product before moving to QC</p>
+                            </div>
+                            <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto">
+                            {loadingBatches ? (
+                                <div className="text-center py-10 text-gray-500">Loading batches...</div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {selectedOrder.items.map((item, idx) => (
+                                        <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <h3 className="font-bold text-gray-800 dark:text-white">{item.productName}</h3>
+                                                    <p className="text-xs text-gray-500">SKU: {item.product?.sku} | Required Qty: {item.quantity}</p>
+                                                </div>
+                                                {selectedBatches[item.product._id] && (
+                                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">✓ Selected</span>
+                                                )}
+                                            </div>
+                                            
+                                            {batches[item.product._id]?.length > 0 ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {batches[item.product._id].map(batch => (
+                                                        <div 
+                                                            key={batch._id}
+                                                            onClick={() => setSelectedBatches(prev => ({ ...prev, [item.product._id]: batch._id }))}
+                                                            className={`p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                                                                selectedBatches[item.product._id] === batch._id
+                                                                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                                                                    : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
+                                                            }`}
+                                                        >
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="font-mono text-xs font-bold text-gray-700 dark:text-gray-300">{batch.batchNumber}</span>
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                    batch.quantity >= item.quantity ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                                }`}>
+                                                                    Stock: {batch.quantity}
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                <div>
+                                                                    <p className="text-gray-500 text-[10px] uppercase">Expiry</p>
+                                                                    <p className="font-bold text-gray-800 dark:text-gray-200">{moment(batch.expiryDate).format('MMM YYYY')}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-gray-500 text-[10px] uppercase">Location</p>
+                                                                    <p className="font-bold text-gray-800 dark:text-gray-200">{batch.rackLocation || 'N/A'}</p>
+                                                                </div>
+                                                            </div>
+                                                            {batch.quantity < item.quantity && (
+                                                                <p className="text-red-600 text-[10px] font-bold mt-2">⚠ Insufficient stock</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-4 text-gray-500 text-sm">No batches available for this product</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800">
+                            <button 
+                                onClick={() => setShowBatchModal(false)}
+                                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-black uppercase hover:bg-gray-300 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleBatchAssignment}
+                                disabled={loadingBatches}
+                                className="px-6 py-2 bg-orange-600 text-white rounded-lg text-xs font-black uppercase hover:bg-orange-700 shadow-lg shadow-orange-500/30 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <CheckCircle size={16} /> {loadingBatches ? 'Processing...' : 'Confirm & Move to QC'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {/* QR Detail Modal */}
+            {showQRModal && qrModalData && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[95vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border-2 border-orange-400">
+                        
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 flex justify-between items-center bg-gradient-to-r from-orange-500 to-amber-500">
+                            <div>
+                                <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                                    <QrCode size={22} /> Batch Confirmed — Scan to Move to QC
+                                </h2>
+                                <p className="text-xs text-orange-100 font-medium mt-1">
+                                    Order #{qrModalData.order._id.substr(-8).toUpperCase()} · {qrModalData.batchDetails.length} item{qrModalData.batchDetails.length > 1 ? 's' : ''}
+                                </p>
+                            </div>
+                            <button onClick={() => { setShowQRModal(false); setQrModalData(null); }} className="text-white/70 hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+                            
+                            {/* Left: SKU + Batch Details */}
+                            <div className="flex-1 p-6 overflow-y-auto border-r border-gray-200 dark:border-gray-700">
+                                <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-4 flex items-center gap-2">
+                                    <Package size={14} /> Selected Batch Details
+                                </h3>
+                                <div className="space-y-4">
+                                    {qrModalData.batchDetails.map((item, idx) => (
+                                        <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gray-50 dark:bg-gray-800">
+                                            {/* Product Header */}
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <p className="font-black text-gray-800 dark:text-white text-sm">{item.productName}</p>
+                                                    <p className="text-[10px] font-mono text-orange-600 dark:text-orange-400 font-bold mt-0.5">SKU: {item.sku}</p>
+                                                </div>
+                                                <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg text-xs font-black">
+                                                    Qty: {item.quantity}
+                                                </span>
+                                            </div>
+                                            {/* Batch Info Grid */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Batch No.</p>
+                                                    <p className="font-mono font-black text-gray-800 dark:text-white text-sm mt-0.5">{item.batchNumber}</p>
+                                                </div>
+                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Expiry</p>
+                                                    <p className={`font-bold text-sm mt-0.5 ${
+                                                        item.expiryDate && new Date(item.expiryDate) < new Date(Date.now() + 90*24*60*60*1000)
+                                                            ? 'text-red-600' : 'text-gray-800 dark:text-white'
+                                                    }`}>
+                                                        {item.expiryDate ? moment(item.expiryDate).format('MMM YYYY') : 'N/A'}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">MRP</p>
+                                                    <p className="font-black text-gray-800 dark:text-white text-sm mt-0.5">₹{item.mrp}</p>
+                                                </div>
+                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Rack Location</p>
+                                                    <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm mt-0.5 flex items-center gap-1">
+                                                        <MapPin size={11} />{item.rackLocation}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {/* Stock warning */}
+                                            {item.availableQty < item.quantity && (
+                                                <div className="mt-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                                    <p className="text-red-600 text-[10px] font-bold">⚠ Available: {item.availableQty} | Required: {item.quantity}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right: QR Code + Scan */}
+                            <div className="w-full md:w-80 p-6 flex flex-col items-center gap-5 bg-gray-50 dark:bg-gray-800/50">
+                                
+                                {/* QR Code */}
+                                <div className="bg-white dark:bg-white p-4 rounded-2xl shadow-lg border-4 border-orange-400">
+                                    <QRCodeSVG
+                                        value={qrModalData.qrPayload}
+                                        size={200}
+                                        level="H"
+                                        includeMargin={false}
+                                        fgColor="#1a1a1a"
+                                    />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Scan to Move to QC</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">Order: #{qrModalData.order._id.substr(-8).toUpperCase()}</p>
+                                </div>
+
+                                {/* Scan Input (hidden, for scanner) */}
+                                <div className="w-full">
+                                    <div className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                                        scanSuccess 
+                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                                            : 'border-orange-300 bg-white dark:bg-gray-900 focus-within:border-orange-500'
+                                    }`}>
+                                        <ScanLine size={18} className={scanSuccess ? 'text-green-500' : 'text-orange-500'} />
+                                        <input
+                                            ref={scanInputRef}
+                                            type="text"
+                                            value={scanInput}
+                                            onChange={handleScanInput}
+                                            onKeyDown={handleScanKeyDown}
+                                            placeholder={scanSuccess ? '✓ Scanned!' : 'Scan QR here...'}
+                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">Point scanner at QR code above</p>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="w-full flex items-center gap-3">
+                                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                                    <span className="text-[10px] font-black text-gray-400 uppercase">or</span>
+                                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                                </div>
+
+                                {/* Manual Move Button */}
+                                <button
+                                    onClick={handleMoveToQC}
+                                    disabled={loadingBatches}
+                                    className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black rounded-xl shadow-lg shadow-orange-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-wide"
+                                >
+                                    {loadingBatches ? (
+                                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processing...</>
+                                    ) : (
+                                        <><CheckCircle size={18} /> Move to QC Manually</>
+                                    )}
+                                </button>
+                                <p className="text-[10px] text-gray-400 text-center -mt-2">Click above if scanner not available</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
                 document.body
             )}
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Trash2, Printer, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, User, Trash2, Printer, Plus, Minus, CreditCard, Banknote, Smartphone, XCircle, CheckCircle, Package, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Calendar, MapPin } from 'lucide-react';
 import { useInventory } from '../../context/InventoryContext';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
@@ -34,6 +34,17 @@ const SalesEntry = () => {
   const [loading, setLoading] = useState(true);
   const [customGst, setCustomGst] = useState('');
 
+  // Keyboard Navigation States
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchesForSelection, setBatchesForSelection] = useState([]);
+  const [selectedProductForBatch, setSelectedProductForBatch] = useState(null);
+  const [highlightedBatchIndex, setHighlightedBatchIndex] = useState(0);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [cartHighlightedIndex, setCartHighlightedIndex] = useState(-1);
+  const [focusedSection, setFocusedSection] = useState('search');
+  const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
+
   // Focus Refs
   const itemSearchRef = useRef(null);
   const customerInputRef = useRef(null);
@@ -42,6 +53,13 @@ const SalesEntry = () => {
   const patientAgeRef = useRef(null);
   const paymentSelectRef = useRef(null);
   const processBtnRef = useRef(null);
+  const batchModalRef = useRef(null);
+  const patientAddressRef = useRef(null);
+  const patientGenderRef = useRef(null);
+  const doctorNameRef = useRef(null);
+  const doctorAddressRef = useRef(null);
+  const boxCountRef = useRef(null);
+  const polyCountRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -119,8 +137,9 @@ const SalesEntry = () => {
   const [shippingDetails, setShippingDetails] = useState({ packingType: 'Box', boxCount: 0, polyCount: 0, isColdStorage: false });
   const [showExtraDetails, setShowExtraDetails] = useState(false);
 
-  const addToCart = (product) => {
-    const existingItem = cart.find(item => item.id === product.id);
+  const addToCart = (product, batchData = null) => {
+    const batchKey = batchData?._id || product.batch;
+    const existingItem = cart.find(item => item.id === product.id && item.batchKey === batchKey);
     const currentQty = existingItem ? (Number(existingItem.qty) || 0) : 0;
     const packSize = getPackSize(product.packing);
     const neededUnits = (currentQty + 1) * packSize;
@@ -138,18 +157,93 @@ const SalesEntry = () => {
 
     if (existingItem) {
       setCart(cart.map(item => 
-        item.id === product.id 
+        item.id === product.id && item.batchKey === batchKey
           ? { ...item, qty: currentQty + 1, amount: (currentQty + 1) * item.rate }
           : item
       ));
     } else {
-      setCart([...cart, { ...product, qty: 1, amount: product.rate }]);
+      const cartItem = { 
+        ...product, 
+        qty: 1, 
+        amount: product.rate,
+        batchId: batchData?._id,
+        batchKey: batchKey,
+        batchNumber: batchData?.batchNumber || product.batch,
+        expiryDate: batchData?.expiryDate || product.exp
+      };
+      setCart([...cart, cartItem]);
     }
   };
 
-  const updateQty = (id, delta) => {
+  const fetchBatchesForProduct = async (product) => {
+    try {
+      setLoadingBatches(true);
+      const { data } = await api.get(`/batches/product/${product.id}`);
+      if (data.success && data.batches) {
+        const activeBatches = data.batches.filter(b => b.status === 'Active' && b.quantity > 0);
+        return activeBatches;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      return [];
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  const handleProductSelection = async (product) => {
+    if (product.stock === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Out of Stock',
+        text: 'This product is currently out of stock.',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
+    
+    // Try to fetch batches from API
+    const batches = await fetchBatchesForProduct(product);
+    
+    // If API returns multiple batches, show modal
+    if (batches.length > 1) {
+      setSelectedProductForBatch(product);
+      setBatchesForSelection(batches);
+      setHighlightedBatchIndex(0);
+      setShowBatchModal(true);
+    } 
+    // If API returns single batch, use it
+    else if (batches.length === 1) {
+      addToCart(product, batches[0]);
+      setSearchTerm('');
+      setHighlightedIndex(-1);
+    } 
+    // If no batches from API, use product's existing batch data (from inventory context)
+    else {
+      addToCart(product, null);
+      setSearchTerm('');
+      setHighlightedIndex(-1);
+    }
+  };
+
+  const handleBatchSelection = (batch) => {
+    if (selectedProductForBatch) {
+      addToCart(selectedProductForBatch, batch);
+      setShowBatchModal(false);
+      setBatchesForSelection([]);
+      setSelectedProductForBatch(null);
+      setHighlightedBatchIndex(0);
+      setSearchTerm('');
+      setHighlightedIndex(-1);
+      itemSearchRef.current?.focus();
+    }
+  };
+
+  const updateQty = (id, batchKey, delta) => {
     setCart(cart.map(item => {
-      if (item.id === id) {
+      if (item.id === id && item.batchKey === batchKey) {
         const currentQty = Number(item.qty) || 0;
         const newQty = currentQty + delta;
         if (newQty <= 0) return item; 
@@ -221,8 +315,8 @@ const SalesEntry = () => {
       }));
   };
 
-  const removeFromCart = (id) => {
-    setCart(cart.filter(item => item.id !== id));
+  const removeFromCart = (id, batchKey) => {
+    setCart(cart.filter(item => !(item.id === id && item.batchKey === batchKey)));
   };
 
   const handleQuickAddCustomer = async () => {
@@ -461,12 +555,13 @@ const SalesEntry = () => {
   // Keyboard navigation helpers
   const handleCustomerInputKeyDown = (e) => {
     if (e.key === 'Enter') {
-        if (selectedCustomer) {
-             paymentSelectRef.current?.focus();
-             setShowCustomerDropdown(false);
-        } else if (filteredCustomers.length > 0) {
-             // Select first matching customer if not explicitly selected
-             const c = filteredCustomers[0];
+        e.preventDefault();
+        if (customerSearch.trim() === '') {
+            // If search is empty, and Enter is pressed, maybe focus payment?
+            setShowCustomerDropdown(false);
+            paymentSelectRef.current?.focus();
+        } else if (customerHighlightedIndex >= 0 && filteredCustomers[customerHighlightedIndex]) {
+             const c = filteredCustomers[customerHighlightedIndex];
              setSelectedCustomer(c);
              setCustomerSearch(c.name);
              setPatientDetails(prev => ({
@@ -485,19 +580,72 @@ const SalesEntry = () => {
         }
     } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        // Ideally navigate dropdown list, but for now let's just show it
         setShowCustomerDropdown(true);
+        setCustomerHighlightedIndex(prev => 
+            prev < filteredCustomers.length - 1 ? prev + 1 : prev
+        );
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCustomerHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
     }
   };
 
   const handlePaymentKeyDown = (e) => {
       if (e.key === 'Enter') {
+          e.preventDefault();
           handleProcessSale();
       }
   };
 
+  useEffect(() => {
+    if (showBatchModal && batchModalRef.current) {
+      batchModalRef.current.focus();
+    }
+  }, [showBatchModal]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (showBatchModal) return;
+      
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setFocusedSection('search');
+        itemSearchRef.current?.focus();
+        setHighlightedIndex(-1);
+        setCartHighlightedIndex(-1);
+      } else if (e.key === 'F3' || e.key === 'Tab') {
+        // Only trigger F3/Tab behavior if not inside an input that needs Tab
+        if (e.key === 'F3' || (e.key === 'Tab' && focusedSection === 'search')) {
+           if (cart.length > 0) {
+             e.preventDefault();
+             setFocusedSection('cart');
+             setCartHighlightedIndex(0);
+           } else {
+             e.preventDefault();
+             setFocusedSection('patient');
+             setShowExtraDetails(true);
+             setTimeout(() => patientNameRef.current?.focus(), 100);
+           }
+        }
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        setFocusedSection('patient');
+        setShowExtraDetails(true);
+        setTimeout(() => patientNameRef.current?.focus(), 100);
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        setFocusedSection('payment');
+        setTimeout(() => paymentSelectRef.current?.focus(), 100);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [cart.length, showBatchModal]);
+
   const handlePatientNameKeyDown = (e) => {
     if (e.key === 'Enter') {
+        e.preventDefault();
         const matches = customers.filter(c => c.name.toLowerCase().includes(patientDetails.name.toLowerCase()));
         if (matches.length > 0) {
             const first = matches[0];
@@ -517,6 +665,7 @@ const SalesEntry = () => {
 
   const handlePatientMobileKeyDown = (e) => {
     if (e.key === 'Enter') {
+        e.preventDefault();
         const matches = customers.filter(c => c.phone?.includes(patientDetails.mobile));
         if (matches.length > 0) {
             const first = matches[0];
@@ -537,6 +686,132 @@ const SalesEntry = () => {
   return (
     <div className="flex flex-col gap-6 p-2 lg:p-6 bg-gray-50/50 dark:bg-gray-900 min-h-screen text-gray-800 dark:text-gray-100 font-sans">
       
+      {/* Batch Selection Modal */}
+      {showBatchModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div 
+            ref={batchModalRef}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden border-2 border-primary"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowBatchModal(false);
+                setBatchesForSelection([]);
+                setSelectedProductForBatch(null);
+                itemSearchRef.current?.focus();
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlightedBatchIndex(prev => 
+                  prev < batchesForSelection.length - 1 ? prev + 1 : prev
+                );
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlightedBatchIndex(prev => prev > 0 ? prev - 1 : 0);
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (batchesForSelection[highlightedBatchIndex]) {
+                  handleBatchSelection(batchesForSelection[highlightedBatchIndex]);
+                }
+              }
+            }}
+            tabIndex={0}
+          >
+            <div className="bg-gradient-to-r from-primary to-emerald-600 p-6 text-white">
+              <h2 className="text-2xl font-black flex items-center gap-3">
+                <Package size={28} />
+                Select Batch for {selectedProductForBatch?.name}
+              </h2>
+              <p className="text-sm mt-2 opacity-90">Multiple batches available. Use ↑↓ to navigate, Enter to select, Esc to cancel</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {loadingBatches ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {batchesForSelection.map((batch, idx) => (
+                    <div
+                      key={batch._id}
+                      onClick={() => handleBatchSelection(batch)}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        highlightedBatchIndex === idx
+                          ? 'border-primary bg-primary/5 shadow-lg scale-[1.02]'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-primary/50 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="px-3 py-1 bg-primary/10 text-primary rounded-lg font-black text-sm">
+                              Batch: {batch.batchNumber}
+                            </span>
+                            <span className={`px-3 py-1 rounded-lg font-bold text-xs ${
+                              new Date(batch.expiryDate) < new Date(Date.now() + 90*24*60*60*1000)
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-emerald-100 text-emerald-600'
+                            }`}>
+                              <Calendar size={12} className="inline mr-1" />
+                              Exp: {new Date(batch.expiryDate).toLocaleDateString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Available Qty</p>
+                              <p className="font-black text-lg text-primary">{batch.quantity} Units</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">MRP</p>
+                              <p className="font-bold text-lg">₹{batch.mrp}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                              <p className="font-bold flex items-center gap-1">
+                                <MapPin size={14} className="text-primary" />
+                                {batch.rackLocation || 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        {highlightedBatchIndex === idx && (
+                          <div className="ml-4">
+                            <CheckCircle size={32} className="text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBatchModal(false);
+                  setBatchesForSelection([]);
+                  setSelectedProductForBatch(null);
+                  itemSearchRef.current?.focus();
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+              >
+                Cancel (Esc)
+              </button>
+              <button
+                onClick={() => {
+                  if (batchesForSelection[highlightedBatchIndex]) {
+                    handleBatchSelection(batchesForSelection[highlightedBatchIndex]);
+                  }
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold bg-primary text-white hover:bg-emerald-700 transition-all shadow-lg"
+              >
+                Select Batch (Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* 1. Item Catalog Section */}
       <div className="flex flex-col gap-5 w-full">
         <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-200/60 dark:border-gray-700 shadow-sm flex flex-col md:flex-row gap-2 items-center shrink-0">
@@ -545,16 +820,57 @@ const SalesEntry = () => {
                 <input 
                     ref={itemSearchRef}
                     type="text" 
-                    placeholder="Search medicines... (Press Enter to Add)" 
+                    placeholder="Search... (↑↓ Navigate | Enter Select | Tab/→ Cart | F2 Focus)" 
                     value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                    onChange={(e) => { 
+                      setSearchTerm(e.target.value); 
+                      setCurrentPage(1); 
+                      setHighlightedIndex(-1);
+                      setFocusedSection('search');
+                    }}
+                    onFocus={() => setFocusedSection('search')}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && paginatedInventory.length > 0) {
-                            const item = paginatedInventory[0];
-                            if (item.stock > 0) {
-                                addToCart(item);
-                                setSearchTerm('');
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setHighlightedIndex(prev => 
+                              prev < paginatedInventory.length - 1 ? prev + 1 : prev
+                            );
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setHighlightedIndex(prev => prev > 0 ? prev - 1 : -1);
+                        } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (highlightedIndex >= 0 && paginatedInventory[highlightedIndex]) {
+                                handleProductSelection(paginatedInventory[highlightedIndex]);
+                            } else if (paginatedInventory.length > 0) {
+                                handleProductSelection(paginatedInventory[0]);
                             }
+                        } else if (e.key === 'Tab') {
+                            if (e.shiftKey) {
+                                e.preventDefault();
+                                processBtnRef.current?.focus();
+                            } else if (cart.length > 0) {
+                                e.preventDefault();
+                                setFocusedSection('cart');
+                                setCartHighlightedIndex(0);
+                            } else {
+                                e.preventDefault();
+                                setFocusedSection('patient');
+                                setShowExtraDetails(true);
+                                setTimeout(() => patientNameRef.current?.focus(), 100);
+                            }
+                        } else if (e.key === 'ArrowRight' && cart.length > 0) {
+                            e.preventDefault();
+                            setFocusedSection('cart');
+                            setCartHighlightedIndex(0);
+                        } else if (e.key === 'PageDown') {
+                            e.preventDefault();
+                            goToPage(currentPage + 1);
+                            setHighlightedIndex(0);
+                        } else if (e.key === 'PageUp') {
+                            e.preventDefault();
+                            goToPage(currentPage - 1);
+                            setHighlightedIndex(0);
                         }
                     }}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border-none rounded-xl focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-primary/10 transition-all text-sm"
@@ -616,8 +932,16 @@ const SalesEntry = () => {
                            </tr>
                          </thead>
                          <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                           {paginatedInventory.map((item) => (
-                             <tr key={item.id} onClick={() => item.stock > 0 && addToCart(item)} className="hover:bg-gray-50/80 transition-colors cursor-pointer capitalize">
+                           {paginatedInventory.map((item, idx) => (
+                             <tr 
+                               key={item.id} 
+                               onClick={() => item.stock > 0 && handleProductSelection(item)} 
+                               className={`transition-colors cursor-pointer capitalize ${
+                                 highlightedIndex === idx 
+                                   ? 'bg-primary/10 ring-2 ring-primary ring-inset' 
+                                   : 'hover:bg-gray-50/80 dark:hover:bg-gray-700/50'
+                               }`}
+                             >
                                <td className="px-4 py-3.5">
                                  <p className="font-bold text-sm">{item.name}</p>
                                  <p className="text-[10px] text-primary font-black uppercase">{item.brand || 'Generic'}</p>
@@ -646,8 +970,63 @@ const SalesEntry = () => {
       </div>
 
       {/* 2. Cart Section */}
-      <div className="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4"><ShoppingCart className="text-primary"/> Current Order</h2>
+      <div 
+        className={`w-full bg-white dark:bg-gray-800 rounded-2xl border-2 shadow-sm p-4 transition-all ${
+          focusedSection === 'cart' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-gray-700'
+        }`}
+        tabIndex={focusedSection === 'cart' ? 0 : -1}
+        onKeyDown={(e) => {
+          if (focusedSection !== 'cart' || cart.length === 0) return;
+          
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setCartHighlightedIndex(prev => prev < cart.length - 1 ? prev + 1 : prev);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setCartHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            setFocusedSection('search');
+            itemSearchRef.current?.focus();
+            setCartHighlightedIndex(-1);
+          } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+            e.preventDefault();
+            setFocusedSection('patient');
+            setShowExtraDetails(true);
+            setTimeout(() => patientNameRef.current?.focus(), 100);
+            setCartHighlightedIndex(-1);
+          } else if ((e.key === '+' || e.key === '=') && cartHighlightedIndex >= 0) {
+            e.preventDefault();
+            const item = cart[cartHighlightedIndex];
+            if (item) updateQty(item.id, item.batchKey, 1);
+          } else if ((e.key === '-' || e.key === '_') && cartHighlightedIndex >= 0) {
+            e.preventDefault();
+            const item = cart[cartHighlightedIndex];
+            if (item) updateQty(item.id, item.batchKey, -1);
+          } else if (e.key === 'Delete' && cartHighlightedIndex >= 0) {
+            e.preventDefault();
+            const item = cart[cartHighlightedIndex];
+            if (item) {
+              removeFromCart(item.id, item.batchKey);
+              setCartHighlightedIndex(prev => Math.max(0, prev - 1));
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setFocusedSection('search');
+            itemSearchRef.current?.focus();
+            setCartHighlightedIndex(-1);
+          }
+        }}
+      >
+            <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
+              <ShoppingCart className="text-primary"/> 
+              Current Order
+              {focusedSection === 'cart' && cart.length > 0 && (
+                <span className="text-xs font-normal text-primary ml-auto animate-pulse">
+                  ↑↓ Navigate | +/- Qty | Del Remove | ← Search | → Patient | Esc Back
+                </span>
+              )}
+            </h2>
             {cart.length === 0 ? <div className="text-center text-gray-400 py-10">Cart is empty. Search items above to add.</div> : (
                   <table className="w-full text-left">
                       <thead>
@@ -660,12 +1039,19 @@ const SalesEntry = () => {
                         </tr>
                       </thead>
                       <tbody>
-                            {cart.map(item => (
-                                <tr key={item.id} className="border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-750">
+                            {cart.map((item, idx) => (
+                                <tr 
+                                  key={`${item.id}-${item.batchKey}-${idx}`}
+                                  className={`border-b last:border-0 transition-all ${
+                                    focusedSection === 'cart' && cartHighlightedIndex === idx
+                                      ? 'bg-primary/10 ring-2 ring-primary ring-inset scale-[1.01]'
+                                      : 'hover:bg-gray-50 dark:hover:bg-gray-750'
+                                  }`}
+                                >
                                       <td className="py-3 font-bold text-xs">{item.name}</td>
                                       <td className="py-3 text-center">
                                           <div className="flex justify-center gap-2 items-center">
-                                                <button onClick={() => updateQty(item.id, -1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Minus size={14}/></button>
+                                                <button onClick={() => updateQty(item.id, item.batchKey, -1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Minus size={14}/></button>
                                                 <input 
                                                     type="number"
                                                     value={item.qty}
@@ -673,12 +1059,12 @@ const SalesEntry = () => {
                                                     onBlur={() => handleQtyBlur(item.id)}
                                                     className="w-12 text-center text-xs font-bold border border-gray-200 rounded focus:border-primary outline-none py-1 mx-1" 
                                                 />
-                                                <button onClick={() => updateQty(item.id, 1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Plus size={14}/></button>
+                                                <button onClick={() => updateQty(item.id, item.batchKey, 1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Plus size={14}/></button>
                                           </div>
                                       </td>
                                       <td className="py-3 text-right text-xs">₹{item.rate}</td>
                                       <td className="py-3 text-right text-xs font-bold">₹{item.amount.toFixed(2)}</td>
-                                      <td className="py-3 text-right"><button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button></td>
+                                      <td className="py-3 text-right"><button onClick={() => removeFromCart(item.id, item.batchKey)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button></td>
                                 </tr>
                             ))}
                       </tbody>
@@ -740,7 +1126,11 @@ const SalesEntry = () => {
                                         setShowExtraDetails(true);
                                         paymentSelectRef.current?.focus();
                                     }}
-                                    className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                    className={`p-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors ${
+                                        customerHighlightedIndex === filteredCustomers.indexOf(c)
+                                            ? 'bg-primary/10 ring-2 ring-primary ring-inset'
+                                            : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                    }`}
                                 >
                                     <p className="font-bold text-sm">{c.name}</p>
                                     <p className="text-xs text-gray-500">{c.phone}</p>
@@ -776,9 +1166,25 @@ const SalesEntry = () => {
                                         ref={patientNameRef}
                                         placeholder="Patient Name" 
                                         value={patientDetails.name} 
-                                        onFocus={() => setShowPatientNameSuggestions(true)}
+                                        onFocus={() => {
+                                          setShowPatientNameSuggestions(true);
+                                          setFocusedSection('patient');
+                                        }}
                                         onBlur={() => setTimeout(() => setShowPatientNameSuggestions(false), 200)}
-                                        onKeyDown={handlePatientNameKeyDown}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'ArrowDown') {
+                                            e.preventDefault();
+                                            patientAgeRef.current?.focus();
+                                          } else if (e.key === 'ArrowRight') {
+                                            e.preventDefault();
+                                            patientMobileRef.current?.focus();
+                                          } else if (e.key === 'Tab') {
+                                            e.preventDefault();
+                                            patientMobileRef.current?.focus();
+                                          } else {
+                                            handlePatientNameKeyDown(e);
+                                          }
+                                        }}
                                         onChange={e => {
                                             const val = e.target.value;
                                             setPatientDetails({...patientDetails, name: val});
@@ -816,9 +1222,26 @@ const SalesEntry = () => {
                                         ref={patientMobileRef}
                                         placeholder="Mobile" 
                                         value={patientDetails.mobile} 
-                                        onFocus={() => setShowPatientMobileSuggestions(true)}
+                                        onFocus={() => {
+                                          setShowPatientMobileSuggestions(true);
+                                          setFocusedSection('patient');
+                                        }}
                                         onBlur={() => setTimeout(() => setShowPatientMobileSuggestions(false), 200)}
-                                        onKeyDown={handlePatientMobileKeyDown}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'ArrowDown') {
+                                            e.preventDefault();
+                                            // Focus gender select or age? Age is below name, Gender is below Mobile
+                                            document.getElementById('patient-gender-select')?.focus();
+                                          } else if (e.key === 'ArrowLeft') {
+                                            e.preventDefault();
+                                            patientNameRef.current?.focus();
+                                          } else if (e.key === 'Tab') {
+                                            e.preventDefault();
+                                            patientAgeRef.current?.focus();
+                                          } else {
+                                            handlePatientMobileKeyDown(e);
+                                          }
+                                        }}
                                         onChange={e => {
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                                             setPatientDetails({...patientDetails, mobile: val});
@@ -861,25 +1284,135 @@ const SalesEntry = () => {
                                         const val = e.target.value.replace(/\D/g, '').slice(0, 3);
                                         setPatientDetails({...patientDetails, age: val});
                                     }} 
-                                    onKeyDown={(e) => e.key === 'Enter' && paymentSelectRef.current?.focus()}
+                                    onFocus={() => setFocusedSection('patient')}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        paymentSelectRef.current?.focus();
+                                      } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        patientNameRef.current?.focus();
+                                      } else if (e.key === 'ArrowRight') {
+                                        e.preventDefault();
+                                        document.getElementById('patient-gender-select')?.focus();
+                                      } else if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        document.getElementById('patient-address-input')?.focus();
+                                      } else if (e.key === 'Tab') {
+                                        e.preventDefault();
+                                        document.getElementById('patient-gender-select')?.focus();
+                                      }
+                                    }}
                                     className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
                                 />
-                                <select value={patientDetails.gender} onChange={e => setPatientDetails({...patientDetails, gender: e.target.value})} className="col-span-2 w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary">
+                                <select 
+                                    ref={patientGenderRef}
+                                    id="patient-gender-select"
+                                    value={patientDetails.gender} 
+                                    onChange={e => setPatientDetails({...patientDetails, gender: e.target.value})} 
+                                    onFocus={() => setFocusedSection('patient')}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        patientMobileRef.current?.focus();
+                                      } else if (e.key === 'ArrowLeft') {
+                                        e.preventDefault();
+                                        patientAgeRef.current?.focus();
+                                      } else if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        patientAddressRef.current?.focus();
+                                      } else if (e.key === 'Tab') {
+                                        e.preventDefault();
+                                        patientAddressRef.current?.focus();
+                                      }
+                                    }}
+                                    className="col-span-2 w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary"
+                                >
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                     <option value="Other">Other</option>
                                 </select>
                             </div>
-                             <input placeholder="Address" value={patientDetails.address} onChange={e => setPatientDetails({...patientDetails, address: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
+                            <input 
+                              ref={patientAddressRef}
+                              id="patient-address-input"
+                              placeholder="Address" 
+                              value={patientDetails.address} 
+                              onChange={e => setPatientDetails({...patientDetails, address: e.target.value})} 
+                              onFocus={() => setFocusedSection('patient')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  patientAgeRef.current?.focus();
+                                } else if (e.key === 'Tab' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  doctorNameRef.current?.focus();
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  doctorNameRef.current?.focus();
+                                }
+                              }}
+                              className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                            />
                           </div>
 
                          {/* Shipping Info */}
                          <div className="space-y-3">
                              <h4 className="text-xs font-black uppercase text-gray-400">Shipping & Doctor</h4>
                              <div className="grid grid-cols-2 gap-2">
-                                 <input placeholder="Doctor Name" value={patientDetails.doctorName} onChange={e => setPatientDetails({...patientDetails, doctorName: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
-                                 <input placeholder="Doctor Address" value={patientDetails.doctorAddress} onChange={e => setPatientDetails({...patientDetails, doctorAddress: e.target.value})} className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" />
-                             </div>
+                                  <input 
+                                    ref={doctorNameRef}
+                                    placeholder="Doctor Name" 
+                                    value={patientDetails.doctorName} 
+                                    onChange={e => setPatientDetails({...patientDetails, doctorName: e.target.value})} 
+                                    onFocus={() => setFocusedSection('patient')}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'ArrowRight') {
+                                        e.preventDefault();
+                                        doctorAddressRef.current?.focus();
+                                      } else if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        boxCountRef.current?.focus();
+                                      } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        patientAddressRef.current?.focus();
+                                      } else if (e.key === 'Tab' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        doctorAddressRef.current?.focus();
+                                      } else if (e.key === 'Tab' && e.shiftKey) {
+                                        e.preventDefault();
+                                        patientAddressRef.current?.focus();
+                                      }
+                                    }}
+                                    className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                                  />
+                                  <input 
+                                    ref={doctorAddressRef}
+                                    placeholder="Doctor Address" 
+                                    value={patientDetails.doctorAddress} 
+                                    onChange={e => setPatientDetails({...patientDetails, doctorAddress: e.target.value})} 
+                                    onFocus={() => setFocusedSection('patient')}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'ArrowLeft') {
+                                        e.preventDefault();
+                                        doctorNameRef.current?.focus();
+                                      } else if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        polyCountRef.current?.focus();
+                                      } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        patientAddressRef.current?.focus();
+                                      } else if (e.key === 'Tab' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        boxCountRef.current?.focus();
+                                      } else if (e.key === 'Tab' && e.shiftKey) {
+                                        e.preventDefault();
+                                        doctorNameRef.current?.focus();
+                                      }
+                                    }}
+                                    className="w-full p-2 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-primary" 
+                                  />
+                              </div>
                              <div className="bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-600">
                                  <div className="flex gap-4 mb-2">
                                      <label className="flex items-center gap-1 cursor-pointer text-xs font-bold"><input type="radio" name="pack" checked={shippingDetails.packingType === 'Box'} onChange={() => setShippingDetails({...shippingDetails, packingType: 'Box'})}/> Box</label>
@@ -887,10 +1420,50 @@ const SalesEntry = () => {
                                      <label className="flex items-center gap-1 cursor-pointer ml-auto text-xs"><input type="checkbox" checked={shippingDetails.isColdStorage} onChange={e => setShippingDetails({...shippingDetails, isColdStorage: e.target.checked})}/> <span className="text-blue-500 font-bold">Cold ❄️</span></label>
                                  </div>
                                  <div className="grid grid-cols-2 gap-2">
-                                     <input type="number" placeholder="Box Count" value={shippingDetails.boxCount} onChange={e => setShippingDetails({...shippingDetails, boxCount: Number(e.target.value)})} className="w-full p-1.5 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none" />
-                                     <input type="number" placeholder="Poly Count" value={shippingDetails.polyCount} onChange={e => setShippingDetails({...shippingDetails, polyCount: Number(e.target.value)})} className="w-full p-1.5 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none" />
-                                 </div>
-                             </div>
+                                      <input 
+                                        ref={boxCountRef}
+                                        type="number" 
+                                        placeholder="Box Count" 
+                                        value={shippingDetails.boxCount} 
+                                        onChange={e => setShippingDetails({...shippingDetails, boxCount: Number(e.target.value)})} 
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'ArrowUp') {
+                                            e.preventDefault();
+                                            doctorNameRef.current?.focus();
+                                          } else if (e.key === 'ArrowRight') {
+                                            e.preventDefault();
+                                            polyCountRef.current?.focus();
+                                          } else if (e.key === 'Enter' || e.key === 'Tab') {
+                                            e.preventDefault();
+                                            setFocusedSection('payment');
+                                            setTimeout(() => paymentSelectRef.current?.focus(), 50);
+                                          }
+                                        }}
+                                        className="w-full p-1.5 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none" 
+                                      />
+                                      <input 
+                                        ref={polyCountRef}
+                                        type="number" 
+                                        placeholder="Poly Count" 
+                                        value={shippingDetails.polyCount} 
+                                        onChange={e => setShippingDetails({...shippingDetails, polyCount: Number(e.target.value)})} 
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'ArrowUp') {
+                                            e.preventDefault();
+                                            doctorAddressRef.current?.focus();
+                                          } else if (e.key === 'ArrowLeft') {
+                                            e.preventDefault();
+                                            boxCountRef.current?.focus();
+                                          } else if (e.key === 'Enter' || e.key === 'Tab') {
+                                            e.preventDefault();
+                                            setFocusedSection('payment');
+                                            setTimeout(() => paymentSelectRef.current?.focus(), 50);
+                                          }
+                                        }}
+                                        className="w-full p-1.5 text-xs rounded border dark:bg-gray-700 dark:border-gray-600 outline-none" 
+                                      />
+                                  </div>
+                              </div>
                          </div>
                      </div>
                  )}
@@ -906,7 +1479,26 @@ const SalesEntry = () => {
                           ref={paymentSelectRef}
                           value={paymentMode} 
                           onChange={(e) => setPaymentMode(e.target.value)}
-                          onKeyDown={handlePaymentKeyDown}
+                          onFocus={() => setFocusedSection('payment')}
+                          onKeyDown={(e) => {
+                             if (e.key === 'ArrowDown') {
+                               e.preventDefault();
+                               const modes = ['Cash', 'Card', 'UPI', 'Credit', 'Bank Transfer'];
+                               const idx = modes.indexOf(paymentMode);
+                               if (idx < modes.length - 1) setPaymentMode(modes[idx + 1]);
+                             } else if (e.key === 'ArrowUp') {
+                               e.preventDefault();
+                               const modes = ['Cash', 'Card', 'UPI', 'Credit', 'Bank Transfer'];
+                               const idx = modes.indexOf(paymentMode);
+                               if (idx > 0) setPaymentMode(modes[idx - 1]);
+                             } else if (e.key === 'Enter') {
+                               e.preventDefault();
+                               handleProcessSale();
+                             } else if (e.key === 'Tab') {
+                               e.preventDefault();
+                               processBtnRef.current?.focus();
+                             }
+                          }}
                           className="w-full md:w-3/4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-lg font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                       >
                           <option value="Cash">Cash 💵</option>
@@ -915,7 +1507,7 @@ const SalesEntry = () => {
                           <option value="Credit">Credit (Udhaar) ⏳</option>
                           <option value="Bank Transfer">Bank Transfer 🏦</option>
                       </select>
-                      <p className="text-[10px] text-gray-400">Press <span className="font-bold border px-1 rounded">Enter</span> to complete sale</p>
+                      <p className="text-[10px] text-gray-400">Navigate using ↑↓ | Press <span className="font-bold border px-1 rounded">Enter</span> to complete sale</p>
                  </div>
             </div>
 
@@ -946,6 +1538,15 @@ const SalesEntry = () => {
                           ref={processBtnRef}
                           onClick={handleProcessSale} 
                           disabled={cart.length === 0} 
+                          onKeyDown={(e) => {
+                            if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault();
+                              itemSearchRef.current?.focus();
+                            } else if (e.key === 'Tab' && e.shiftKey) {
+                              e.preventDefault();
+                              paymentSelectRef.current?.focus();
+                            }
+                          }}
                           className="w-full bg-primary hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/30 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2"
                       >
                           <CheckCircle size={20} />
