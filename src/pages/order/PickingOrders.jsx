@@ -31,6 +31,7 @@ const PickingOrders = () => {
     const [batches, setBatches] = useState({});
     const [selectedBatches, setSelectedBatches] = useState({});
     const [loadingBatches, setLoadingBatches] = useState(false);
+    const [batchModalData, setBatchModalData] = useState(null); // { batchData, autoSelected }
 
     // QR Detail Modal State
     const [showQRModal, setShowQRModal] = useState(false);
@@ -227,50 +228,130 @@ const PickingOrders = () => {
         window.print();
     };
 
-    const fetchBatchesForOrder = async () => {
-        if (!selectedOrder) return;
+    const fetchBatchesForOrder = async (orderToFetch) => {
+        const order = orderToFetch || selectedOrder;
+        if (!order) return null;
         setLoadingBatches(true);
         try {
             const batchData = {};
-            for (const item of selectedOrder.items) {
-                const { data } = await api.get(`/batches/product/${item.product._id}`);
-                if (data.success) {
-                    batchData[item.product._id] = data.batches;
+            const autoSelected = {};
+            for (const item of order.items) {
+                const pid = String(item.product?._id || item.product || "");
+                if (!pid) continue;
+                try {
+                    const { data } = await api.get(`/batches/product/${pid}`);
+                    if (data.success) {
+                        let pBatches = data.batches || [];
+                        
+                        // Handle products with quantity but NO batch records (legacy/unbatched)
+                        if (pBatches.length === 0 && (item.product?.quantity > 0)) {
+                            pBatches = [{
+                                _id: 'PRODUCT_LEVEL',
+                                batchNumber: item.product.batchNumber || 'Product Stock',
+                                expiryDate: item.product.expiryDate || 'N/A',
+                                quantity: item.product.quantity,
+                                rackLocation: item.product.rackLocation || item.product.rackLocation || 'N/A'
+                            }];
+                        }
+
+                        batchData[pid] = pBatches;
+                        // Auto-select if there is exactly one batch (real or virtual)
+                        if (pBatches.length === 1) {
+                            autoSelected[pid] = pBatches[0]._id;
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Error fetching batches for product ${pid}:`, err);
                 }
             }
             setBatches(batchData);
+            setSelectedBatches(autoSelected);
+            return { batchData, autoSelected };
         } catch (error) {
             console.error('Failed to fetch batches:', error);
             Swal.fire('Error', 'Failed to load batch information', 'error');
+            return null;
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+    // Shared function to finalize move to QC
+    const finalizeOrderMoveToQC = async (orderId, batchAssignments) => {
+        try {
+            setLoadingBatches(true);
+            await api.put(`/orders/${orderId}/assign-batches`, { batchAssignments });
+            await api.put(`/orders/${orderId}/status`, { status: 'Quality Check' });
+            
+            setOrders(prev => prev.filter(o => o._id !== orderId));
+            setShowBatchModal(false);
+            setShowModal(false);
+            setShowQRModal(false);
+            setQrModalData(null);
+            setSelectedBatches({});
+            setScanSuccess(false);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Moved to QC!',
+                text: 'Order successfully moved to QC stage.',
+                timer: 1500,
+                showConfirmButton: false,
+                customClass: { container: 'z-[100001]' }
+            });
+            return true;
+        } catch (error) {
+            console.error('Finalize QC Move failed:', error);
+            Swal.fire('Error', 'Failed to move to QC', 'error');
+            return false;
         } finally {
             setLoadingBatches(false);
         }
     };
 
-    const handleMarkAsPicked = () => {
-        // Open batch selection modal
-        fetchBatchesForOrder();
-        setShowBatchModal(true);
-    };
 
-    const handleBatchAssignment = async () => {
-        // Validate all items have batch selected
-        const missingBatches = selectedOrder.items.filter(item => !selectedBatches[item.product._id]);
+    const handleBatchAssignment = async (bdOverride, skipFlowConfirm = false) => {
+        const bd = bdOverride || batches;
+        const currentSelected = selectedBatches;
+        
+        // Final sanity check on items and their batches
+        const missingBatches = selectedOrder.items.filter(item => {
+            const pid = String(item.product?._id || item.product || "");
+            const productBatches = bd[pid] || [];
+            
+            // 1. Single batch available? Auto-accept.
+            if (productBatches.length === 1) return false;
+            
+            // 2. Multiple batches? Check if one is manually selected or was auto-selected
+            if (productBatches.length > 1) {
+                return !currentSelected[pid];
+            }
+            
+            // 3. No batches? Mark as missing/incomplete
+            return true;
+        });
+
         if (missingBatches.length > 0) {
-            Swal.fire('Incomplete', 'Please select batch for all items', 'warning');
+            Swal.fire({ 
+                title: 'Incomplete', 
+                text: 'Some items need a batch selection or are out of stock. Please check all items.', 
+                icon: 'warning', 
+                customClass: { container: 'z-[100001]' } 
+            });
+            setShowBatchModal(true);
             return;
         }
 
-        // Build QR modal data from selected batches
         const batchDetails = selectedOrder.items.map(item => {
-            const batchId = selectedBatches[item.product._id];
-            const batchInfo = batches[item.product._id]?.find(b => b._id === batchId);
+            const pid = String(item.product?._id || item.product || "");
+            const productBatches = bd[pid] || [];
+            const bId = productBatches.length === 1 ? productBatches[0]._id : currentSelected[pid];
+            const batchInfo = productBatches.find(b => b._id === bId);
             return {
-                productId: item.product._id,
+                productId: pid,
                 productName: item.productName,
                 sku: item.product?.sku || 'N/A',
                 quantity: item.quantity,
-                batchId,
+                batchId: bId,
                 batchNumber: batchInfo?.batchNumber || 'N/A',
                 expiryDate: batchInfo?.expiryDate,
                 mrp: batchInfo?.mrp || 0,
@@ -279,7 +360,23 @@ const PickingOrders = () => {
             };
         });
 
-        // QR code payload - scan karne par yahi data milega
+        // Calculate all items have single batch
+        const isAllSingle = selectedOrder.items.every(item => {
+            const pid = String(item.product?._id || item.product);
+            return (bd[pid] || []).length === 1;
+        });
+
+        // Direct Execution if skipFlowConfirm or if user is in "Direct" mode
+        if (skipFlowConfirm || isAllSingle) {
+            const batchAssignments = batchDetails.map((b, idx) => ({
+                itemIndex: idx,
+                batchId: b.batchId,
+                quantity: b.quantity
+            }));
+            await finalizeOrderMoveToQC(selectedOrder._id, batchAssignments);
+            return;
+        }
+
         const qrPayload = JSON.stringify({
             orderId: selectedOrder._id,
             action: 'MOVE_TO_QC',
@@ -294,38 +391,40 @@ const PickingOrders = () => {
         setTimeout(() => scanInputRef.current?.focus(), 300);
     };
 
+    const handleMarkAsPicked = async () => {
+        setLoadingBatches(true);
+        // Force a fresh fetch if we are not 100% sure we have all items
+        const result = await fetchBatchesForOrder();
+        if (!result) { setLoadingBatches(false); return; }
+        const bd = result.batchData;
+        const isFullySelected = selectedOrder.items.every(item => {
+            const pid = String(item.product?._id || item.product || "");
+            const productBatches = bd[pid] || [];
+            // Auto-accept if single batch exists
+            if (productBatches.length === 1) return true;
+            // For multiple batches, check either the current state or the fresh autoSelected result
+            if (productBatches.length > 1) {
+                return selectedBatches[pid] || result.autoSelected[pid];
+            }
+            return false; // Zero batches
+        });
+
+        if (isFullySelected) {
+            await handleBatchAssignment(bd, true);
+        } else {
+            setShowBatchModal(true);
+        }
+        setLoadingBatches(false);
+    };
+
     const handleMoveToQC = async () => {
         if (!qrModalData) return;
-        try {
-            setLoadingBatches(true);
-            const batchAssignments = qrModalData.batchDetails.map(b => ({
-                productId: b.productId,
-                batchId: b.batchId,
-                quantity: b.quantity
-            }));
-            await api.post(`/orders/${qrModalData.order._id}/assign-batches`, { batches: batchAssignments });
-            await api.put(`/orders/${qrModalData.order._id}/status`, { status: 'Quality Check' });
-            
-            setOrders(prev => prev.filter(o => o._id !== qrModalData.order._id));
-            setShowQRModal(false);
-            setShowModal(false);
-            setQrModalData(null);
-            setSelectedBatches({});
-            setScanSuccess(false);
-            Swal.fire({
-                icon: 'success',
-                title: 'Moved to Quality Check!',
-                text: 'Order successfully moved to QC stage.',
-                timer: 1500,
-                showConfirmButton: false,
-                customClass: { container: 'z-[100001]' }
-            });
-        } catch (error) {
-            console.error('Move to QC failed:', error);
-            Swal.fire('Error', error.response?.data?.message || 'Failed to move to QC', 'error');
-        } finally {
-            setLoadingBatches(false);
-        }
+        const batchAssignments = qrModalData.batchDetails.map((b, idx) => ({
+            itemIndex: idx,
+            batchId: b.batchId,
+            quantity: b.quantity
+        }));
+        await finalizeOrderMoveToQC(qrModalData.order._id, batchAssignments);
     };
 
     // QR scan handler - jab scanner se scan ho
@@ -579,7 +678,13 @@ const PickingOrders = () => {
                                         </td>
                                         <td className="px-6 py-4 font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
                                             <button 
-                                                onClick={() => { setSelectedOrder(order); setShowModal(true); }}
+                                                onClick={() => { 
+                                                    setBatches({});
+                                                    setSelectedBatches({});
+                                                    setSelectedOrder(order); 
+                                                    setShowModal(true); 
+                                                    fetchBatchesForOrder(order);
+                                                }}
                                                 className="hover:underline"
                                             >
                                                 {order._id.substr(-12).toUpperCase()}
@@ -598,7 +703,13 @@ const PickingOrders = () => {
                                         <td className="px-6 py-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{order.city}</td>
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
                                             <button 
-                                                onClick={() => { setSelectedOrder(order); setShowModal(true); }}
+                                                onClick={() => { 
+                                                    setBatches({});
+                                                    setSelectedBatches({});
+                                                    setSelectedOrder(order); 
+                                                    setShowModal(true); 
+                                                    fetchBatchesForOrder(order);
+                                                }}
                                                 className="text-gray-400 hover:text-orange-500 p-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
                                             >
                                                 <Eye size={18} />
@@ -720,34 +831,87 @@ const PickingOrders = () => {
                                         <th className="p-3">Product Name</th>
                                         <th className="p-3 text-center">Prescription</th>
                                         <th className="p-3 text-center">Required Qty</th>
-                                        <th className="p-3">Bin Location</th>
+                                        <th className="p-3 text-center">Bin Location</th>
+                                        <th className="p-3 text-center">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                    {selectedOrder.items.map((item, i) => (
-                                        <tr key={i}>
-                                            <td className="p-3 font-medium">
-                                                <p className="text-gray-800 dark:text-gray-200">{item.productName}</p>
-                                                <p className="text-[10px] text-gray-400">SKU: {item.product?.sku || 'N/A'}</p>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                {item.product?.isPrescriptionRequired
-                                                    ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
-                                                    : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
-                                                }
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <span className="bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-800 dark:text-gray-200 rounded-full font-black text-lg">
-                                                    {item.quantity}
-                                                </span>
-                                            </td>
-                                            <td className="p-3">
-                                                <span className="font-mono text-xs bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 px-2 py-1 rounded border border-cyan-100 dark:border-cyan-800">
-                                                    {item.product?.rackLocation || 'TBD'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {selectedOrder.items.map((item, i) => {
+                                        const pid = String(item.product?._id || item.product);
+                                        const productBatches = batches[pid] || [];
+                                        const isPicked = selectedBatches[pid];
+                                        return (
+                                            <tr key={i} className={isPicked ? 'bg-orange-50/20 dark:bg-orange-900/10' : ''}>
+                                                <td className="p-3 font-medium">
+                                                    <p className="text-gray-800 dark:text-gray-200">{item.productName}</p>
+                                                    <p className="text-[10px] text-gray-400">SKU: {item.product?.sku || 'N/A'}</p>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    {item.product?.isPrescriptionRequired
+                                                        ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
+                                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
+                                                    }
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className="bg-gray-100 dark:bg-gray-800 px-3 py-1 text-gray-800 dark:text-gray-200 rounded-full font-black text-lg">
+                                                        {item.quantity}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className="font-mono text-xs bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 px-2 py-1 rounded border border-cyan-100 dark:border-cyan-800">
+                                                        {item.product?.rackLocation || 'TBD'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    {loadingBatches ? (
+                                                        <span className="flex items-center justify-center gap-1 text-[10px] text-gray-400">
+                                                            <RefreshCw className="w-3 h-3 animate-spin" /> Fetching...
+                                                        </span>
+                                                    ) : productBatches.length === 0 ? (
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-[10px] font-black uppercase text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-100">Zero Stock</span>
+                                                            <span className="text-[10px] text-gray-400">Available: {item.product?.quantity || 0}</span>
+                                                        </div>
+                                                    ) : isPicked ? (
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-black uppercase border border-green-200">
+                                                                Done
+                                                            </span>
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    const result = await fetchBatchesForOrder();
+                                                                    if (result) setShowBatchModal(true);
+                                                                }}
+                                                                className="text-[9px] font-black uppercase text-orange-600 hover:underline"
+                                                            >
+                                                                Change
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            disabled={loadingBatches}
+                                                            onClick={async () => {
+                                                                let currentBatches = productBatches;
+                                                                if (currentBatches.length === 0) {
+                                                                    const result = await fetchBatchesForOrder();
+                                                                    if (result) currentBatches = result.batchData[pid] || [];
+                                                                }
+                                                                
+                                                                if (currentBatches.length === 1) {
+                                                                    setSelectedBatches(prev => ({ ...prev, [pid]: currentBatches[0]._id }));
+                                                                } else {
+                                                                    setShowBatchModal(true);
+                                                                }
+                                                            }}
+                                                            className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1 mx-auto disabled:opacity-50"
+                                                        >
+                                                            Pick
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                             
@@ -878,26 +1042,55 @@ const PickingOrders = () => {
                                 <div className="text-center py-10 text-gray-500">Loading batches...</div>
                             ) : (
                                 <div className="space-y-6">
-                                    {selectedOrder.items.map((item, idx) => (
+                                    {selectedOrder.items.map((item, idx) => {
+                                        const pid = String(item.product?._id || item.product);
+                                        const bd = batchModalData?.batchData || batches;
+                                        const productBatches = bd[pid] || [];
+                                        const isSingleBatch = productBatches.length === 1;
+                                        const autoBatch = isSingleBatch ? productBatches[0] : null;
+                                        return (
                                         <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div>
                                                     <h3 className="font-bold text-gray-800 dark:text-white">{item.productName}</h3>
                                                     <p className="text-xs text-gray-500">SKU: {item.product?.sku} | Required Qty: {item.quantity}</p>
                                                 </div>
-                                                {selectedBatches[item.product._id] && (
-                                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">✓ Selected</span>
-                                                )}
+                                                {isSingleBatch ? (
+                                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">Auto Selected</span>
+                                                ) : selectedBatches[pid] ? (
+                                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">&#10003; Selected</span>
+                                                ) : null}
                                             </div>
-                                            
-                                            {batches[item.product._id]?.length > 0 ? (
+
+                                            {isSingleBatch ? (
+                                                <div className="flex items-center gap-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                                    <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                                        <div>
+                                                            <p className="text-gray-500 text-[10px] uppercase">Batch No.</p>
+                                                            <p className="font-mono font-bold text-gray-800 dark:text-white">{autoBatch.batchNumber}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 text-[10px] uppercase">Expiry</p>
+                                                            <p className="font-bold text-gray-800 dark:text-white">{moment(autoBatch.expiryDate).format('MMM YYYY')}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 text-[10px] uppercase">Stock</p>
+                                                            <p className={`font-bold ${autoBatch.quantity >= item.quantity ? 'text-green-600' : 'text-red-600'}`}>{autoBatch.quantity}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 text-[10px] uppercase">Location</p>
+                                                            <p className="font-bold text-cyan-600">{autoBatch.rackLocation || 'N/A'}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : productBatches.length > 1 ? (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    {batches[item.product._id].map(batch => (
-                                                        <div 
+                                                    {productBatches.map(batch => (
+                                                        <div
                                                             key={batch._id}
-                                                            onClick={() => setSelectedBatches(prev => ({ ...prev, [item.product._id]: batch._id }))}
+                                                            onClick={() => setSelectedBatches(prev => ({ ...prev, [pid]: batch._id }))}
                                                             className={`p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                                                selectedBatches[item.product._id] === batch._id
+                                                                selectedBatches[pid] === batch._id
                                                                     ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                                                                     : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
                                                             }`}
@@ -906,9 +1099,7 @@ const PickingOrders = () => {
                                                                 <span className="font-mono text-xs font-bold text-gray-700 dark:text-gray-300">{batch.batchNumber}</span>
                                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                                                     batch.quantity >= item.quantity ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                                }`}>
-                                                                    Stock: {batch.quantity}
-                                                                </span>
+                                                                }`}>Stock: {batch.quantity}</span>
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                                 <div>
@@ -921,7 +1112,7 @@ const PickingOrders = () => {
                                                                 </div>
                                                             </div>
                                                             {batch.quantity < item.quantity && (
-                                                                <p className="text-red-600 text-[10px] font-bold mt-2">⚠ Insufficient stock</p>
+                                                                <p className="text-red-600 text-[10px] font-bold mt-2">&#9888; Insufficient stock</p>
                                                             )}
                                                         </div>
                                                     ))}
@@ -930,7 +1121,8 @@ const PickingOrders = () => {
                                                 <div className="text-center py-4 text-gray-500 text-sm">No batches available for this product</div>
                                             )}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -956,140 +1148,108 @@ const PickingOrders = () => {
             )}
             {/* QR Detail Modal */}
             {showQRModal && qrModalData && createPortal(
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[95vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border-2 border-orange-400">
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
                         
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 flex justify-between items-center bg-gradient-to-r from-orange-500 to-amber-500">
-                            <div>
-                                <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-                                    <QrCode size={22} /> Batch Confirmed — Scan to Move to QC
-                                </h2>
-                                <p className="text-xs text-orange-100 font-medium mt-1">
-                                    Order #{qrModalData.order._id.substr(-8).toUpperCase()} · {qrModalData.batchDetails.length} item{qrModalData.batchDetails.length > 1 ? 's' : ''}
-                                </p>
+                        <div className="px-5 py-3.5 flex justify-between items-center border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                                    <QrCode size={16} className="text-orange-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-black text-gray-800 dark:text-white">Batch Confirmed</p>
+                                    <p className="text-[10px] text-gray-400">Order #{qrModalData.order._id.substr(-8).toUpperCase()}</p>
+                                </div>
                             </div>
-                            <button onClick={() => { setShowQRModal(false); setQrModalData(null); }} className="text-white/70 hover:text-white transition-colors">
-                                <X size={24} />
+                            <button onClick={() => { setShowQRModal(false); setQrModalData(null); }} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                            
-                            {/* Left: SKU + Batch Details */}
-                            <div className="flex-1 p-6 overflow-y-auto border-r border-gray-200 dark:border-gray-700">
-                                <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-4 flex items-center gap-2">
-                                    <Package size={14} /> Selected Batch Details
-                                </h3>
-                                <div className="space-y-4">
-                                    {qrModalData.batchDetails.map((item, idx) => (
-                                        <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gray-50 dark:bg-gray-800">
-                                            {/* Product Header */}
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div>
-                                                    <p className="font-black text-gray-800 dark:text-white text-sm">{item.productName}</p>
-                                                    <p className="text-[10px] font-mono text-orange-600 dark:text-orange-400 font-bold mt-0.5">SKU: {item.sku}</p>
-                                                </div>
-                                                <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg text-xs font-black">
-                                                    Qty: {item.quantity}
-                                                </span>
-                                            </div>
-                                            {/* Batch Info Grid */}
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
-                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Batch No.</p>
-                                                    <p className="font-mono font-black text-gray-800 dark:text-white text-sm mt-0.5">{item.batchNumber}</p>
-                                                </div>
-                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
-                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Expiry</p>
-                                                    <p className={`font-bold text-sm mt-0.5 ${
-                                                        item.expiryDate && new Date(item.expiryDate) < new Date(Date.now() + 90*24*60*60*1000)
-                                                            ? 'text-red-600' : 'text-gray-800 dark:text-white'
-                                                    }`}>
-                                                        {item.expiryDate ? moment(item.expiryDate).format('MMM YYYY') : 'N/A'}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
-                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">MRP</p>
-                                                    <p className="font-black text-gray-800 dark:text-white text-sm mt-0.5">₹{item.mrp}</p>
-                                                </div>
-                                                <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-gray-100 dark:border-gray-700">
-                                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Rack Location</p>
-                                                    <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm mt-0.5 flex items-center gap-1">
-                                                        <MapPin size={11} />{item.rackLocation}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {/* Stock warning */}
-                                            {item.availableQty < item.quantity && (
-                                                <div className="mt-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                                                    <p className="text-red-600 text-[10px] font-bold">⚠ Available: {item.availableQty} | Required: {item.quantity}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                        <div className="p-5 space-y-4">
+                            {/* Batch Items - compact table */}
+                            <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="bg-gray-50 dark:bg-gray-800 text-gray-500 uppercase">
+                                            <th className="px-3 py-2 text-left font-black tracking-wide">Product</th>
+                                            <th className="px-3 py-2 text-center font-black tracking-wide">Batch</th>
+                                            <th className="px-3 py-2 text-center font-black tracking-wide">Expiry</th>
+                                            <th className="px-3 py-2 text-center font-black tracking-wide">Qty</th>
+                                            <th className="px-3 py-2 text-center font-black tracking-wide">Rack</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                        {qrModalData.batchDetails.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                                                <td className="px-3 py-2.5">
+                                                    <p className="font-bold text-gray-800 dark:text-white truncate max-w-[120px]">{item.productName}</p>
+                                                    <p className="text-[9px] text-orange-500 font-mono">{item.sku}</p>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-center font-mono font-bold text-gray-700 dark:text-gray-300">{item.batchNumber}</td>
+                                                <td className={`px-3 py-2.5 text-center font-bold ${
+                                                    item.expiryDate && new Date(item.expiryDate) < new Date(Date.now() + 90*24*60*60*1000) ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'
+                                                }`}>
+                                                    {item.expiryDate ? moment(item.expiryDate).format('MMM YY') : 'N/A'}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                                                        item.availableQty < item.quantity ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'
+                                                    }`}>{item.quantity}</span>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-center font-bold text-cyan-600 dark:text-cyan-400">{item.rackLocation}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            {/* Right: QR Code + Scan */}
-                            <div className="w-full md:w-80 p-6 flex flex-col items-center gap-5 bg-gray-50 dark:bg-gray-800/50">
-                                
+                            {/* QR + Scan row */}
+                            <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
                                 {/* QR Code */}
-                                <div className="bg-white dark:bg-white p-4 rounded-2xl shadow-lg border-4 border-orange-400">
-                                    <QRCodeSVG
-                                        value={qrModalData.qrPayload}
-                                        size={200}
-                                        level="H"
-                                        includeMargin={false}
-                                        fgColor="#1a1a1a"
-                                    />
+                                <div className="bg-white p-2 rounded-xl border-2 border-orange-300 shrink-0">
+                                    <QRCodeSVG value={qrModalData.qrPayload} size={100} level="H" fgColor="#1a1a1a" />
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Scan to Move to QC</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">Order: #{qrModalData.order._id.substr(-8).toUpperCase()}</p>
-                                </div>
-
-                                {/* Scan Input (hidden, for scanner) */}
-                                <div className="w-full">
-                                    <div className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                                        scanSuccess 
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
-                                            : 'border-orange-300 bg-white dark:bg-gray-900 focus-within:border-orange-500'
+                                {/* Scan input + info */}
+                                <div className="flex-1 space-y-2">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Scan QR to move to QC</p>
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                                        scanSuccess ? 'border-green-500 bg-green-50' : 'border-orange-200 bg-white dark:bg-gray-900 focus-within:border-orange-400'
                                     }`}>
-                                        <ScanLine size={18} className={scanSuccess ? 'text-green-500' : 'text-orange-500'} />
+                                        <ScanLine size={14} className={scanSuccess ? 'text-green-500' : 'text-orange-400'} />
                                         <input
                                             ref={scanInputRef}
                                             type="text"
                                             value={scanInput}
                                             onChange={handleScanInput}
                                             onKeyDown={handleScanKeyDown}
-                                            placeholder={scanSuccess ? '✓ Scanned!' : 'Scan QR here...'}
-                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                                            placeholder={scanSuccess ? '✓ Scanned!' : 'Scan here...'}
+                                            className="flex-1 bg-transparent outline-none text-xs font-bold text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
                                         />
                                     </div>
-                                    <p className="text-[10px] text-gray-400 mt-1.5 text-center">Point scanner at QR code above</p>
+                                    <p className="text-[9px] text-gray-400">Point scanner at QR code</p>
                                 </div>
+                            </div>
 
-                                {/* Divider */}
-                                <div className="w-full flex items-center gap-3">
-                                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                                    <span className="text-[10px] font-black text-gray-400 uppercase">or</span>
-                                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                                </div>
-
-                                {/* Manual Move Button */}
+                            {/* Footer buttons */}
+                            <div className="flex items-center gap-3 pt-1">
+                                <button
+                                    onClick={() => { setShowQRModal(false); setQrModalData(null); }}
+                                    className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-xl text-xs font-black uppercase hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                                >
+                                    Cancel
+                                </button>
                                 <button
                                     onClick={handleMoveToQC}
                                     disabled={loadingBatches}
-                                    className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black rounded-xl shadow-lg shadow-orange-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-wide"
+                                    className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-orange-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {loadingBatches ? (
-                                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processing...</>
-                                    ) : (
-                                        <><CheckCircle size={18} /> Move to QC Manually</>
-                                    )}
+                                    {loadingBatches
+                                        ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processing...</>
+                                        : <><CheckCircle size={14} /> Move to QC</>
+                                    }
                                 </button>
-                                <p className="text-[10px] text-gray-400 text-center -mt-2">Click above if scanner not available</p>
                             </div>
                         </div>
                     </div>
