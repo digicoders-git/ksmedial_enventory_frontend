@@ -42,6 +42,7 @@ const SalesEntry = () => {
   const [highlightedBatchIndex, setHighlightedBatchIndex] = useState(0);
   const [loadingBatches, setLoadingBatches] = useState(false);
   const [cartHighlightedIndex, setCartHighlightedIndex] = useState(-1);
+  const [cartColumnIndex, setCartColumnIndex] = useState(0); // 0: Qty, 1: Remove
   const [focusedSection, setFocusedSection] = useState('search');
   const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
 
@@ -613,25 +614,17 @@ const SalesEntry = () => {
         itemSearchRef.current?.focus();
         setHighlightedIndex(-1);
         setCartHighlightedIndex(-1);
-      } else if (e.key === 'F3' || e.key === 'Tab') {
-        // Only trigger F3/Tab behavior if not inside an input that needs Tab
-        if (e.key === 'F3' || (e.key === 'Tab' && focusedSection === 'search')) {
+      } else if (e.key === 'F3') {
            if (cart.length > 0) {
              e.preventDefault();
              setFocusedSection('cart');
              setCartHighlightedIndex(0);
-           } else {
-             e.preventDefault();
-             setFocusedSection('patient');
-             setShowExtraDetails(true);
-             setTimeout(() => patientNameRef.current?.focus(), 100);
            }
-        }
       } else if (e.key === 'F4') {
         e.preventDefault();
         setFocusedSection('patient');
         setShowExtraDetails(true);
-        setTimeout(() => patientNameRef.current?.focus(), 100);
+        setTimeout(() => customerInputRef.current?.focus(), 100);
       } else if (e.key === 'F5') {
         e.preventDefault();
         setFocusedSection('payment');
@@ -641,7 +634,7 @@ const SalesEntry = () => {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [cart.length, showBatchModal]);
+  }, [cart.length, showBatchModal, focusedSection]);
 
   const handlePatientNameKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -814,7 +807,7 @@ const SalesEntry = () => {
       
       {/* 1. Item Catalog Section */}
       <div className="flex flex-col gap-5 w-full">
-        <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-200/60 dark:border-gray-700 shadow-sm flex flex-col md:flex-row gap-2 items-center shrink-0">
+        <div className={`bg-white dark:bg-gray-800 p-2 rounded-2xl border transition-all ${focusedSection === 'search' ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-gray-200/60 dark:border-gray-700 shadow-sm'} flex flex-col md:flex-row gap-2 items-center shrink-0`}>
            <div className="relative w-full md:w-72 lg:w-80 group shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 group-focus-within:text-primary transition-colors" size={18} />
                 <input 
@@ -853,11 +846,12 @@ const SalesEntry = () => {
                                 e.preventDefault();
                                 setFocusedSection('cart');
                                 setCartHighlightedIndex(0);
+                                setCartColumnIndex(0);
+                                document.getElementById('cart-section-container')?.focus();
                             } else {
                                 e.preventDefault();
-                                setFocusedSection('patient');
-                                setShowExtraDetails(true);
-                                setTimeout(() => patientNameRef.current?.focus(), 100);
+                                setFocusedSection('customer');
+                                customerInputRef.current?.focus();
                             }
                         } else if (e.key === 'ArrowRight' && cart.length > 0) {
                             e.preventDefault();
@@ -971,6 +965,7 @@ const SalesEntry = () => {
 
       {/* 2. Cart Section */}
       <div 
+        id="cart-section-container"
         className={`w-full bg-white dark:bg-gray-800 rounded-2xl border-2 shadow-sm p-4 transition-all ${
           focusedSection === 'cart' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-gray-700'
         }`}
@@ -978,7 +973,16 @@ const SalesEntry = () => {
         onKeyDown={(e) => {
           if (focusedSection !== 'cart' || cart.length === 0) return;
           
-          if (e.key === 'ArrowDown') {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                setFocusedSection('search');
+                itemSearchRef.current?.focus();
+            } else {
+                setFocusedSection('customer');
+                customerInputRef.current?.focus();
+            }
+          } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             setCartHighlightedIndex(prev => prev < cart.length - 1 ? prev + 1 : prev);
           } else if (e.key === 'ArrowUp') {
@@ -986,15 +990,19 @@ const SalesEntry = () => {
             setCartHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
           } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            setFocusedSection('search');
-            itemSearchRef.current?.focus();
-            setCartHighlightedIndex(-1);
-          } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+            setCartColumnIndex(prev => Math.max(0, prev - 1));
+          } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            setFocusedSection('patient');
-            setShowExtraDetails(true);
-            setTimeout(() => patientNameRef.current?.focus(), 100);
-            setCartHighlightedIndex(-1);
+            setCartColumnIndex(prev => Math.min(1, prev + 1));
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (cartColumnIndex === 1 && cartHighlightedIndex >= 0) {
+              const item = cart[cartHighlightedIndex];
+              if (item) {
+                removeFromCart(item.id, item.batchKey);
+                setCartHighlightedIndex(prev => Math.max(0, prev - 1));
+              }
+            }
           } else if ((e.key === '+' || e.key === '=') && cartHighlightedIndex >= 0) {
             e.preventDefault();
             const item = cart[cartHighlightedIndex];
@@ -1023,7 +1031,7 @@ const SalesEntry = () => {
               Current Order
               {focusedSection === 'cart' && cart.length > 0 && (
                 <span className="text-xs font-normal text-primary ml-auto animate-pulse">
-                  ↑↓ Navigate | +/- Qty | Del Remove | ← Search | → Patient | Esc Back
+                  ↑↓ Navigate Rows | ←→ Navigate Cells | +/- Qty | Enter/Del Remove | Tab Next
                 </span>
               )}
             </h2>
@@ -1044,27 +1052,36 @@ const SalesEntry = () => {
                                   key={`${item.id}-${item.batchKey}-${idx}`}
                                   className={`border-b last:border-0 transition-all ${
                                     focusedSection === 'cart' && cartHighlightedIndex === idx
-                                      ? 'bg-primary/10 ring-2 ring-primary ring-inset scale-[1.01]'
+                                      ? 'bg-primary/5 scale-[1.01]'
                                       : 'hover:bg-gray-50 dark:hover:bg-gray-750'
                                   }`}
                                 >
                                       <td className="py-3 font-bold text-xs">{item.name}</td>
                                       <td className="py-3 text-center">
-                                          <div className="flex justify-center gap-2 items-center">
-                                                <button onClick={() => updateQty(item.id, item.batchKey, -1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Minus size={14}/></button>
+                                          <div className={`flex justify-center gap-2 items-center p-1 rounded transition-colors ${focusedSection === 'cart' && cartHighlightedIndex === idx && cartColumnIndex === 0 ? 'ring-2 ring-primary bg-white' : ''}`}>
+                                                <button onClick={() => updateQty(item.id, item.batchKey, -1)} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><Minus size={14}/></button>
                                                 <input 
                                                     type="number"
                                                     value={item.qty}
                                                     onChange={(e) => handleManualQtyChange(item.id, e.target.value)}
                                                     onBlur={() => handleQtyBlur(item.id)}
-                                                    className="w-12 text-center text-xs font-bold border border-gray-200 rounded focus:border-primary outline-none py-1 mx-1" 
+                                                    className="w-12 text-center text-xs font-bold border border-gray-200 rounded outline-none py-1 mx-1" 
+                                                    tabIndex={-1}
                                                 />
-                                                <button onClick={() => updateQty(item.id, item.batchKey, 1)} className="p-1 bg-gray-100 rounded focus:ring-2 focus:ring-primary"><Plus size={14}/></button>
+                                                <button onClick={() => updateQty(item.id, item.batchKey, 1)} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><Plus size={14}/></button>
                                           </div>
                                       </td>
                                       <td className="py-3 text-right text-xs">₹{item.rate}</td>
                                       <td className="py-3 text-right text-xs font-bold">₹{item.amount.toFixed(2)}</td>
-                                      <td className="py-3 text-right"><button onClick={() => removeFromCart(item.id, item.batchKey)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button></td>
+                                      <td className="py-3 text-right">
+                                        <button 
+                                          onClick={() => removeFromCart(item.id, item.batchKey)} 
+                                          className={`p-1.5 rounded transition-colors ${focusedSection === 'cart' && cartHighlightedIndex === idx && cartColumnIndex === 1 ? 'ring-2 ring-red-500 bg-red-50 text-red-600' : 'text-red-400 hover:text-red-600'}`}
+                                          tabIndex={-1}
+                                        >
+                                          <Trash2 size={14}/>
+                                        </button>
+                                      </td>
                                 </tr>
                             ))}
                       </tbody>
@@ -1078,7 +1095,7 @@ const SalesEntry = () => {
       </div>
 
       {/* 3. Customer Section */}
-      <div className="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+      <div className={`w-full bg-white dark:bg-gray-800 rounded-2xl border shadow-sm p-5 transition-all ${focusedSection === 'customer' || focusedSection === 'patient' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-gray-700'}`}>
            <h2 className="text-lg font-bold flex items-center gap-2 mb-4"><User className="text-primary"/> Customer Details</h2>
            <div className="relative">
                 <div className="bg-gray-50 dark:bg-gray-750 rounded-xl p-1 flex items-center border border-gray-200 dark:border-gray-600 focus-within:border-primary ring-focus">
@@ -1499,7 +1516,7 @@ const SalesEntry = () => {
                                processBtnRef.current?.focus();
                              }
                           }}
-                          className="w-full md:w-3/4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-lg font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                          className={`w-full md:w-3/4 bg-gray-50 dark:bg-gray-700 border rounded-xl px-4 py-3 text-lg font-bold outline-none transition-all cursor-pointer ${focusedSection === 'payment' ? 'border-primary ring-4 ring-primary/30 shadow-lg' : 'border-gray-200 dark:border-gray-600'}`}
                       >
                           <option value="Cash">Cash 💵</option>
                           <option value="Card">Card 💳</option>
