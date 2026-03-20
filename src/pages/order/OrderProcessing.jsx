@@ -1,680 +1,512 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
-    Search, Filter, Calendar, RefreshCw, X, Download, 
-    ChevronRight, Play, CheckCircle, AlertCircle, Truck, Package,
-    Layers
+    Search, RefreshCw, X, Play, CheckCircle, AlertCircle, Truck, Package,
+    User as UserIcon, MapPin, Clock, Edit3, PlusCircle, ArrowLeft, ScanLine, QrCode as QrIcon
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
-import Papa from 'papaparse';
 import { createPortal } from 'react-dom';
 
 const OrderProcessing = () => {
-    const [activeTab, setActiveTab] = useState('qc'); // 'qc' or 'packing'
+    const [activeTab, setActiveTab] = useState('qc'); 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Modal State
-    const [showQCModal, setShowQCModal] = useState(false);
+    // Comprehensive Modal State
+    const [showProcessModal, setShowProcessModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [processingQC, setProcessingQC] = useState(false);
+    const [batches, setBatches] = useState({});
+    const [selectedBatches, setSelectedBatches] = useState({});
+    const [loadingBatches, setLoadingBatches] = useState(false);
+    
+    // Batch Picker Modal State
+    const [editingBatchProduct, setEditingBatchProduct] = useState(null);
 
-    // Shared Filters State
-    const [filters, setFilters] = useState({
-        orderId: '',
-        dateRangeStart: '',
-        dateRangeEnd: '',
-        skuName: '', // Relevant for QC
-        vendorRefId: '',
-        orderType: ''
-    });
+    // QR & Scan
+    const [scanInput, setScanInput] = useState('');
+    const [scanSuccess, setScanSuccess] = useState(false);
+    const scanInputRef = useRef(null);
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(25);
+    // Filters
     const [selectedIds, setSelectedIds] = useState([]);
+    const [filters, setFilters] = useState({ orderId: '' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(25);
 
-    useEffect(() => {
-        fetchOrders();
-    }, [activeTab]); // Refetch when tab changes
-
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         try {
             setLoading(true);
             const { data } = await api.get('/orders');
             if (data.success) {
                 let relevantOrders = [];
-                
                 if (activeTab === 'qc') {
-                    relevantOrders = data.orders.filter(o => 
-                        o.status === 'Quality Check' || o.status === 'Under QC'
-                    ).map(order => ({
-                        ...order,
-                        vendorId: order.vendorId || 'N/A',
-                        orderType: order.orderType || 'KS4',
-                        skuCount: order.items.length,
-                        paymentMethod: order.paymentMethod || 'Online',
-                        collectibleAmount: order.total,
-                        skuNames: order.items.map(i => i.productName).join(', ')
-                    }));
+                    relevantOrders = data.orders.filter(o => o.status === 'Quality Check' || o.status === 'Under QC');
                 } else if (activeTab === 'packing') {
-                    relevantOrders = data.orders.filter(o => 
-                        o.status === 'Packing'
-                    ).map(order => ({
-                        ...order,
-                        vendorId: order.vendorId || 'N/A',
-                        orderType: order.orderType || 'KS4',
-                        paymentMethod: order.paymentMethod || 'Online',
-                        collectibleAmount: order.total
-                    }));
+                    relevantOrders = data.orders.filter(o => o.status === 'Packing');
                 }
                 
-                setOrders(relevantOrders);
-                setCurrentPage(1); // Reset to page 1 on tab switch
+                setOrders(relevantOrders.map(order => ({
+                    ...order,
+                    vendorId: order.vendorId || 'N/A',
+                    skuNames: order.items.map(i => i.productName).join(', '),
+                    collectibleAmount: order.total
+                })));
+                setCurrentPage(1);
             }
-        } catch (error) {
-            console.error("Failed to fetch orders:", error);
-            Swal.fire('Error', `Failed to load ${activeTab === 'qc' ? 'Quality Check' : 'Packing'} orders`, 'error');
+        } catch {
+            Swal.fire('Error', 'Failed to load orders', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeTab]);
 
-    // Action: Start QC (Moves to Packing)
-    const handleStartQC = (order) => {
-        setSelectedOrder(order);
-        setShowQCModal(true);
-    };
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
 
-    const confirmQC = async () => {
-        if (!selectedOrder) return;
-        
+    const fetchBatchesForOrder = async (order) => {
+        setLoadingBatches(true);
         try {
-            setProcessingQC(true);
-            const result = await Swal.fire({
-                title: 'Pass Quality Check?',
-                text: "Confirm that all items in this order have been verified.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#10B981',
-                confirmButtonText: 'Yes, Pass QC'
-            });
-
-            if (result.isConfirmed) {
-                await api.put(`/orders/${selectedOrder._id}/status`, { status: 'Packing' });
-                Swal.fire({
-                    title: 'Moved to Packing!',
-                    text: 'Order is now ready for packing.',
-                    icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                setShowQCModal(false);
-                setSelectedOrder(null);
-                fetchOrders(); 
-            }
-        } catch (error) {
-            console.error(error);
-            Swal.fire('Error', 'Failed to update order status', 'error');
-        } finally {
-            setProcessingQC(false);
-        }
-    };
-
-    // Action: Move to Shipping (Moves from Packing to Shipping)
-    const handleMoveToShipping = async (orderId) => {
-        try {
-            const result = await Swal.fire({
-                title: 'Move to Shipping?',
-                text: "Confirm that this order is packed and ready for shipping.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#8B5CF6',
-                confirmButtonText: 'Yes, Move to Shipping'
-            });
-
-            if (result.isConfirmed) {
-                await api.put(`/orders/${orderId}/status`, { status: 'Scanned For Shipping' });
-                Swal.fire({
-                    title: 'Moved to Shipping!',
-                    text: 'Order is now ready for shipping.',
-                    icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                fetchOrders(); 
-            }
-        } catch (error) {
-            console.error(error);
-            const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
-            Swal.fire('Error', `Failed to update status: ${errorMsg}`, 'error');
-        }
-    };
-
-    const handleBulkStatusUpdate = async (newStatus) => {
-        if (selectedIds.length === 0) return;
-
-        try {
-            const { value: confirmed } = await Swal.fire({
-                title: 'Bulk Update Status?',
-                text: `Are you sure you want to move ${selectedIds.length} orders to ${newStatus}?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#003B5C',
-                confirmButtonText: 'Yes, Update All'
-            });
-
-            if (confirmed) {
-                const { data } = await api.put('/orders/bulk-status', {
-                    orderIds: selectedIds,
-                    status: newStatus
-                });
-
+            const batchData = {};
+            const autoSelected = {};
+            for (const item of order.items) {
+                const pid = String(item.product?._id || item.product || "");
+                if (!pid) continue;
+                const { data } = await api.get(`/batches/product/${pid}`);
                 if (data.success) {
-                    Swal.fire('Success', `${selectedIds.length} orders updated successfully`, 'success');
+                    let pBatches = data.batches || [];
+                    if (pBatches.length === 0 && (item.product?.quantity > 0)) {
+                        pBatches = [{
+                            _id: 'PRODUCT_LEVEL',
+                            batchNumber: item.product.batchNumber || 'Stock',
+                            expiryDate: item.product.expiryDate || 'N/A',
+                            quantity: item.product.quantity,
+                            rackLocation: item.product.rackLocation || 'N/A'
+                        }];
+                    }
+                    batchData[pid] = pBatches;
+                    if (pBatches.length === 1) autoSelected[pid] = pBatches[0]._id;
+                }
+            }
+            setBatches(batchData);
+            setSelectedBatches(autoSelected);
+        } catch (error) {
+            console.error('Batch fetch error:', error);
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+
+    const handleOpenProcessModal = async (order) => {
+        setSelectedOrder(order);
+        setEditingBatchProduct(null);
+        setScanSuccess(false);
+        setScanInput('');
+        setShowProcessModal(true);
+        await fetchBatchesForOrder(order);
+        setTimeout(() => scanInputRef.current?.focus(), 800);
+    };
+
+    const isOrderReady = useMemo(() => {
+        if (!selectedOrder) return false;
+        return selectedOrder.items.every(item => {
+            const pid = String(item.product?._id || item.product);
+            return !!selectedBatches[pid];
+        });
+    }, [selectedOrder, selectedBatches]);
+
+    const qrPayload = useMemo(() => {
+        if (!isOrderReady || !selectedOrder) return '';
+        const batchDetails = selectedOrder.items.map(item => {
+            const pid = String(item.product?._id || item.product);
+            const bId = selectedBatches[pid];
+            return { productId: pid, batchId: bId, qty: item.quantity };
+        });
+        return JSON.stringify({ orderId: selectedOrder._id, action: 'PASS_QC', batches: batchDetails });
+    }, [isOrderReady, selectedOrder, selectedBatches]);
+
+    const handleManualPass = async () => {
+        if (!isOrderReady) {
+            return Swal.fire({ title: 'Batches Missing', text: 'Select a batch for each SKU.', icon: 'warning', customClass: { container: 'z-[99999]' } });
+        }
+
+        const result = await Swal.fire({
+            title: 'Manual Pass?',
+            text: 'Move instantly to Packing?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Move',
+            customClass: { container: 'z-[99999]' }
+        });
+
+        if (result.isConfirmed) { await finalizeQC(true); }
+    };
+
+    const handleScanInput = (e) => {
+        const val = e.target.value;
+        if (val.endsWith('\n') || e.nativeEvent?.inputType === 'insertLineBreak') {
+             try {
+                 const parsed = JSON.parse(val.trim());
+                 if (parsed.action === 'PASS_QC' && parsed.orderId === selectedOrder._id) {
+                     setScanSuccess(true);
+                     setTimeout(() => finalizeQC(), 800);
+                 } else {
+                     setScanInput('');
+                     Swal.fire({ icon: 'error', title: 'Invalid', text: 'Invalid QR for this order.', timer: 1500, showConfirmButton: false });
+                 }
+             } catch { setScanInput(''); }
+        } else {
+            setScanInput(val);
+        }
+    };
+
+    const finalizeQC = async (isManual = false) => {
+        const orderId = selectedOrder._id;
+        const currentBatches = batches;
+        const currentSelected = selectedBatches;
+
+        const batchAssignments = selectedOrder.items.map((item, idx) => {
+            const pid = String(item.product?._id || item.product || "");
+            const pBatches = currentBatches[pid] || [];
+            const bId = pBatches.length === 1 ? pBatches[0]._id : currentSelected[pid];
+            return { itemIndex: idx, batchId: bId, quantity: item.quantity };
+        });
+
+        try {
+            await api.put(`/orders/${orderId}/assign-batches`, { batchAssignments });
+            await api.put(`/orders/${orderId}/status`, { status: 'Packing' });
+            Swal.fire({ icon: 'success', title: isManual ? 'Manual Pass' : 'QC Verified', text: 'Order sent to Packing.', timer: 1200, showConfirmButton: false, customClass: { container: 'z-[99999]' } });
+            setShowProcessModal(false);
+            fetchOrders();
+        } catch { Swal.fire('Error', 'Update failed.', 'error'); }
+    };
+
+    const handleMoveToShipping = async (orderId) => {
+        const result = await Swal.fire({ title: 'Ready for shipping?', icon: 'question', showCancelButton: true });
+        if (result.isConfirmed) {
+            try {
+                await api.put(`/orders/${orderId}/status`, { status: 'Scanned For Shipping' });
+                fetchOrders();
+            } catch { Swal.fire('Error', 'Failed', 'error'); }
+        }
+    };
+
+    const paginatedOrders = orders.filter(o => o._id.toLowerCase().includes(filters.orderId.toLowerCase()))
+                                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const handleSelectAll = (e) => setSelectedIds(e.target.checked ? paginatedOrders.map(o => o._id) : []);
+    const handleSelectOne = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+    const handleBulkMove = async () => {
+        if (selectedIds.length === 0) return;
+        const targetStatus = activeTab === 'qc' ? 'Packing' : 'Scanned For Shipping';
+        
+        const result = await Swal.fire({
+            title: `Bulk Move ${selectedIds.length} Orders?`,
+            text: `This will move selected orders to "${targetStatus}". Note: Manual batch verification will be skipped for these orders.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: `Yes, Move to ${targetStatus}`,
+            confirmButtonColor: '#003B5C'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                setLoading(true);
+                const { data } = await api.put('/orders/bulk-status', { 
+                    orderIds: selectedIds, 
+                    status: targetStatus 
+                });
+                if (data.success) {
+                    Swal.fire('Success', `${selectedIds.length} orders moved to ${targetStatus}`, 'success');
                     setSelectedIds([]);
                     fetchOrders();
                 }
+            } catch {
+                Swal.fire('Error', 'Bulk update failed.', 'error');
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Bulk Update Error:", error);
-            Swal.fire('Error', 'Failed to update orders in bulk', 'error');
-        }
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedIds.length === paginatedOrders.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(paginatedOrders.map(o => o._id));
-        }
-    };
-
-    const toggleSelect = (id) => {
-        setSelectedIds(prev => 
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
-    const handleFilterChange = (e) => {
-        const { name, value } = e.target;
-        setFilters(prev => ({ ...prev, [name]: value }));
-        setCurrentPage(1);
-    };
-
-    const clearFilters = () => {
-        setFilters({
-            orderId: '',
-            dateRangeStart: '',
-            dateRangeEnd: '',
-            skuName: '',
-            vendorRefId: '',
-            orderType: ''
-        });
-        setCurrentPage(1);
-    };
-
-    // Filter Logic
-    const filteredOrders = orders.filter(order => {
-        if (filters.orderId && !order._id.toLowerCase().includes(filters.orderId.toLowerCase())) return false;
-        
-        // SKU Name filter only applies for QC usually, but we can keep it generic if data exists
-        if (filters.skuName && activeTab === 'qc' && !order.skuNames?.toLowerCase().includes(filters.skuName.toLowerCase())) return false;
-        
-        if (filters.vendorRefId && !order.vendorId?.toLowerCase().includes(filters.vendorRefId.toLowerCase())) return false;
-        if (filters.orderType && !order.orderType.toLowerCase().includes(filters.orderType.toLowerCase())) return false;
-        
-        if (filters.dateRangeStart && moment(order.createdAt).isBefore(filters.dateRangeStart)) return false;
-        if (filters.dateRangeEnd && moment(order.createdAt).isAfter(filters.dateRangeEnd)) return false;
-
-        return true;
-    });
-
-    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
-    const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-    const handleExport = () => {
-        const csv = Papa.unparse(filteredOrders.map(o => ({
-            'Order ID': o._id,
-            'Vendor ID': o.vendorId,
-            'Status': o.status,
-            'Items': o.items?.length || 0,
-            'Amount': o.collectibleAmount,
-            'Created': moment(o.createdAt).format('YYYY-MM-DD HH:mm')
-        })));
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${activeTab}_list.csv`;
-        a.click();
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Picking': return 'text-orange-600 bg-orange-50 border-orange-200';
-            case 'On Hold': return 'text-amber-600 bg-amber-50 border-amber-200';
-            case 'Packing': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
-            case 'Shipping': return 'text-purple-600 bg-purple-50 border-purple-200';
-            case 'Problem Queue': return 'text-rose-600 bg-rose-50 border-rose-200';
-            case 'delivered': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-            case 'cancelled': return 'text-gray-600 bg-gray-100 border-gray-200';
-            default: return 'text-blue-600 bg-blue-50 border-blue-200';
         }
     };
 
     return (
-        <div className="space-y-6 animate-fade-in pb-10">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Order Processing</h1>
-                    <p className="text-sm text-gray-500 font-medium">Manage Quality Check and Packing stages.</p>
-                </div>
-                
-                {/* Tabs */}
-                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg self-start">
-                    <button 
-                        onClick={() => setActiveTab('qc')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'qc' ? 'bg-white dark:bg-gray-700 shadow text-cyan-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                    >
-                         Quality Check ({activeTab === 'qc' ? orders.length : ''})
+        <div className="p-4 space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center">
+                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <Package className="text-[#003B5C]"/> Order Processing
+                </h1>
+                <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border shadow-inner">
+                    <button onClick={() => setActiveTab('qc')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'qc' ? 'bg-white shadow text-[#003B5C]' : 'text-gray-500'}`}>
+                        QC Queue ({activeTab === 'qc' ? orders.length : ''})
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('packing')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'packing' ? 'bg-white dark:bg-gray-700 shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                    >
+                    <button onClick={() => setActiveTab('packing')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'packing' ? 'bg-white shadow text-[#003B5C]' : 'text-gray-500'}`}>
                         Packing ({activeTab === 'packing' ? orders.length : ''})
                     </button>
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="flex flex-wrap items-end gap-2">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-gray-500">Filter results:</label>
-                        <input name="orderId" placeholder="Order ID" value={filters.orderId} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-32 outline-none focus:ring-1 focus:ring-cyan-500" />
+            <div className="bg-white dark:bg-gray-800 rounded-xl border shadow-sm overflow-hidden">
+                <div className="p-3 border-b flex gap-3">
+                    <div className="relative flex-1 max-w-xs">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                        <input placeholder="Search Order ID..." className="w-full pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-gray-900 border rounded text-xs focus:ring-1 focus:ring-blue-500 outline-none" onChange={e => setFilters({...filters, orderId: e.target.value})} />
                     </div>
-                    
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-gray-500">Created</label>
-                        <div className="flex gap-1">
-                            <input type="datetime-local" name="dateRangeStart" value={filters.dateRangeStart} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-32 outline-none" />
-                            <input type="datetime-local" name="dateRangeEnd" value={filters.dateRangeEnd} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-32 outline-none" />
-                        </div>
-                    </div>
-
-                    {activeTab === 'qc' && (
-                        <input name="skuName" placeholder="SKU Name" value={filters.skuName} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-32 outline-none" />
-                    )}
-                    
-                    <input name="vendorRefId" placeholder="Vendor Ref ID" value={filters.vendorRefId} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-28 outline-none" />
-                    <input name="orderType" placeholder="Order Type" value={filters.orderType} onChange={handleFilterChange} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs w-28 outline-none" />
-                    
-                    <button onClick={() => setCurrentPage(1)} className="bg-cyan-500 text-white text-xs font-bold uppercase px-4 py-1.5 rounded">Search</button>
-                    <button onClick={clearFilters} className="bg-amber-400 text-white text-xs font-bold uppercase px-4 py-1.5 rounded">Clear</button>
-                </div>
-            </div>
-
-            {/* Table */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-                <div className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-xs font-bold text-gray-500">Showing {filteredOrders.length} orders</p>
-                    <button onClick={handleExport} className="px-3 py-1.5 bg-cyan-500 text-white text-xs font-bold uppercase rounded flex items-center gap-2">
-                        <Download size={14} /> CSV
-                    </button>
+                    <button onClick={fetchOrders} className="p-2 border rounded hover:bg-gray-100"><RefreshCw size={14} className={loading ? 'animate-spin' : ''}/></button>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-[#003B5C] text-white text-[11px] font-bold uppercase">
+                    <table className="w-full text-xs text-left">
+                        <thead className="bg-[#003B5C] text-white font-bold uppercase tracking-wider">
                             <tr>
-                                <th className="p-3 w-8">
+                                <th className="p-4 w-10">
                                     <input 
                                         type="checkbox" 
-                                        checked={selectedIds.length === paginatedOrders.length && paginatedOrders.length > 0}
-                                        onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                        checked={paginatedOrders.length > 0 && selectedIds.length === paginatedOrders.length}
+                                        onChange={handleSelectAll}
+                                        className="rounded border-white/20"
                                     />
                                 </th>
-                                <th className="p-3">Order ID</th>
-                                <th className="p-3">Vendor ID</th>
-                                <th className="p-3">Picker</th>
-                                <th className="p-3">Status</th>
-                                <th className="p-3">Order Type</th>
-                                {activeTab === 'qc' && <th className="p-3 text-center">SKU Count</th>}
-                                <th className="p-3">Payment Mode</th>
-                                <th className="p-3">Amount</th>
-                                <th className="p-3">Created On</th>
-                                <th className="p-3 text-center">Action</th>
+                                <th className="p-4">Order ID</th>
+                                <th className="p-4">Vendor</th>
+                                <th className="p-4">Picker</th>
+                                <th className="p-4 text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300">
-                            {loading ? <tr><td colSpan="10" className="p-10 text-center">Loading...</td></tr> : 
-                             paginatedOrders.map(order => (
-                                <tr key={order._id} className={`hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-colors ${selectedIds.includes(order._id) ? 'bg-cyan-50/30' : ''}`}>
-                                    <td className="p-3 text-center">
+                        <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
+                            {loading ? <tr><td colSpan="5" className="p-10 text-center text-gray-400 uppercase font-black tracking-widest animate-pulse">Syncing Warehouse Queue...</td></tr> : 
+                             paginatedOrders.length === 0 ? <tr><td colSpan="5" className="p-10 text-center text-gray-300 uppercase font-bold italic">No orders in this queue.</td></tr> :
+                             paginatedOrders.map(o => (
+                                <tr key={o._id} className={`hover:bg-blue-50/30 transition-colors border-l-4 ${selectedIds.includes(o._id) ? 'border-blue-500 bg-blue-50/20' : 'border-transparent'}`}>
+                                    <td className="p-4 text-center">
                                         <input 
                                             type="checkbox" 
-                                            checked={selectedIds.includes(order._id)}
-                                            onChange={() => toggleSelect(order._id)}
-                                            className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                                            checked={selectedIds.includes(o._id)}
+                                            onChange={() => handleSelectOne(o._id)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         />
                                     </td>
-                                    <td className="p-3 font-bold text-cyan-600">
-                                        <button 
-                                            onClick={() => { setSelectedOrder(order); setShowDetailsModal(true); }}
-                                            className="hover:underline"
-                                        >
-                                            {order._id.substr(-12).toUpperCase()}
+                                    <td className="p-4 font-bold text-[#003B5C] cursor-pointer hover:underline" onClick={() => handleOpenProcessModal(o)}>{o._id.substr(-8).toUpperCase()}</td>
+                                    <td className="p-4 text-gray-400 font-mono text-[10px]">{o.vendorId}</td>
+                                    <td className="p-4 uppercase text-[10px] font-bold text-gray-600">{o.pickerName || '---'}</td>
+                                    <td className="p-4 text-center">
+                                        <button onClick={() => activeTab === 'qc' ? handleOpenProcessModal(o) : handleMoveToShipping(o._id)} className="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-transform active:scale-90">
+                                            {activeTab === 'qc' ? <Play size={14} fill="currentColor"/> : <Truck size={14}/>}
                                         </button>
                                     </td>
-                                    <td className="p-3">{order.vendorId}</td>
-                                    <td className="p-3">
-                                        <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
-                                            <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400">
-                                                <Package size={10} />
-                                            </div>
-                                            {order.pickerName || 'Unassigned'}
-                                        </div>
-                                    </td>
-                                    <td className="p-3">
-                                        <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-black ${
-                                            activeTab === 'qc' 
-                                            ? 'border-purple-200 bg-purple-50 text-purple-600' 
-                                            : 'border-indigo-200 bg-indigo-50 text-indigo-600'
-                                        }`}>
-                                            {order.status}
-                                        </span>
-                                    </td>
-                                    <td className="p-3">{order.orderType}</td>
-                                    {activeTab === 'qc' && <td className="p-3 text-center">{order.skuCount}</td>}
-                                    <td className="p-3">{order.paymentMethod}</td>
-                                    <td className="p-3 font-bold">₹{order.collectibleAmount.toFixed(2)}</td>
-                                    <td className="p-3">{moment(order.createdAt).format('D MMM YYYY HH:mm')}</td>
-                                    <td className="p-3 text-center">
-                                        {activeTab === 'qc' ? (
-                                            <button 
-                                                onClick={() => handleStartQC(order)} 
-                                                className="text-blue-600 hover:text-blue-800 hover:scale-110 transition-transform bg-blue-50 p-1.5 rounded-full" 
-                                                title="View QC Detail"
-                                            >
-                                                <Play size={16} fill="currentColor" />
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleMoveToShipping(order._id)} 
-                                                className="text-purple-600 hover:text-purple-800 hover:scale-110 transition-transform bg-purple-50 p-1.5 rounded-full" 
-                                                title="Move to Shipping"
-                                            >
-                                                <Truck size={16} />
-                                            </button>
-                                        )}
-                                    </td>
                                 </tr>
-                            ))}
+                             ))}
                         </tbody>
                     </table>
                 </div>
-                {/* Pagination */}
-                <div className="flex justify-end p-4 gap-2">
-                    <button disabled={currentPage===1} onClick={()=>setCurrentPage(c=>Math.max(1,c-1))} className="p-1 rounded bg-gray-100 disabled:opacity-50"><ChevronRight className="rotate-180" size={16}/></button>
-                    <span className="text-xs font-bold pt-1">{currentPage}</span>
-                    <button disabled={currentPage>=totalPages} onClick={()=>setCurrentPage(c=>Math.min(totalPages,c+1))} className="p-1 rounded bg-gray-100 disabled:opacity-50"><ChevronRight size={16}/></button>
-                </div>
             </div>
 
-            {/* Quality Check Detail Modal */}
-            {showQCModal && selectedOrder && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-up">
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 bg-gradient-to-r from-[#003B5C] to-[#005a8d] text-white flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-black uppercase tracking-tight">Quality Check Details</h2>
-                                <p className="text-[10px] font-bold opacity-80 uppercase">Order ID: {selectedOrder._id.toUpperCase()}</p>
-                            </div>
-                            <button onClick={() => setShowQCModal(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Modal Body */}
-                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                            {/* Order Summary Info */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Vendor ID</p>
-                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.vendorId}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Order Type</p>
-                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.orderType}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Payment</p>
-                                    <p className="text-xs font-black text-gray-800 dark:text-white">{selectedOrder.paymentMethod}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Total Amount</p>
-                                    <p className="text-xs font-black text-green-600">₹{selectedOrder.total.toFixed(2)}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Assigned Picker</p>
-                                    <p className="text-xs font-black text-orange-600 uppercase tracking-tighter">{selectedOrder.pickerName || 'NOT ASSIGNED'}</p>
-                                </div>
-                            </div>
-
-                            {/* Item List */}
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-black text-gray-500 uppercase flex items-center gap-2">
-                                    <Package size={14} /> Items To Verify ({selectedOrder.items.length})
-                                </h3>
-                                <div className="space-y-2">
-                                    {selectedOrder.items.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border-l-4 border-cyan-500 rounded shadow-sm border border-gray-100 dark:border-gray-700">
-                                            <div className="space-y-1">
-                                                <p className="text-sm font-bold text-gray-800 dark:text-white">{item.productName}</p>
-                                                <div className="flex gap-4">
-                                                    <p className="text-[10px] text-gray-400">Price: <span className="text-gray-600 font-bold">₹{Number(item.productPrice || item.price || 0).toFixed(2)}</span></p>
-                                                    <p className="text-[10px] text-gray-400">Status: <span className="text-green-500 font-bold">Available</span></p>
-                                                    {item.product?.isPrescriptionRequired
-                                                        ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
-                                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
-                                                    }
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Quantity</p>
-                                                <p className="text-lg font-black text-cyan-600">{item.quantity}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* QC Notes/Checklist (Optional Visual) */}
-                            <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded border border-amber-100 dark:border-amber-900/30 flex gap-3">
-                                <AlertCircle className="text-amber-500 shrink-0" size={18} />
-                                <p className="text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                                    Please verify that the product names, quantities, and batch details match the physical items before passing the quality check.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
-                            <button 
-                                onClick={() => setShowQCModal(false)}
-                                className="px-4 py-2 text-xs font-bold text-gray-500 uppercase hover:text-gray-700 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={confirmQC}
-                                disabled={processingQC}
-                                className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-xs font-black uppercase rounded-lg shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                            >
-                                {processingQC ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                                Pass Quality Check
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Bulk Action Bar */}
+            {/* BULK ACTION BAR */}
             {selectedIds.length > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#003B5C] text-white px-6 py-4 rounded-2xl shadow-2xl z-50 flex items-center gap-8 animate-scale-up border border-white/10 backdrop-blur-md">
-                    <div className="flex items-center gap-3 border-r border-white/20 pr-8">
-                        <div className="bg-cyan-500 p-2 rounded-lg shadow-inner">
-                            <Layers size={18} />
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-[#003B5C] text-white px-8 py-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[100] flex items-center gap-10 animate-scale-up border border-white/10 backdrop-blur-xl">
+                    <div className="flex items-center gap-4 pr-10 border-r border-white/10">
+                        <div className="bg-blue-500 p-2.5 rounded-2xl shadow-inner">
+                            <Package size={22} className="text-white" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Selected</p>
-                            <p className="text-sm font-black">{selectedIds.length} {selectedIds.length === 1 ? 'Order' : 'Orders'}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 opacity-80">Selected</p>
+                            <p className="text-lg font-black tracking-tight">{selectedIds.length} {selectedIds.length === 1 ? 'Order' : 'Orders'}</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bulk Move To:</p>
-                        <div className="flex gap-2">
-                            {activeTab === 'qc' ? (
-                                <button 
-                                    onClick={() => handleBulkStatusUpdate('Packing')}
-                                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
-                                >
-                                    <CheckCircle size={14} /> Packing Stage
-                                </button>
-                            ) : (
-                                <button 
-                                    onClick={() => handleBulkStatusUpdate('Scanned For Shipping')}
-                                    className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2"
-                                >
-                                    <Truck size={14} /> Ready To Ship
-                                </button>
-                            )}
-                            
+                    <div className="flex items-center gap-6">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Step Progression</span>
                             <button 
-                                onClick={() => handleBulkStatusUpdate('Problem Queue')}
-                                className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                                onClick={handleBulkMove}
+                                className="px-8 py-3 bg-white text-[#003B5C] hover:bg-blue-50 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center gap-3 group"
                             >
-                                Problem Queue
+                                <CheckCircle size={18} className="group-hover:rotate-12 transition-transform" />
+                                Move to {activeTab === 'qc' ? 'Packing' : 'Shipping'}
                             </button>
                         </div>
                     </div>
 
                     <button 
                         onClick={() => setSelectedIds([])}
-                        className="text-white/40 hover:text-white transition-colors"
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"
                     >
-                        <X size={20} />
+                        <X size={24} />
                     </button>
                 </div>
             )}
-            {/* Order Details Modal (Mirroring OnlineOrders functionality) */}
-            {showDetailsModal && selectedOrder && createPortal(
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-scale-up border border-gray-200 dark:border-gray-700">
-                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
-                            <div>
-                                <h2 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Order #{selectedOrder._id.substr(-8).toUpperCase()}</h2>
-                                <p className="text-xs text-gray-500 font-medium mt-1">View complete details and items.</p>
-                            </div>
-                            <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button>
-                        </div>
+
+            {/* MAIN PROCESS MODAL */}
+            {showProcessModal && selectedOrder && createPortal(
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-5xl max-h-[92vh] rounded-2xl shadow-xl flex flex-col overflow-hidden border relative animate-scale-up">
                         
-                        <div className="p-6 overflow-y-auto custom-scrollbar">
-                            {/* Detailed Info Grid */}
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                {/* Customer Details */}
-                                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
-                                    <h3 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest">Customer Details</h3>
-                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{selectedOrder.userId?.name || selectedOrder.shippingAddress?.name || 'Guest'}</p>
-                                    {selectedOrder.shippingAddress?.phone && <p className="text-xs text-gray-500 mt-1">📞 {selectedOrder.shippingAddress.phone}</p>}
-                                    <div className="mt-2 pt-2 border-t border-blue-100 dark:border-blue-800 text-xs text-gray-500 space-y-0.5">
-                                        <p>{[selectedOrder.shippingAddress?.city, selectedOrder.shippingAddress?.state].filter(Boolean).join(', ')}</p>
-                                        {selectedOrder.shippingAddress?.pincode && <p>PIN: {selectedOrder.shippingAddress.pincode}</p>}
+                        {/* THE NESTED BATCH MODAL */}
+                        {editingBatchProduct && (
+                            <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/50 animate-fade-in shadow-2xl">
+                                <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh] border border-white/20">
+                                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                                        <h3 className="font-bold text-sm uppercase tracking-tight">Select Batch Matrix</h3>
+                                        <button onClick={() => setEditingBatchProduct(null)} className="p-1 hover:text-red-500 transition-colors"><X size={18}/></button>
+                                    </div>
+                                    <div className="p-4 bg-blue-50/30 border-b">
+                                        <h4 className="font-bold text-sm leading-tight text-[#003B5C] uppercase">{editingBatchProduct.productName}</h4>
+                                        <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase">Required Quantity: <span className="text-blue-600">{editingBatchProduct.requiredQty} UNITS</span></p>
+                                    </div>
+                                    <div className="p-4 overflow-y-auto space-y-2 custom-scrollbar bg-gray-50/30">
+                                        {(batches[editingBatchProduct.pid] || []).map(b => (
+                                            <div 
+                                                key={b._id} 
+                                                onClick={() => { setSelectedBatches({...selectedBatches, [editingBatchProduct.pid]: b._id}); setEditingBatchProduct(null); }}
+                                                className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedBatches[editingBatchProduct.pid] === b._id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20' : 'hover:border-blue-200 bg-white shadow-sm'}`}
+                                            >
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="font-bold text-xs uppercase tracking-tight">Batch: {b.batchNumber}</span>
+                                                    <span className="text-white bg-[#003B5C] px-2.5 py-0.5 rounded text-[9px] font-black uppercase">{b.rackLocation}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[11px] font-bold text-gray-500 mt-2 border-t pt-2">
+                                                    <span>In Stock: <span className={b.quantity >= editingBatchProduct.requiredQty ? 'text-green-600' : 'text-red-500'}>{b.quantity}</span></span>
+                                                    <span>Expiry: {moment(b.expiryDate).format('MMM YYYY')}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-3 border-t bg-gray-50 text-center">
+                                         <button onClick={() => setEditingBatchProduct(null)} className="text-[10px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest transition-colors">Abort Selection</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* HEADER */}
+                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h2 className="font-bold text-lg text-[#003B5C] uppercase tracking-tight">Quality Check Mode</h2>
+                                <p className="text-[10px] text-blue-600 font-bold uppercase flex items-center gap-2 mt-0.5">
+                                    <Clock size={12}/> {selectedOrder._id.substr(-12).toUpperCase()} • Picker: {selectedOrder.pickerName || 'System'}
+                                </p>
+                            </div>
+                            <button onClick={() => setShowProcessModal(false)} className="p-1 hover:text-red-500 transition-colors"><X size={20}/></button>
+                        </div>
+
+                        <div className="flex-1 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x overflow-hidden">
+                            {/* LEFT SIDE: INVENTORY CHECKLIST */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 flex flex-col">
+                                        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Customer</span>
+                                        <span className="text-xs font-bold mt-0.5 truncate">{selectedOrder.userId?.name || selectedOrder.shippingAddress?.name || 'Guest'}</span>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 rounded-lg border flex flex-col">
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">City</span>
+                                        <span className="text-xs font-bold mt-0.5 truncate">{selectedOrder.shippingAddress?.city || selectedOrder.city || 'N/A'}</span>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 rounded-lg border flex flex-col">
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Pricing</span>
+                                        <span className="text-xs font-bold mt-0.5 text-emerald-600">₹{selectedOrder.total}</span>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 rounded-lg border flex flex-col">
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Items</span>
+                                        <span className="text-xs font-bold mt-0.5">{selectedOrder.items?.length} SKUs</span>
                                     </div>
                                 </div>
 
-                                {/* Order Summary */}
-                                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800">
-                                    <h3 className="text-[10px] font-black uppercase text-emerald-600 mb-2 tracking-widest">Order Summary</h3>
-                                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">Total: ₹{typeof selectedOrder.total === 'number' ? selectedOrder.total.toLocaleString() : selectedOrder.collectibleAmount?.toLocaleString()}</p>
-                                    <p className="text-xs text-gray-500 mt-1">💳 Payment: {selectedOrder.paymentMethod}</p>
-                                    <p className="text-xs text-gray-500">📦 Items: {selectedOrder.items?.length || 0}</p>
-                                    <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-800 text-xs text-gray-500 space-y-0.5">
-                                        <p>🏷️ Vendor ID: <span className="font-mono font-bold text-gray-700 dark:text-gray-300">{selectedOrder.vendorId || 'N/A'}</span></p>
-                                        <p>📋 Type: {selectedOrder.orderType || 'N/A'}</p>
-                                        <p>🕐 Placed: {moment(selectedOrder.createdAt).format('DD MMM YYYY, hh:mm A')}</p>
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-black text-[#003B5C]/40 uppercase tracking-[0.3em] px-1">Scanning Checklist</h3>
+                                    <div className="space-y-1.5 min-h-[100px]">
+                                        {loadingBatches ? (
+                                            <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3 border border-dashed rounded-2xl">
+                                                <RefreshCw size={24} className="animate-spin text-blue-500" />
+                                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] animate-pulse">Assigning Batches...</p>
+                                            </div>
+                                        ) : (
+                                            selectedOrder.items.map((it, idx) => {
+                                            const pid = String(it.product?._id || it.product);
+                                            const pBatches = batches[pid] || [];
+                                            const selectedId = selectedBatches[pid];
+                                            const bInfo = pBatches.find(b => b._id === selectedId);
+                                            return (
+                                                <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all ${selectedId ? 'bg-blue-50/20 border-blue-100 shadow-sm' : 'bg-white border-gray-100'}`}>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-sm truncate uppercase tracking-tight text-gray-700">{it.productName}</p>
+                                                        <div className="flex items-center gap-3 mt-1.5">
+                                                            <p className="text-[10px] text-gray-400 font-bold uppercase">Req: <span className="text-blue-600">{it.quantity} UNITS</span></p>
+                                                            {selectedId && <span className="text-[9px] font-bold text-emerald-600 bg-white border border-emerald-100 px-2 rounded flex items-center gap-1"><CheckCircle size={10}/> Batch: {bInfo?.batchNumber}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setEditingBatchProduct({ pid, productName: it.productName, requiredQty: it.quantity })}
+                                                        className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-2 border shadow-sm ${selectedId ? 'bg-white text-blue-600 border-blue-100 hover:shadow-md' : 'bg-blue-600 text-white animate-pulse'}`}
+                                                    >
+                                                        {selectedId ? <><Edit3 size={12}/> Change</> : <><PlusCircle size={12}/> Add</>}
+                                                    </button>
+                                                </div>
+                                            );
+                                        }))}
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Current Status & Picker */}
-                                <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
-                                    <h3 className="text-[10px] font-black uppercase text-purple-600 mb-2 tracking-widest">Processing Info</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Status</p>
-                                            <div className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${getStatusColor(selectedOrder.status)}`}>
-                                                {selectedOrder.status}
+                            {/* RIGHT SIDE: SCAN & PROCESS CONTROLS */}
+                            <div className="w-full md:w-[320px] bg-gray-50 flex flex-col p-6 border-l overflow-y-auto custom-scrollbar">
+                                <div className="space-y-6">
+                                    <h3 className="text-[10px] font-black text-[#003B5C] uppercase tracking-widest px-1">Verification Center</h3>
+                                    
+                                    {qrPayload ? (
+                                        <div className="space-y-6 animate-scale-up">
+                                            {/* QR Section */}
+                                            <div className="bg-white p-5 rounded-2xl shadow-lg border-t-4 border-[#003B5C] flex flex-col items-center gap-4">
+                                                <div className="bg-white p-2 rounded-xl border">
+                                                    <QRCodeSVG value={qrPayload} size={150} level="M" />
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="text-[10px] font-black text-[#003B5C] uppercase tracking-tighter italic">Scanner Protocol Active</p>
+                                                    <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase">Scan QR to verify & move to packing</p>
+                                                </div>
+                                                <div className="w-full relative h-12 flex items-center justify-center bg-gray-900 rounded-xl border border-white/20 group">
+                                                    <input ref={scanInputRef} type="text" value={scanInput} onChange={handleScanInput} autoFocus className="absolute inset-0 opacity-0 cursor-default" />
+                                                    {scanSuccess ? (
+                                                        <div className="text-green-400 font-black text-[10px] gap-2 flex items-center uppercase animate-pulse">
+                                                            <CheckCircle size={14}/> Verified
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 group-focus-within:text-blue-400 transition-colors text-gray-500">
+                                                            <ScanLine size={16} className="animate-pulse" />
+                                                            <span className="text-[9px] font-bold uppercase tracking-widest">Entry Active</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Manual Section (Properly Visible) */}
+                                            <div className="bg-white p-5 rounded-2xl border flex flex-col gap-3 shadow-sm">
+                                                <div className="flex items-center gap-2 text-[#003B5C]">
+                                                    <Edit3 size={14}/>
+                                                    <span className="text-[10px] font-black uppercase tracking-tight">Manual Control</span>
+                                                </div>
+                                                <button 
+                                                    onClick={handleManualPass}
+                                                    className="w-full py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                                                >
+                                                    Move to Packing
+                                                </button>
+                                                <p className="text-[9px] text-gray-400 font-bold text-center uppercase tracking-tighter opacity-50 italic">Log Manual QC Pass</p>
                                             </div>
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Picker</p>
-                                            <p className="text-xs font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight flex items-center gap-1.5">
-                                                <Layers size={14} className="text-purple-400" />
-                                                {selectedOrder.pickerName || 'No Picker assigned'}
-                                            </p>
+                                    ) : (
+                                        <div className="bg-white p-10 rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center gap-4 text-center">
+                                            <div className="p-4 bg-gray-50 rounded-full text-gray-200"><AlertCircle size={32}/></div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">Please complete the checklist to enable controls</p>
                                         </div>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-4 border-t border-purple-100 dark:border-purple-800/50 pt-2 flex justify-between">
-                                        <span>Last Update:</span>
-                                        <span className="font-bold text-gray-700 dark:text-gray-300">{moment(selectedOrder.updatedAt || selectedOrder.createdAt).format('DD MMM YYYY')}</span>
-                                    </p>
+                                    )}
                                 </div>
-                             </div>
-
-                             {/* Items Table */}
-                            <h3 className="text-xs font-black uppercase text-gray-500 tracking-widest mb-3">Order Items</h3>
-                            <div className="border border-gray-100 dark:border-gray-700 overflow-hidden rounded-lg">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 uppercase font-bold">
-                                        <tr>
-                                            <th className="p-3">Product Name</th>
-                                            <th className="p-3 text-center">Prescription</th>
-                                            <th className="p-3 text-center">Qty</th>
-                                            <th className="p-3 text-right">Price</th>
-                                            <th className="p-3 text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                        {selectedOrder.items?.map((item, i) => (
-                                            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                                <td className="p-3 font-medium text-gray-800 dark:text-gray-200">{item.productName}</td>
-                                                <td className="p-3 text-center">
-                                                    {item.product?.isPrescriptionRequired
-                                                        ? <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-black uppercase">Rx Required</span>
-                                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-[10px] font-black uppercase">No Rx</span>
-                                                    }
-                                                </td>
-                                                <td className="p-3 text-center text-gray-600 dark:text-gray-400">{item.quantity}</td>
-                                                <td className="p-3 text-right text-gray-600 dark:text-gray-400">₹{Number(item.productPrice || item.price || 0).toFixed(2)}</td>
-                                                <td className="p-3 text-right font-bold text-gray-800 dark:text-gray-200">₹{(Number(item.productPrice || item.price || 0) * item.quantity).toFixed(2)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
-                        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-end">
-                            <button 
-                                onClick={() => setShowDetailsModal(false)}
-                                className="px-8 py-2.5 bg-gray-800 dark:bg-gray-700 text-white text-xs font-black uppercase rounded-xl hover:bg-gray-700 transition-all active:scale-95 shadow-lg"
-                            >
-                                Close Detail
-                            </button>
+                        
+                        <div className="p-3 bg-white border-t flex justify-between items-center px-6">
+                            <span className="text-[9px] font-bold text-gray-300 uppercase italic">Warehouse Automation Mode v2 • {new Date().toLocaleDateString()}</span>
+                            <button onClick={() => setShowProcessModal(false)} className="px-6 py-2 text-[10px] font-black text-gray-400 hover:text-red-500 uppercase transition-colors">Abort & Exit</button>
                         </div>
                     </div>
                 </div>,

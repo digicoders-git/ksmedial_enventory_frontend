@@ -8,6 +8,8 @@ import api from '../../api/axios';
 import Swal from 'sweetalert2';
 import moment from 'moment';
 import Papa from 'papaparse';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { createPortal } from 'react-dom';
 
 const PicklistGenerated = () => {
@@ -105,6 +107,18 @@ const PicklistGenerated = () => {
     };
 
     const handleStatusUpdate = async (orderId, newStatus) => {
+        const result = await Swal.fire({
+            title: `Move to ${newStatus}?`,
+            text: `Confirming will move this order to the "${newStatus}" stage.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Move It',
+            confirmButtonColor: '#003B5C',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
         try {
             const { data } = await api.put(`/orders/${orderId}/status`, { status: newStatus });
             if (data.success) {
@@ -173,7 +187,54 @@ const PicklistGenerated = () => {
         a.click();
     };
 
-    const getStatusColor = (status) => {
+    const handleDownloadPicklist = (order) => {
+        const doc = new jsPDF();
+        const orderId = order._id.substr(-8).toUpperCase();
+        
+        // PDF Header
+        doc.setFontSize(22);
+        doc.setTextColor(0, 59, 92); // #003B5C
+        doc.text("WAREHOUSE PICKLIST", 105, 20, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Order ID: ${orderId}`, 15, 35);
+        doc.text(`Picker: ${order.pickerName || 'Unassigned'}`, 15, 42);
+        doc.text(`Vendor: ${order.vendorId}`, 15, 49);
+        doc.text(`Date: ${moment().format('DD-MM-YYYY HH:mm')}`, 140, 35);
+        
+        const tableData = order.items.map((it, idx) => [
+            idx + 1,
+            it.productName,
+            it.quantity,
+            it.product?.rackLocation || it.product?.shelf || '---',
+            "[  ]" // Checkbox placeholder
+        ]);
+        
+        autoTable(doc, {
+            startY: 60,
+            head: [['SN', 'Product Name', 'Qty', 'Rack/Shelf', 'Picked']],
+            body: tableData,
+            headStyles: { fillColor: [0, 59, 92], fontSize: 10, halign: 'center' },
+            bodyStyles: { fontSize: 9 },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                2: { halign: 'center' },
+                3: { halign: 'center' },
+                4: { halign: 'center', cellWidth: 20 }
+            }
+        });
+        
+        // Footer line
+        const finalY = doc.lastAutoTable.finalY + 20;
+        doc.setFontSize(10);
+        doc.text("__________________________", 15, finalY);
+        doc.text("Picker Signature", 15, finalY + 7);
+        
+        doc.save(`Picklist_${orderId}.pdf`);
+    };
+
+    const getStatusColor = () => {
         return 'text-purple-600 bg-purple-50 border-purple-200';
     };
 
@@ -382,13 +443,22 @@ const PicklistGenerated = () => {
                                         <td className="p-3 font-bold">₹{order.collectibleAmount.toFixed(2)}</td>
                                         <td className="p-3">{moment(order.createdAt).format('D MMM YYYY HH:mm')}</td>
                                         <td className="p-3 text-center">
-                                            <button 
-                                                onClick={() => { setSelectedOrder(order); setShowModal(true); }}
-                                                className="text-purple-600 hover:text-purple-800 hover:scale-110 transition-transform bg-purple-50 p-1.5 rounded-full" 
-                                                title="View Details"
-                                            >
-                                                <Eye size={16} />
-                                            </button>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button 
+                                                    onClick={() => handleDownloadPicklist(order)}
+                                                    className="text-white bg-blue-600 hover:bg-blue-700 transition-all p-1.5 rounded-lg shadow-sm" 
+                                                    title="Download Picklist"
+                                                >
+                                                    <Printer size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => { setSelectedOrder(order); setShowModal(true); }}
+                                                    className="text-purple-600 hover:text-purple-800 hover:scale-110 transition-transform bg-purple-50 p-1.5 rounded-full" 
+                                                    title="View Details"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
